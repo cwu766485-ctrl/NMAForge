@@ -1,0 +1,199 @@
+{
+  "run_id": "NMAFORGE-V1.3-ROUND33-PERFORMANCE-CLOSURE",
+  "completion_date": "2026-11-25",
+  "timezone": "Asia/Singapore",
+  "status": "PERFORMANCE_CLOSURE_PARTIAL",
+  "branch": "research/nmaforge-v1.3-round33-overlapped-execution",
+  "worktree": "/home/ray/workspace/NMAForge-round33",
+  "base_commit": "651c32db216c34e653575dbeaddaefd4787a5c91",
+  "source_identity": {
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "sha256:292fb106de2fece913a2f662dbd3b3daf2826996a119f61d6052873edd4e1d71",
+    "benchmark/performance_dominance/round33/evidence/source/tb_ai_tensor_matrix_core_round33.sv": "sha256:dcb313e0e47534558e72d514c8938c22281339f0d3478b814e449a489d838642",
+    "benchmark/performance_dominance/round33/evidence/source/tb_tinynpu_native_gemm_l1_round33.sv": "sha256:ec0b0021ff3990da444c6a61d48d9dcecba99a20362a02d74fe89247df7e4354",
+    "dv/block/compute/matrix/formal/ai_matrix_overlap_formal_top.sv": "sha256:c5ba9c09ccffd77fe8e483b3c87c50dfc7684205ee1279761e02f2b0f2bb67fd",
+    "dv/block/compute/matrix/formal/run_overlap_ownership.tcl": "sha256:c5652f8d8afca537a4a143afc465a04e85a9234dce002ff1cac01d14972148ad",
+    "benchmark/performance_dominance/round33/evidence/source/tiny_sram_dp_sim.sv": "sha256:37d6656c4663b40ed29d6fb6cd9ab7426b731e4aaac1c878e4ada9e6feab4253"
+  },
+  "tinynpu": {
+    "commit": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "workspace": "/home/ray/workspace/NMAForge-round33-evidence/tiny-npu",
+    "tracked_source_changes": false,
+    "l1_adapter": "/home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/tiny_sram_dp_sim.sv",
+    "l1_adapter_sha256": "37d6656c4663b40ed29d6fb6cd9ab7426b731e4aaac1c878e4ada9e6feab4253",
+    "notes": [
+      "The VCS adapter changes only the local simulation model for upstream dual always_ff SRAM ports; the pinned TinyNPU source is unchanged.",
+      "The L1 harness maps 16-bit controller address bit 14 to the actual banked_sram ping-pong select, exposing the physical 32 KiB SRAM while retaining the native 1-cycle byte-read service.",
+      "TinyNPU native gemm_ctrl fails the 1x64x256 independent INT8 Golden: k_tiles_r is four bits and K=256 requires 16 K tiles, which encodes as zero. No Tiny source was changed to hide this result."
+    ]
+  },
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "vc_formal": "V-2023.12-SP2",
+    "dc_shell": "unavailable",
+    "TSMC28_STDCELL_DB": "unset"
+  },
+  "cross_project_summary": {
+    "l1_gemm_shapes": [
+      "16x16x16",
+      "16x16x32",
+      "32x32x64",
+      "64x64x64"
+    ],
+    "l1_gemm_tiny_over_nma_ratios": [
+      1.8,
+      2.33147,
+      4.726338,
+      7.593721
+    ],
+    "l1_gemm_geometric_mean_tiny_over_nma": 3.503244,
+    "l1_gemm_minimum_objective_1_05x": "PASS for the four matched INT8 shapes",
+    "l1_gemv_objective_1_20x": "NOT_CLOSED: output precision differs; Tiny K=256 case fails Golden",
+    "l2_shared_cnn_objective_1_10x": "NOT_COMPARABLE: Tiny graph_top is not instantiated by pinned rtl/top.sv",
+    "l0_direct_array": "NOT_COMPARABLE to NMAForge Matrix Core plus SPAD"
+  },
+  "commands": [
+    {
+      "name": "matrix_full_seed_20261122",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/simv +SEED=20261122 -l /home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/matrix_full_random_seed20261122_iter3.log",
+      "result": "PASS: 18 numerical cases and 35 fault scenarios",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/matrix_full_random_seed20261122_iter3.log"
+    },
+    {
+      "name": "gemm_fixed",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/simv +TINY_NPU_MATCH_MULTI +MATRIX_FIXED_MEMORY +SEED=20261122 -l /home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/gemm_fixed.log",
+      "result": "PASS: four fixed-memory GEMM Goldens",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/gemm_fixed.log"
+    },
+    {
+      "name": "gemm_seeded_20261122_24_25",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/simv +TINY_NPU_MATCH_MULTI +SEED=<20261122|20261124|20261125>",
+      "result": "PASS: four GEMM Goldens for each seed",
+      "logs": [
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemm_seed20261122.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemm_seed20261124.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemm_seed20261125.log"
+      ]
+    },
+    {
+      "name": "gemv_fixed_and_seeded",
+      "commands": [
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/simv +ROUND32_GEMV_SUITE +MATRIX_FIXED_MEMORY +SEED=20261122",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/simv +ROUND32_GEMV_SUITE +SEED=<20261122|20261124|20261125>"
+      ],
+      "result": "PASS: all four wide-GEMV signed INT32 Goldens, fixed and all three seeds",
+      "logs": [
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/gemv_fixed_correct.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemv_seed20261122.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemv_seed20261124.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-default/gemv_seed20261125.log"
+      ]
+    },
+    {
+      "name": "output_overlap_backpressure_abort_protection_reset",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/simv +ROUND33_MATRIX_OVERLAP +SEED=20261122",
+      "result": "PASS: 158 overlap cycles, 132 stalled-line checks, abort/protection/reset/recovery",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/overlap.log"
+    },
+    {
+      "name": "product_top_smoke_and_seeded_regression",
+      "commands": [
+        "cd dv/subsystem/top_smoke/sim && make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261122",
+        "cd dv/subsystem/top_smoke/sim && make ai_run AI_RANDOM_CASES=20 AI_SEED=12345"
+      ],
+      "result": "PASS",
+      "logs": [
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/ai_smoke.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/ai_run20.log"
+      ]
+    },
+    {
+      "name": "compute_cluster_uvm_capacity_128_256_512",
+      "command_template": "make -C dv/uvm/sim uvm_compute_cluster_regress SPAD_KIB=<128|256|512> COMPUTE_CLUSTER_UVM_SEEDS=20261122 COMPUTE_CLUSTER_UVM_OUT=/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/uvm-<capacity>k",
+      "result": "PASS at all three capacities; one seed each",
+      "logs": [
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/uvm-128k/seed_20261122/run.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/uvm-256k/seed_20261122/run.log",
+        "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/uvm-512k/seed_20261122/run.log"
+      ]
+    },
+    {
+      "name": "representative_cnn",
+      "command": "cd dv/subsystem/top_smoke/sim && make ai_representative_cnn AI_REPRESENTATIVE_RUN=/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/cnn-representative AI_REPRESENTATIVE_SEED=20261108",
+      "result": "PASS: 20480 Golden words; 59620 command cycles",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/cnn-representative/run.log"
+    },
+    {
+      "name": "deit_round31_partial_output_projection",
+      "command": "cd dv/subsystem/top_smoke/sim && make ai_deit_round31_attention_output_projection_256k AI_DEIT_R31_WO_RUN=/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/deit-round31 AI_DEIT_R31_WO_CHECKPOINT=/tmp/nmaforge_deit_tiny_b3428f18_pytorch_model.bin",
+      "result": "PASS: 72384 Golden words; 64 batches; 16 valid query rows",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/deit-round31/run.log"
+    },
+    {
+      "name": "nma_l1_matched_gemm",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/simv +ROUND33_TINY_FUSED_GEMM +MATRIX_MATCHED_BYTE_BW +SEED=20261122",
+      "result": "PASS: four matched INT8 saturating GEMM Goldens",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/tiny_int8_matched_bw.log"
+    },
+    {
+      "name": "nma_l1_matched_gemv_raw_timing",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/build-final/simv +MATRIX_MATCHED_BYTE_BW +ROUND32_GEMV_SUITE +SEED=20261122",
+      "result": "PASS Goldens; raw cycles retained but no Tiny comparison due INT32-versus-INT8 output mismatch",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/nma_gemv_matched_byte_bw.log"
+    },
+    {
+      "name": "tiny_native_l1_compile",
+      "command": "cd /home/ray/workspace/NMAForge-round33-evidence/tiny-npu && vcs -full64 -sverilog -timescale=1ns/1ps -debug_access+all -Mdir=/home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/csrc -o /home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/simv +incdir+rtl/pkg +incdir+rtl/gemm +incdir+rtl/mem rtl/pkg/npu_pkg.sv rtl/pkg/isa_pkg.sv rtl/pkg/fixed_pkg.sv rtl/graph/fp16_utils.sv /home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/tiny_sram_dp_sim.sv rtl/mem/banked_sram.sv rtl/gemm/mac_int8.sv rtl/gemm/mac_fp16.sv rtl/gemm/pe.sv rtl/gemm/systolic_array.sv rtl/gemm/gemm_ctrl.sv /home/ray/workspace/NMAForge-round33/benchmark/performance_dominance/round33/evidence/source/tb_tinynpu_native_gemm_l1_round33.sv -top tb_tinynpu_native_gemm_l1_round33 -l /home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/compile_round33_iter5.log",
+      "result": "PASS compile",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/compile_round33_iter5.log"
+    },
+    {
+      "name": "tiny_native_l1_execution",
+      "command": "/home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/simv -l /home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/run_round33_iter6.log",
+      "result": "7 workload Goldens pass; 1x64x256 emits $fatal for 64/64 mismatches; simulator process exit status is 0",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/tiny-native-l1/run_round33_iter6.log"
+    },
+    {
+      "name": "gemv_request_stability_formal",
+      "command": "make -C dv/block/compute/matrix/formal gemv-request-stability RUN_TAG=round33 GEMV_REQUEST_OUT=/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-gemv-stability",
+      "result": "PASS: 1 non-vacuous assertion proven; 1 backpressure cover reached",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-gemv-stability/vc_formal.log"
+    },
+    {
+      "name": "new_output_overlap_formal",
+      "command": "cd /home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-overlap && timeout --kill-after=5s 360s /opt/Synopsys/vc_formal/V-2023.12-SP2/bin/vcf -fmode FPV -batch -no_restore -lic_wait 1 -f /home/ray/workspace/NMAForge-round33/dv/block/compute/matrix/formal/run_overlap_ownership.tcl -output_log_file vc_formal.log",
+      "result": "PARTIAL: 2 of 4 assertions proven; timeout at 360 seconds; remaining two unresolved",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-overlap/vc_formal.log"
+    },
+    {
+      "name": "matrix_fsm_guard_formal",
+      "command": "make -C dv/block/compute/matrix/formal fsm-guards RUN_TAG=round33 OUT=/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-fsm",
+      "result": "PARTIAL: 1 of 5 assertions proven before timeout at 360 seconds",
+      "log": "/home/ray/workspace/NMAForge-round33-evidence/overlap-a/round33/formal-fsm/vc_formal.log"
+    },
+    {
+      "name": "ppa_guardrail_probe",
+      "command": "command -v dc_shell; inspect TSMC28_STDCELL_DB and private library variables",
+      "result": "BLOCKED_ENV: dc_shell not found; TSMC28_STDCELL_DB unset",
+      "log": "benchmark/performance_dominance/round33/evidence/resource_and_ppa.csv"
+    }
+  ],
+  "not_run_or_not_supported": [
+    "TinyNPU L2 graph/Product Top + DMA/runtime is unavailable at the pinned source: graph_top is not instantiated and graph status is tied off.",
+    "Shared CNN TinyNPU L2 speed comparison remains NOT_COMPARABLE.",
+    "GPT-2 target was not run because it retrains the model; Round33 explicitly prohibits starting retraining.",
+    "DeiT twelve-layer development was not run, per Round33 scope.",
+    "No DC/PPA was produced because the configured synthesis tool and compatible private TSMC28 libraries were unavailable."
+  ],
+  "artifacts": {
+    "comparison": "benchmark/performance_dominance/round33/evidence/comparison.csv",
+    "exclusive_cycle_breakdown": "benchmark/performance_dominance/round33/evidence/cycle_breakdown.csv",
+    "ablations": "benchmark/performance_dominance/round33/evidence/ablation.csv",
+    "resources_and_ppa": "benchmark/performance_dominance/round33/evidence/resource_and_ppa.csv",
+    "verification_and_formal": "benchmark/performance_dominance/round33/evidence/verification_formal.csv",
+    "raw_logs_archive": "benchmark/performance_dominance/round33/evidence/raw_logs.tar.gz",
+    "raw_logs_archive_sha256": "sha256:9a6e7ec3a99828af157e65fabbf4113a104e6d073a05e6b0de0c2b057918f3cc",
+    "raw_logs_file_count": 28,
+    "raw_logs_uncompressed_bytes": 8656186,
+    "raw_logs_index": "embedded as raw_logs/index.json in the archive"
+  }
+}

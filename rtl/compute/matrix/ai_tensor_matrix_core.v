@@ -12,7 +12,10 @@ module ai_tensor_matrix_core #(
     parameter integer ENABLE_GEMV_B_TILE_CACHE = 1,
     parameter integer ENABLE_GEMM_B_TILE_CACHE = 1,
     parameter integer ENABLE_ELASTIC_TILE_FORWARDING = 1,
-    parameter integer ENABLE_FUSED_PINGPONG_WRITEBACK = 1
+    parameter integer ENABLE_FUSED_PINGPONG_WRITEBACK = 1,
+    parameter integer ENABLE_MATRIX_OUTPUT_OVERLAP = 1,
+    parameter integer ENABLE_MATRIX_DIRECT_PREFETCH = 1,
+    parameter integer ENABLE_GEMV_FILL_MAC_OVERLAP = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -182,6 +185,10 @@ module ai_tensor_matrix_core #(
     reg gemv_b_bulk_fill_r;
     reg gemv_b_panel_cached_r;
     reg gemv_b_fill_next_panel_r;
+    reg gemv_b_stream_enable_r;
+    reg gemv_next_panel_kick_pending_r;
+    reg gemv_panel_advance_pending_r;
+    reg [A_TILE_CACHE_K_WORDS-1:0] gemv_a_stream_valid_r;
     reg [15:0] gemv_k_elements_r;
     reg [31:0] watchdog_limit_r;
 
@@ -192,6 +199,19 @@ module ai_tensor_matrix_core #(
     reg [31:0] bias_tile_base_r;
     reg [31:0] src0_batch_stride_r, src1_batch_stride_r, dst_batch_stride_r;
     reg [31:0] dst_row_stride_r;
+    // One completed 16x16 output tile can drain to SPAD while the live MAC
+    // array starts the next tile. Values are post-processed into INT32 at the
+    // ownership transfer, so the decoupling buffer is exactly 1 KiB.
+    reg matrix_overlap_enabled_r;
+    reg matrix_overlap_capture_pending_r;
+    reg matrix_overlap_wb_active_r;
+    reg [31:0] matrix_overlap_output_r [0:255];
+    reg [31:0] matrix_overlap_dst_base_r;
+    reg [31:0] matrix_overlap_row_stride_r;
+    reg [3:0] matrix_overlap_write_row_r;
+    reg [3:0] matrix_overlap_write_col_r;
+    reg [31:0] perf_matrix_overlap_cycles;
+    wire prefetch_direct_kick;
     reg [127:0] fused_line_buffer_r;
     reg fused_commit_pending_r;
     wire [31:0] fused_word_current;
@@ -284,6 +304,22 @@ module ai_tensor_matrix_core #(
                                              gemv_b_prefetch_remaining;
     wire [31:0] b_group_count = gemv_kfold_r ? gemv_k_valid_lanes :
                                                        (valid_cols >> 2);
+    wire [3:0] gemv_next_k_group_index = k_group_r[3:0] + 1'b1;
+    wire [A_TILE_CACHE_K_WORDS-1:0] gemv_stream_required_mask =
+        {A_TILE_CACHE_K_WORDS{1'b1}} >>
+        (A_TILE_CACHE_K_WORDS - k_words_r);
+    wire gemv_bulk_stream_panel_ready =
+        ((gemv_b_cache_valid_r & gemv_stream_required_mask) ==
+         gemv_stream_required_mask) &&
+        ((gemv_a_stream_valid_r & gemv_stream_required_mask) ==
+         gemv_stream_required_mask);
+    wire gemv_bulk_stream_first_ready = gemv_b_stream_enable_r &&
+        (ENABLE_GEMV_FILL_MAC_OVERLAP ?
+         (gemv_b_cache_valid_r[0] && gemv_a_stream_valid_r[0]) :
+         gemv_bulk_stream_panel_ready);
+    wire gemv_bulk_stream_next_ready = gemv_b_stream_enable_r &&
+        gemv_b_cache_valid_r[gemv_next_k_group_index] &&
+        gemv_a_stream_valid_r[gemv_next_k_group_index];
     wire [31:0] gemv_a_row_stride =
         ({16'd0,gemv_k_elements_r} + 32'd15) & 32'hffff_fff0;
     wire [31:0] gemv_b_row_stride =
@@ -294,7 +330,9 @@ module ai_tensor_matrix_core #(
         ({16'd0,col_tile_r} + {31'd0,gemv_b_fill_next_panel_r}) *
         ARRAY_SIZE;
     wire [31:0] prefetch_gemv_k_remaining =
-        {16'd0,gemv_k_elements_r} - ({16'd0,prefetch_k_group_r} << 2);
+        {16'd0,gemv_k_elements_r} -
+        ({16'd0,(prefetch_direct_kick ? prefetch_kick_k_group :
+                                       prefetch_k_group_r)} << 2);
     wire [31:0] prefetch_gemv_k_valid_lanes =
         prefetch_gemv_k_remaining > 32'd4 ? 32'd4 :
                                                    prefetch_gemv_k_remaining;
@@ -325,37 +363,47 @@ module ai_tensor_matrix_core #(
                                                     legacy_a_read_addr;
     wire [31:0] b_read_addr = gemv_kfold_r ? gemv_b_read_addr :
                                                     legacy_b_read_addr;
-    wire prefetch_active = (prefetch_state_r != PF_IDLE);
+    wire prefetch_active;
+    wire prefetch_issue_active;
     wire tile_forward_a_copy = (state_r == ST_A_REQ) &&
                                tile_forward_consume_active_r;
     wire prefetch_is_b_req = (prefetch_state_r == PF_B_REQ);
-    wire prefetch_request_pending =
-        ((prefetch_state_r == PF_A_REQ) && (prefetch_group_r < a_group_count)) ||
-        ((prefetch_state_r == PF_B_REQ) &&
-         (prefetch_group_r < prefetch_b_group_count));
+    wire prefetch_request_pending;
+    wire prefetch_direct_is_b;
+    wire prefetch_request_is_b = prefetch_direct_kick ?
+        prefetch_direct_is_b : prefetch_is_b_req;
+    wire [15:0] prefetch_address_k_group = prefetch_direct_kick ?
+        prefetch_kick_k_group : prefetch_k_group_r;
     wire [31:0] prefetch_word_offset =
-        (({29'd0,prefetch_group_r} * {16'd0,k_words_r}) +
-         {16'd0,prefetch_k_group_r}) << 4;
+        (({29'd0,(prefetch_direct_kick ? 3'd0 : prefetch_group_r)} *
+          {16'd0,k_words_r}) + {16'd0,prefetch_address_k_group}) << 4;
     wire [31:0] prefetch_a_addr = a_tile_base_r + prefetch_word_offset;
     wire [31:0] prefetch_b_addr = b_tile_base_r + prefetch_word_offset;
     wire [31:0] prefetch_gemv_a_addr =
-        (a_tile_base_r + ({29'd0,prefetch_group_r} * gemv_a_row_stride) +
-         ({16'd0,prefetch_k_group_r} << 2)) & 32'hffff_fff0;
+        (a_tile_base_r + ({29'd0,(prefetch_direct_kick ? 3'd0 :
+                                   prefetch_group_r)} * gemv_a_row_stride) +
+         ({16'd0,prefetch_address_k_group} << 2)) & 32'hffff_fff0;
     wire [31:0] prefetch_gemv_b_addr = b_tile_base_r +
-        ((({16'd0,prefetch_k_group_r} << 2) +
-          {29'd0,prefetch_group_r}) * gemv_b_row_stride) +
+        ((({16'd0,prefetch_address_k_group} << 2) +
+          {29'd0,(prefetch_direct_kick ? 3'd0 : prefetch_group_r)}) *
+         gemv_b_row_stride) +
         gemv_prefetch_col_tile_offset;
     wire [31:0] prefetch_read_addr = gemv_kfold_r ?
-        (prefetch_is_b_req ? prefetch_gemv_b_addr : prefetch_gemv_a_addr) :
-        (prefetch_is_b_req ? prefetch_b_addr : prefetch_a_addr);
-    wire banked_request_is_prefetch = prefetch_active;
-    wire banked_request_is_b = prefetch_active ? prefetch_is_b_req :
+        (prefetch_request_is_b ? prefetch_gemv_b_addr : prefetch_gemv_a_addr) :
+        (prefetch_request_is_b ? prefetch_b_addr : prefetch_a_addr);
+    wire banked_request_is_prefetch = prefetch_issue_active;
+    wire banked_request_is_b = prefetch_direct_kick ? prefetch_direct_is_b :
+                               prefetch_active ? prefetch_is_b_req :
                                (state_r == ST_B_REQ);
-    wire [2:0] banked_request_group = prefetch_active ? prefetch_group_r :
+    wire [2:0] banked_request_group = prefetch_direct_kick ? 3'd0 :
+                                      prefetch_active ? prefetch_group_r :
                                       read_group_r;
-    wire [15:0] banked_request_k_group = prefetch_active ?
-                                         prefetch_k_group_r : k_group_r;
-    wire banked_request_buffer = prefetch_active ? prefetch_buffer_r : 1'b0;
+    wire [15:0] banked_request_k_group = prefetch_direct_kick ?
+                                         prefetch_kick_k_group :
+                                         prefetch_active ? prefetch_k_group_r :
+                                         k_group_r;
+    wire banked_request_buffer = prefetch_direct_kick ? prefetch_kick_buffer :
+                                 prefetch_active ? prefetch_buffer_r : 1'b0;
     wire gemv_a_line_reuse = gemv_kfold_r && (k_group_r[1:0] != 2'b00);
     wire [32:0] gemv_b_cache_end = {1'b0,b_batch_base_r} +
         ({17'd0,gemv_k_elements_r} * gemv_b_row_stride);
@@ -418,6 +466,21 @@ module ai_tensor_matrix_core #(
         (read_group_r == 0) && gemm_b_cache_hit;
     wire gemm_b_cache_prefetch_copy = prefetch_kick &&
         (prefetch_state_r == PF_IDLE) && gemm_b_cache_prefetch_hit;
+    assign prefetch_direct_is_b = gemv_kfold_r &&
+                                  (prefetch_kick_k_group[1:0] != 2'b00);
+    assign prefetch_direct_kick = ENABLE_MATRIX_DIRECT_PREFETCH &&
+        prefetch_kick &&
+        (prefetch_state_r == PF_IDLE) && !tile_forward_consume_active_r &&
+        ((!gemv_kfold_r && !a_cache_prefetch_hit) ||
+         (gemv_kfold_r && !gemv_b_bulk_fill_r &&
+          !gemv_b_prefetch_hit));
+    assign prefetch_active = (prefetch_state_r != PF_IDLE);
+    assign prefetch_issue_active = prefetch_active || prefetch_direct_kick;
+    assign prefetch_request_pending = prefetch_direct_kick ||
+        ((prefetch_state_r == PF_A_REQ) &&
+         (prefetch_group_r < a_group_count)) ||
+        ((prefetch_state_r == PF_B_REQ) &&
+         (prefetch_group_r < prefetch_b_group_count));
     wire a_cache_initial_copy = (state_r == ST_A_REQ) &&
                                 (read_group_r == 0) && a_cache_initial_hit;
     wire a_cache_prefetch_copy = prefetch_kick &&
@@ -430,7 +493,7 @@ module ai_tensor_matrix_core #(
                                 gemv_a_prefetch_reuse;
     wire bank_response_has_parity_error = |bank_parity_error;
     wire banked_read_accept = banked_read_valid && banked_ready;
-    wire read_request_pending = prefetch_active ? prefetch_request_pending :
+    wire read_request_pending = prefetch_issue_active ? prefetch_request_pending :
         (((state_r == ST_A_REQ) && !a_cache_initial_copy &&
           !tile_forward_a_copy &&
           !gemv_a_line_reuse &&
@@ -531,6 +594,26 @@ module ai_tensor_matrix_core #(
     wire [127:0] fused_commit_data = fused_commit_bank_r ?
         fused_line_buffer1_r : fused_line_buffer_r;
     wire fused_pingpong_commit = fused_line_full_r[fused_commit_bank_r] && line_ready;
+    wire matrix_overlap_tile_eligible = matrix_overlap_enabled_r &&
+        (valid_rows == 32'd16) && (valid_cols == 32'd16);
+    wire matrix_overlap_launch = (state_r == ST_NEXT) &&
+        matrix_overlap_capture_pending_r && !matrix_overlap_wb_active_r;
+    wire [7:0] matrix_overlap_index0 =
+        {matrix_overlap_write_row_r,4'b0} + {4'd0,matrix_overlap_write_col_r};
+    wire [31:0] matrix_overlap_word0 =
+        matrix_overlap_output_r[matrix_overlap_index0];
+    wire [31:0] matrix_overlap_word1 =
+        matrix_overlap_output_r[matrix_overlap_index0 + 8'd1];
+    wire [31:0] matrix_overlap_word2 =
+        matrix_overlap_output_r[matrix_overlap_index0 + 8'd2];
+    wire [31:0] matrix_overlap_word3 =
+        matrix_overlap_output_r[matrix_overlap_index0 + 8'd3];
+    wire [31:0] matrix_overlap_line_addr = matrix_overlap_dst_base_r +
+        ({28'd0,matrix_overlap_write_row_r} * matrix_overlap_row_stride_r) +
+        ({28'd0,matrix_overlap_write_col_r} << 2);
+    wire matrix_overlap_write_accept = matrix_overlap_wb_active_r && line_ready;
+    wire matrix_overlap_write_fault = matrix_overlap_write_accept &&
+                                      line_protection_error;
     wire gemv_kfold_command = (op_mode == OP_TENSOR_GEMV_KFOLD);
     wire valid_operation = (op_mode == OP_TENSOR_GEMM) ||
                            (op_mode == OP_TENSOR_BATCH_GEMM) ||
@@ -581,11 +664,39 @@ module ai_tensor_matrix_core #(
          gemv_b_cache_hit && !abort && !watchdog_expired);
     wire gemv_bulk_initial_operand_load =
         (state_r == ST_GEMV_B_FILL) &&
-        prefetch_valid_r[~compute_buffer_r];
-    wire gemv_bulk_next_operand_load = (state_r == ST_MAC) &&
-        gemv_b_panel_cached_r && !last_k_group;
+        (gemv_b_stream_enable_r ? gemv_bulk_stream_first_ready :
+         prefetch_valid_r[~compute_buffer_r]);
+    wire gemv_bulk_next_operand_load = gemv_b_panel_cached_r &&
+        !last_k_group &&
+        (!gemv_b_stream_enable_r || gemv_bulk_stream_next_ready) &&
+        ((state_r == ST_MAC) ||
+         (gemv_b_stream_enable_r && (state_r == ST_PREFETCH_WAIT)));
     wire gemv_bulk_operand_load = gemv_bulk_initial_operand_load ||
                                   gemv_bulk_next_operand_load;
+    // K-group operand words are already present in the inactive read buffer
+    // when prefetch_valid is raised. Load lane zero there on the final MAC
+    // edge, or on the last prefetch-wait edge, to remove a standalone PREP.
+    wire matrix_next_operand_preload = !gemv_kfold_r &&
+        prefetch_valid_r[~compute_buffer_r] &&
+        (((state_r == ST_MAC) && (lane_r == 2'd3) && !last_k_group) ||
+         (state_r == ST_PREFETCH_WAIT));
+    wire matrix_operand_source_buffer = matrix_next_operand_preload ?
+        ~compute_buffer_r : compute_buffer_r;
+    wire gemv_stream_next_operand_preload = gemv_kfold_r &&
+        !gemv_b_bulk_fill_r && !gemv_b_panel_cached_r &&
+        prefetch_valid_r[~compute_buffer_r] &&
+        (((state_r == ST_MAC) && !last_k_group) ||
+         (state_r == ST_PREFETCH_WAIT));
+    wire [15:0] gemv_operand_load_k_group =
+        gemv_stream_next_operand_preload ? (k_group_r + 1'b1) : k_group_r;
+    wire gemv_operand_source_buffer = gemv_stream_next_operand_preload ?
+        ~compute_buffer_r : compute_buffer_r;
+    wire [31:0] gemv_operand_load_k_remaining =
+        {16'd0,gemv_k_elements_r} -
+        ({16'd0,gemv_operand_load_k_group} << 2);
+    wire [31:0] gemv_operand_load_k_valid_lanes =
+        gemv_operand_load_k_remaining > 32'd4 ? 32'd4 :
+                                                 gemv_operand_load_k_remaining;
     wire [15:0] gemv_bulk_operand_k_group =
         gemv_bulk_initial_operand_load ? 16'd0 : (k_group_r + 1'b1);
     wire [31:0] gemv_bulk_operand_k_remaining =
@@ -792,14 +903,14 @@ module ai_tensor_matrix_core #(
     always @* begin
         banked_read_valid = 1'b0;
         banked_addr = 32'd0;
-        if (prefetch_active && prefetch_request_pending &&
+        if (prefetch_issue_active && prefetch_request_pending &&
             (read_outstanding_count < MAX_OUTSTANDING_READS) &&
             (state_r != ST_ERROR_DRAIN) && (state_r != ST_ERROR) &&
             !abort && !watchdog_expired && !banked_response_fault &&
             !banked_response_context_fault) begin
             banked_read_valid = 1'b1;
             banked_addr = prefetch_read_addr;
-        end else if (!prefetch_active && (state_r == ST_A_REQ) &&
+        end else if (!prefetch_issue_active && (state_r == ST_A_REQ) &&
             !a_cache_initial_copy &&
             !tile_forward_a_copy &&
             !gemv_a_line_reuse &&
@@ -809,7 +920,7 @@ module ai_tensor_matrix_core #(
             !banked_response_context_fault) begin
             banked_read_valid = 1'b1;
             banked_addr = a_read_addr;
-        end else if (!prefetch_active && (state_r == ST_B_REQ) &&
+        end else if (!prefetch_issue_active && (state_r == ST_B_REQ) &&
                      !gemm_b_cache_initial_copy &&
                      (read_group_r < b_group_count) &&
                      (read_outstanding_count < MAX_OUTSTANDING_READS) &&
@@ -841,8 +952,14 @@ module ai_tensor_matrix_core #(
             line_addr = fused_commit_bank_r ? fused_line_addr1_r : fused_line_addr0_r;
             line_wdata = fused_commit_data;
         end
+        if (matrix_overlap_wb_active_r) begin
+            line_valid = 1'b1;
+            line_addr = matrix_overlap_line_addr;
+            line_wdata = {matrix_overlap_word3,matrix_overlap_word2,
+                          matrix_overlap_word1,matrix_overlap_word0};
+        end
 
-        if (state_r == ST_PREP_MAC)
+        if (matrix_next_operand_preload || (state_r == ST_PREP_MAC))
             array_load_lane = 2'd0;
         else if ((state_r == ST_MAC) && (lane_r != 2'd3))
             array_load_lane = lane_r + 1'b1;
@@ -872,15 +989,18 @@ module ai_tensor_matrix_core #(
                              (vector_i/4)*4)+3],
                         gemv_bulk_operand_k_group[1:0],vector_i%4,1'b0);
                 else if (((vector_i / 4) >= valid_rows) ||
-                         ((vector_i % 4) >= gemv_k_valid_lanes))
+                         ((vector_i % 4) >=
+                          (gemv_stream_next_operand_preload ?
+                           gemv_operand_load_k_valid_lanes :
+                           gemv_k_valid_lanes)))
                     array_load_a[vector_i*8 +: 8] = 8'd0;
                 else
                     array_load_a[vector_i*8 +: 8] = matrix_tile_element(
-                        a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
-                        a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
-                        a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
-                        a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
-                        k_group_r[1:0],vector_i%4,1'b0);
+                        a_tile_words_r[gemv_operand_source_buffer][(vector_i/4)*4+0],
+                        a_tile_words_r[gemv_operand_source_buffer][(vector_i/4)*4+1],
+                        a_tile_words_r[gemv_operand_source_buffer][(vector_i/4)*4+2],
+                        a_tile_words_r[gemv_operand_source_buffer][(vector_i/4)*4+3],
+                        gemv_operand_load_k_group[1:0],vector_i%4,1'b0);
                 array_load_b[vector_i*8 +: 8] = 8'd0;
                 for (matrix_col_i = 0; matrix_col_i < ARRAY_SIZE;
                      matrix_col_i = matrix_col_i + 1) begin
@@ -898,40 +1018,48 @@ module ai_tensor_matrix_core #(
                                 ((vector_i%4)*4)+(matrix_col_i/4)]
                                 [(matrix_col_i%4)*8 +: 8];
                     else if (((vector_i / 4) >= valid_rows) ||
-                        ((vector_i % 4) >= gemv_k_valid_lanes) ||
+                        ((vector_i % 4) >=
+                         (gemv_stream_next_operand_preload ?
+                          gemv_operand_load_k_valid_lanes :
+                          gemv_k_valid_lanes)) ||
                         (matrix_col_i >= valid_cols))
                         array_load_b_matrix[
                             (vector_i*ARRAY_SIZE+matrix_col_i)*8 +: 8] = 8'd0;
                     else
                         array_load_b_matrix[
                             (vector_i*ARRAY_SIZE+matrix_col_i)*8 +: 8] =
-                            b_tile_words_r[compute_buffer_r][
+                            b_tile_words_r[gemv_operand_source_buffer][
                                 ((vector_i%4)*4)+(matrix_col_i/4)]
                                 [(matrix_col_i%4)*8 +: 8];
                 end
             end else begin
                 array_load_a[vector_i*8 +: 8] = matrix_tile_element(
-                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
-                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
-                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
-                    a_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
+                    a_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+0],
+                    a_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+1],
+                    a_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+2],
+                    a_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+3],
                     vector_i%4,array_load_lane,transpose_a_r);
                 array_load_b[vector_i*8 +: 8] = matrix_tile_element(
-                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+0],
-                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+1],
-                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+2],
-                    b_tile_words_r[compute_buffer_r][(vector_i/4)*4+3],
+                    b_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+0],
+                    b_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+1],
+                    b_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+2],
+                    b_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+3],
                     vector_i%4,array_load_lane,transpose_b_r);
             end
         end
     end
 
     assign array_buffer_write_valid = (state_r == ST_PREP_MAC) ||
+                                      matrix_next_operand_preload ||
+                                      gemv_stream_next_operand_preload ||
                                       gemv_bulk_initial_operand_load ||
                                       gemv_bulk_next_operand_load ||
                                       ((state_r == ST_MAC) && !gemv_kfold_r &&
                                        (lane_r != 2'd3));
-    assign array_buffer_write_bank = gemv_bulk_next_operand_load ?
+    assign array_buffer_write_bank = (matrix_next_operand_preload ||
+                                      gemv_stream_next_operand_preload) ?
+                                     1'b0 :
+                                     gemv_bulk_next_operand_load ?
                                      ~compute_buffer_r :
                                      ((state_r == ST_PREP_MAC) ||
                                       gemv_bulk_initial_operand_load) ?
@@ -939,7 +1067,9 @@ module ai_tensor_matrix_core #(
     assign array_mac_enable = (state_r == ST_MAC) && !abort &&
                               !watchdog_expired;
     assign array_clear_accumulators = ((state_r == ST_IDLE) && start) ||
-                                      (state_r == ST_NEXT) ||
+                                      ((state_r == ST_NEXT) &&
+                                       (!matrix_overlap_capture_pending_r ||
+                                        !matrix_overlap_wb_active_r)) ||
                                       gemv_cached_last_write;
 
     ai_tensor_matrix_array #(
@@ -987,21 +1117,43 @@ module ai_tensor_matrix_core #(
                 prefetch_state_r <= PF_IDLE;
                 prefetch_valid_r <= 2'b00;
             end else if (prefetch_kick && (prefetch_state_r == PF_IDLE)) begin
-                prefetch_group_r <= 3'd0;
                 prefetch_k_group_r <= prefetch_kick_k_group;
                 prefetch_buffer_r <= prefetch_kick_buffer;
                 prefetch_valid_r[prefetch_kick_buffer] <= 1'b0;
-                if (gemv_b_bulk_fill_r)
+                if (prefetch_direct_kick && banked_read_accept) begin
+                    if (prefetch_direct_is_b) begin
+                        if (prefetch_b_group_count <= 32'd1) begin
+                            prefetch_group_r <= 3'd0;
+                            prefetch_state_r <= PF_B_DRAIN;
+                        end else begin
+                            prefetch_group_r <= 3'd1;
+                            prefetch_state_r <= PF_B_REQ;
+                        end
+                    end else if (a_group_count <= 32'd1) begin
+                        prefetch_group_r <= 3'd0;
+                        if (gemv_kfold_r && !gemv_b_bulk_fill_r)
+                            prefetch_state_r <= PF_A_DRAIN;
+                        else
+                            prefetch_state_r <= gemm_b_cache_prefetch_hit ?
+                                                PF_B_DRAIN : PF_B_REQ;
+                    end else begin
+                        prefetch_group_r <= 3'd1;
+                        prefetch_state_r <= PF_A_REQ;
+                    end
+                end else begin
+                    prefetch_group_r <= 3'd0;
+                    if (gemv_b_bulk_fill_r)
                     prefetch_state_r <=
                         (prefetch_kick_k_group[1:0] == 2'b00) ?
                         PF_A_REQ : PF_B_REQ;
-                else
-                    prefetch_state_r <=
+                    else
+                        prefetch_state_r <=
                         (a_cache_prefetch_hit || gemv_a_prefetch_reuse ||
                          tile_forward_consume_active_r) ?
                         ((gemv_b_prefetch_hit || gemm_b_cache_prefetch_hit) ?
                          PF_B_DRAIN : PF_B_REQ) :
                         PF_A_REQ;
+                end
             end else begin
                 case (prefetch_state_r)
                     PF_A_REQ: begin
@@ -1077,6 +1229,7 @@ module ai_tensor_matrix_core #(
             perf_arbiter_stall_cycles <= 32'd0;
             perf_response_wait_cycles <= 32'd0;
             perf_writeback_wait_cycles <= 32'd0;
+            perf_matrix_overlap_cycles <= 32'd0;
             perf_prefetch_a_req_cycles <= 32'd0;
             perf_prefetch_a_drain_cycles <= 32'd0;
             perf_prefetch_b_req_cycles <= 32'd0;
@@ -1132,6 +1285,10 @@ module ai_tensor_matrix_core #(
             gemv_b_bulk_fill_r <= 1'b0;
             gemv_b_panel_cached_r <= 1'b0;
             gemv_b_fill_next_panel_r <= 1'b0;
+            gemv_b_stream_enable_r <= 1'b0;
+            gemv_next_panel_kick_pending_r <= 1'b0;
+            gemv_panel_advance_pending_r <= 1'b0;
+            gemv_a_stream_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
             gemv_k_elements_r <= 16'd0;
             watchdog_limit_r <= 32'd0;
             a_batch_base_r <= 32'd0;
@@ -1148,6 +1305,13 @@ module ai_tensor_matrix_core #(
             src1_batch_stride_r <= 32'd0;
             dst_batch_stride_r <= 32'd0;
             dst_row_stride_r <= 32'd0;
+            matrix_overlap_enabled_r <= 1'b0;
+            matrix_overlap_capture_pending_r <= 1'b0;
+            matrix_overlap_wb_active_r <= 1'b0;
+            matrix_overlap_dst_base_r <= 32'd0;
+            matrix_overlap_row_stride_r <= 32'd0;
+            matrix_overlap_write_row_r <= 4'd0;
+            matrix_overlap_write_col_r <= 4'd0;
             fused_line_buffer_r <= 128'd0;
             fused_commit_pending_r <= 1'b0;
             fused_line_buffer1_r <= 128'd0;
@@ -1172,12 +1336,15 @@ module ai_tensor_matrix_core #(
                 b_tile_words_r[1][reset_i] <= 32'd0;
                 bias_words_r[reset_i] <= 32'sd0;
             end
+            for (reset_i = 0; reset_i < 256; reset_i = reset_i + 1)
+                matrix_overlap_output_r[reset_i] <= 32'd0;
             a_cache_base_r <= 32'd0;
             a_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
             gemv_b_cache_valid_r <= {A_TILE_CACHE_K_WORDS{1'b0}};
             for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1) begin
                 a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                 gemv_b_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
+                gemv_a_stream_valid_r[cache_i] <= 1'b0;
                 for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1)
                     a_tile_cache_words_r[cache_i][reset_i] <= 32'd0;
             end
@@ -1193,6 +1360,40 @@ module ai_tensor_matrix_core #(
             done <= 1'b0;
             prefetch_kick <= 1'b0;
             prefetch_consume <= 1'b0;
+
+            // Transfer one complete, post-processed tile to its output owner.
+            // The line writer then advances independently of the MAC FSM.
+            if (matrix_overlap_launch) begin
+                for (reset_i = 0; reset_i < 256; reset_i = reset_i + 1)
+                    matrix_overlap_output_r[reset_i] <= post_process_matrix(
+                        $signed(array_accumulator_vector[reset_i*64 +: 64]),
+                        32'sd0,scale_shift_r,activation_r);
+                matrix_overlap_dst_base_r <= dst_tile_base_r;
+                matrix_overlap_row_stride_r <= dst_row_stride_r;
+                matrix_overlap_write_row_r <= 4'd0;
+                matrix_overlap_write_col_r <= 4'd0;
+                matrix_overlap_wb_active_r <= 1'b1;
+            end else if (matrix_overlap_write_accept &&
+                         !matrix_overlap_write_fault) begin
+                result <= matrix_overlap_word3;
+                element_count <= element_count + 32'd4;
+                if (matrix_overlap_write_row_r == 4'd15 &&
+                    matrix_overlap_write_col_r == 4'd12) begin
+                    matrix_overlap_wb_active_r <= 1'b0;
+                end else if (matrix_overlap_write_col_r == 4'd12) begin
+                    matrix_overlap_write_col_r <= 4'd0;
+                    matrix_overlap_write_row_r <= matrix_overlap_write_row_r + 1'b1;
+                end else begin
+                    matrix_overlap_write_col_r <= matrix_overlap_write_col_r + 4'd4;
+                end
+            end
+            if (abort || watchdog_expired || banked_request_fault ||
+                banked_response_fault || banked_response_context_fault ||
+                matrix_overlap_write_fault || (state_r == ST_ERROR_DRAIN) ||
+                (state_r == ST_ERROR)) begin
+                matrix_overlap_wb_active_r <= 1'b0;
+                matrix_overlap_capture_pending_r <= 1'b0;
+            end
 
             // The banked SPAD has no response ready or transaction ID. Keep
             // accepted Matrix metadata in order until each registered
@@ -1278,6 +1479,16 @@ module ai_tensor_matrix_core #(
                         a_tile_words_r[response_buffer][
                             (response_k_group[3:2] * ARRAY_GROUPS) +
                             (response_group * 4) + 3] <= bank3_data;
+                        if (gemv_b_stream_enable_r &&
+                            (response_k_group[1:0] == 2'b00) &&
+                            (({29'd0,response_group} + 32'd1) >=
+                             a_group_count)) begin
+                            for (cache_i = 0; cache_i < 4; cache_i = cache_i + 1)
+                                if (({16'd0,response_k_group} + cache_i) <
+                                    {16'd0,k_words_r})
+                                    gemv_a_stream_valid_r[
+                                        response_k_group[3:0]+cache_i] <= 1'b1;
+                        end
                     end else begin
                         a_tile_words_r[response_buffer][response_group*4+0] <= bank0_data;
                         a_tile_words_r[response_buffer][response_group*4+1] <= bank1_data;
@@ -1397,6 +1608,7 @@ module ai_tensor_matrix_core #(
                 perf_arbiter_stall_cycles <= 32'd0;
                 perf_response_wait_cycles <= 32'd0;
                 perf_writeback_wait_cycles <= 32'd0;
+                perf_matrix_overlap_cycles <= 32'd0;
                 perf_prefetch_a_req_cycles <= 32'd0;
                 perf_prefetch_a_drain_cycles <= 32'd0;
                 perf_prefetch_b_req_cycles <= 32'd0;
@@ -1420,6 +1632,14 @@ module ai_tensor_matrix_core #(
                 if (prefetch_state_r == PF_A_REQ)
                     perf_prefetch_a_req_cycles <=
                         perf_prefetch_a_req_cycles + 1'b1;
+                if (prefetch_direct_kick && banked_read_accept) begin
+                    if (prefetch_direct_is_b)
+                        perf_prefetch_b_req_cycles <=
+                            perf_prefetch_b_req_cycles + 1'b1;
+                    else
+                        perf_prefetch_a_req_cycles <=
+                            perf_prefetch_a_req_cycles + 1'b1;
+                end
                 if (prefetch_state_r == PF_A_DRAIN)
                     perf_prefetch_a_drain_cycles <=
                         perf_prefetch_a_drain_cycles + 1'b1;
@@ -1429,7 +1649,7 @@ module ai_tensor_matrix_core #(
                 if (prefetch_state_r == PF_B_DRAIN)
                     perf_prefetch_b_drain_cycles <=
                         perf_prefetch_b_drain_cycles + 1'b1;
-                if ((state_r == ST_MAC) && prefetch_active)
+                if ((state_r == ST_MAC) && prefetch_issue_active)
                     perf_prefetch_overlap_cycles <=
                         perf_prefetch_overlap_cycles + 1'b1;
                 if (state_r == ST_PREFETCH_WAIT)
@@ -1440,6 +1660,9 @@ module ai_tensor_matrix_core #(
                 if (prefetch_complete && gemv_b_cache_allowed &&
                     (prefetch_k_group_r < A_TILE_CACHE_K_WORDS))
                     gemv_b_cache_valid_r[prefetch_k_group_r[3:0]] <= 1'b1;
+                if (matrix_overlap_wb_active_r)
+                    perf_matrix_overlap_cycles <=
+                        perf_matrix_overlap_cycles + 1'b1;
                 if (a_cache_initial_copy || a_cache_prefetch_copy)
                     perf_a_tile_cache_hits <= perf_a_tile_cache_hits + 1'b1;
                 if (read_outstanding_next > perf_outstanding_highwater)
@@ -1458,7 +1681,8 @@ module ai_tensor_matrix_core #(
                     ((state_r == ST_BIAS_WAIT) && !spad_rsp_valid))
                     perf_response_wait_cycles <=
                         perf_response_wait_cycles + 1'b1;
-                if ((state_r == ST_WRITE) && !output_write_accepted)
+                if (((state_r == ST_WRITE) && !output_write_accepted) ||
+                    (matrix_overlap_wb_active_r && !line_ready))
                     perf_writeback_wait_cycles <=
                         perf_writeback_wait_cycles + 1'b1;
             end
@@ -1480,6 +1704,9 @@ module ai_tensor_matrix_core #(
             end else if (banked_response_context_fault) begin
                 error_code <= ERR_CONFIG;
                 state_r <= ST_ERROR_DRAIN;
+            end else if (matrix_overlap_write_fault) begin
+                error_code <= ERR_PROTECTION;
+                state_r <= ST_ERROR_DRAIN;
             end else begin
                 case (state_r)
                     ST_IDLE: begin
@@ -1498,6 +1725,21 @@ module ai_tensor_matrix_core #(
                             transpose_a_r <= transpose_a;
                             transpose_b_r <= transpose_b;
                             bias_enable_r <= bias_enable;
+                            matrix_overlap_enabled_r <=
+                                ENABLE_MATRIX_OUTPUT_OVERLAP &&
+                                (ARRAY_SIZE == 16) &&
+                                ((op_mode == OP_TENSOR_GEMM) ||
+                                 (op_mode == OP_TENSOR_BATCH_GEMM)) &&
+                                !bias_enable &&
+                                (m_size[3:0] == 4'd0) &&
+                                (n_size[3:0] == 4'd0) &&
+                                (dst_base[3:0] == 4'd0) &&
+                                ((instance_count <= 32'd1) ||
+                                 (dst_batch_stride[3:0] == 4'd0));
+                            matrix_overlap_capture_pending_r <= 1'b0;
+                            matrix_overlap_wb_active_r <= 1'b0;
+                            matrix_overlap_write_row_r <= 4'd0;
+                            matrix_overlap_write_col_r <= 4'd0;
                             scale_shift_r <= scale_shift;
                             activation_r <= activation;
                             requant_shift_r <= aux0[4:0];
@@ -1507,6 +1749,14 @@ module ai_tensor_matrix_core #(
                             fused_linearized_line_index_r <= 2'd0;
                             gemv_kfold_r <=
                                 (op_mode == OP_TENSOR_GEMV_KFOLD);
+                            gemv_b_stream_enable_r <=
+                                (op_mode == OP_TENSOR_GEMV_KFOLD) &&
+                                (m_size == 16'd1) &&
+                                gemv_b_bulk_fill_request;
+                            gemv_next_panel_kick_pending_r <= 1'b0;
+                            gemv_panel_advance_pending_r <= 1'b0;
+                            gemv_a_stream_valid_r <=
+                                {A_TILE_CACHE_K_WORDS{1'b0}};
                             watchdog_limit_r <= watchdog_limit;
                             a_batch_base_r <= src0_base;
                             b_batch_base_r <= src1_base;
@@ -1531,7 +1781,11 @@ module ai_tensor_matrix_core #(
                                         {ARRAY_GROUPS{1'b0}};
                             end
                             for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
-                                gemv_b_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
+                                begin
+                                    gemv_b_cache_group_seen_r[cache_i] <=
+                                        {ARRAY_GROUPS{1'b0}};
+                                    gemv_a_stream_valid_r[cache_i] <= 1'b0;
+                                end
                             for (cache_i = 0; cache_i < A_TILE_CACHE_K_WORDS; cache_i = cache_i + 1)
                                 a_cache_group_seen_r[cache_i] <= {ARRAY_GROUPS{1'b0}};
                             src0_batch_stride_r <= (src0_batch_stride == 0) ?
@@ -1747,7 +2001,8 @@ module ai_tensor_matrix_core #(
                                 write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                                 write_lane_r <= 2'd0;
                                 dst_row_addr_r <= dst_tile_base_r;
-                                if (gemv_b_panel_cached_r &&
+                                if (!gemv_b_stream_enable_r &&
+                                    gemv_b_panel_cached_r &&
                                     (({16'd0,col_tile_r} + 32'd1) <
                                      n_tile_count)) begin
                                     gemv_b_bulk_fill_r <= 1'b1;
@@ -1766,10 +2021,16 @@ module ai_tensor_matrix_core #(
                                 end
                                 state_r <= ST_WRITE;
                             end else if (gemv_b_panel_cached_r) begin
-                                k_group_r <= k_group_r + 1'b1;
-                                compute_buffer_r <= ~compute_buffer_r;
-                                read_group_r <= 3'd0;
-                                state_r <= ST_MAC;
+                                if (!gemv_b_stream_enable_r ||
+                                    gemv_bulk_stream_next_ready) begin
+                                    k_group_r <= k_group_r + 1'b1;
+                                    compute_buffer_r <= ~compute_buffer_r;
+                                    read_group_r <= 3'd0;
+                                    state_r <= ST_MAC;
+                                end else begin
+                                    read_group_r <= 3'd0;
+                                    state_r <= ST_PREFETCH_WAIT;
+                                end
                             end else if (!ENABLE_NEXT_K_PREFETCH) begin
                                 k_group_r <= k_group_r + 1'b1;
                                 compute_buffer_r <= 1'b0;
@@ -1787,7 +2048,7 @@ module ai_tensor_matrix_core #(
                                     prefetch_kick_k_group <= k_group_r + 2'd2;
                                     prefetch_kick_buffer <= compute_buffer_r;
                                 end
-                                state_r <= ST_PREP_MAC;
+                                state_r <= ST_MAC;
                             end else begin
                                 read_group_r <= 3'd0;
                                 state_r <= ST_PREFETCH_WAIT;
@@ -1799,7 +2060,12 @@ module ai_tensor_matrix_core #(
                                 write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                                 write_lane_r <= 2'd0;
                                 dst_row_addr_r <= dst_tile_base_r;
-                                state_r <= ST_WRITE;
+                                if (matrix_overlap_tile_eligible) begin
+                                    matrix_overlap_capture_pending_r <= 1'b1;
+                                    state_r <= ST_NEXT;
+                                end else begin
+                                    state_r <= ST_WRITE;
+                                end
                             end else if (!ENABLE_NEXT_K_PREFETCH) begin
                                 k_group_r <= k_group_r + 1'b1;
                                 compute_buffer_r <= 1'b0;
@@ -1816,7 +2082,7 @@ module ai_tensor_matrix_core #(
                                     prefetch_kick_k_group <= k_group_r + 2'd2;
                                     prefetch_kick_buffer <= compute_buffer_r;
                                 end
-                                state_r <= ST_PREP_MAC;
+                                state_r <= ST_MAC;
                             end else begin
                                 read_group_r <= 3'd0;
                                 state_r <= ST_PREFETCH_WAIT;
@@ -1827,7 +2093,14 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_PREFETCH_WAIT: begin
-                        if (!ENABLE_NEXT_K_PREFETCH) begin
+                        if (gemv_b_stream_enable_r &&
+                            gemv_b_panel_cached_r &&
+                            gemv_bulk_stream_next_ready) begin
+                            k_group_r <= k_group_r + 1'b1;
+                            compute_buffer_r <= ~compute_buffer_r;
+                            read_group_r <= 3'd0;
+                            state_r <= ST_MAC;
+                        end else if (!ENABLE_NEXT_K_PREFETCH) begin
                             k_group_r <= k_group_r + 1'b1;
                             compute_buffer_r <= 1'b0;
                             read_group_r <= 3'd0;
@@ -1843,12 +2116,72 @@ module ai_tensor_matrix_core #(
                                 prefetch_kick_k_group <= k_group_r + 2'd2;
                                 prefetch_kick_buffer <= compute_buffer_r;
                             end
-                            state_r <= ST_PREP_MAC;
+                            state_r <= ST_MAC;
                         end
                     end
 
                     ST_GEMV_B_FILL: begin
-                        if (prefetch_valid_r[~compute_buffer_r]) begin
+                        if (gemv_b_stream_enable_r) begin
+                            if (gemv_panel_advance_pending_r &&
+                                (prefetch_state_r == PF_IDLE) &&
+                                (read_outstanding_next == 0)) begin
+                                // Keep the active panel identity stable until
+                                // every accepted read response has drained.
+                                // Then advance the context before issuing the
+                                // next panel's first request.
+                                col_tile_r <= col_tile_r + 1'b1;
+                                dst_tile_base_r <= dst_tile_base_r +
+                                    (ARRAY_SIZE * 4);
+                                dst_row_addr_r <= dst_row_tile_base_r +
+                                    (ARRAY_SIZE * 4);
+                                bias_tile_base_r <= bias_tile_base_r +
+                                    (ARRAY_SIZE * 4);
+                                bias_loaded_r <= 1'b0;
+                                gemv_b_panel_cached_r <= 1'b0;
+                                gemv_b_fill_next_panel_r <= 1'b0;
+                                gemv_b_cache_valid_r <=
+                                    {A_TILE_CACHE_K_WORDS{1'b0}};
+                                gemv_a_stream_valid_r <=
+                                    {A_TILE_CACHE_K_WORDS{1'b0}};
+                                for (cache_i = 0;
+                                     cache_i < A_TILE_CACHE_K_WORDS;
+                                     cache_i = cache_i + 1)
+                                    gemv_b_cache_group_seen_r[cache_i] <=
+                                        {ARRAY_GROUPS{1'b0}};
+                                if (prefetch_valid_r[~compute_buffer_r]) begin
+                                    prefetch_consume <= 1'b1;
+                                    prefetch_consume_buffer <=
+                                        ~compute_buffer_r;
+                                end
+                                prefetch_kick <= 1'b1;
+                                prefetch_kick_k_group <= 16'd0;
+                                prefetch_kick_buffer <= 1'b1;
+                                gemv_panel_advance_pending_r <= 1'b0;
+                            end else if (!gemv_panel_advance_pending_r &&
+                                         gemv_bulk_stream_first_ready) begin
+                                if (prefetch_valid_r[~compute_buffer_r]) begin
+                                    prefetch_consume <= 1'b1;
+                                    prefetch_consume_buffer <=
+                                        ~compute_buffer_r;
+                                end
+                                gemv_b_panel_cached_r <= 1'b1;
+                                gemv_b_fill_next_panel_r <= 1'b0;
+                                k_group_r <= 16'd0;
+                                compute_buffer_r <= 1'b0;
+                                read_group_r <= 3'd0;
+                                state_r <= ST_MAC;
+                            end else if (!gemv_panel_advance_pending_r &&
+                                         gemv_next_panel_kick_pending_r &&
+                                         prefetch_valid_r[~compute_buffer_r] &&
+                                         (prefetch_state_r == PF_IDLE)) begin
+                                prefetch_consume <= 1'b1;
+                                prefetch_consume_buffer <= ~compute_buffer_r;
+                                prefetch_kick <= 1'b1;
+                                prefetch_kick_k_group <= 16'd0;
+                                prefetch_kick_buffer <= 1'b1;
+                                gemv_next_panel_kick_pending_r <= 1'b0;
+                            end
+                        end else if (prefetch_valid_r[~compute_buffer_r]) begin
                             prefetch_consume <= 1'b1;
                             prefetch_consume_buffer <= ~compute_buffer_r;
                             gemv_b_bulk_fill_r <= 1'b0;
@@ -2022,20 +2355,19 @@ module ai_tensor_matrix_core #(
                                         write_row_r <= write_row_r + 1'b1;
                                         dst_row_addr_r <= dst_row_addr_r + dst_row_stride_r;
                                     end else if (gemv_cached_last_write) begin
-                                        col_tile_r <= col_tile_r + 1'b1;
                                         k_group_r <= 16'd0;
                                         read_group_r <= 3'd0;
                                         compute_buffer_r <= 1'b0;
                                         write_row_r <= {TILE_INDEX_WIDTH{1'b0}};
                                         write_col_r <= {TILE_INDEX_WIDTH{1'b0}};
                                         write_lane_r <= 2'd0;
-                                        dst_tile_base_r <= dst_tile_base_r +
-                                            (ARRAY_SIZE * 4);
-                                        dst_row_addr_r <= dst_row_tile_base_r;
-                                        bias_tile_base_r <= bias_tile_base_r +
-                                            (ARRAY_SIZE * 4);
-                                        bias_loaded_r <= 1'b0;
-                                        gemv_b_fill_next_panel_r <= 1'b0;
+                                        if (gemv_b_stream_enable_r) begin
+                                            gemv_panel_advance_pending_r <= 1'b1;
+                                            gemv_next_panel_kick_pending_r <=
+                                                1'b0;
+                                        end else begin
+                                            gemv_b_fill_next_panel_r <= 1'b0;
+                                        end
                                         state_r <= ST_GEMV_B_FILL;
                                     end else begin
                                         state_r <= ST_NEXT;
@@ -2046,6 +2378,13 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_NEXT: begin
+                        if (matrix_overlap_capture_pending_r &&
+                            matrix_overlap_wb_active_r) begin
+                            // Keep the accumulator intact until the sole
+                            // output buffer becomes available.
+                        end else begin
+                        if (matrix_overlap_capture_pending_r)
+                            matrix_overlap_capture_pending_r <= 1'b0;
                         fused_line_full_r <= 2'b00;
                         fused_pack_bank_r <= 1'b0;
                         fused_commit_bank_r <= 1'b0;
@@ -2131,9 +2470,13 @@ module ai_tensor_matrix_core #(
                         end else begin
                             state_r <= ST_DONE;
                         end
+                        end
                     end
 
                     ST_DONE: begin
+                        if (matrix_overlap_wb_active_r) begin
+                            // Completion is the writeback drain barrier.
+                        end else begin
                         if (tile_forward_capture_active_r &&
                             (tile_forward_capture_mask_r == 16'hffff)) begin
                             tile_forward_valid_r <= 1'b1;
@@ -2149,6 +2492,7 @@ module ai_tensor_matrix_core #(
                         done <= 1'b1;
                         error <= 1'b0;
                         state_r <= ST_IDLE;
+                        end
                     end
 
                     ST_ERROR: begin

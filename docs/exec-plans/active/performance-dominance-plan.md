@@ -1,5 +1,35 @@
 # NMAForge V1.3 — Performance Dominance Execution Plan
 
+## Round 33 measured performance closure — 2026-11-25
+
+Round 33 implementation is on isolated branch
+`research/nmaforge-v1.3-round33-overlapped-execution`, based on verified
+Round 32 HEAD `651c32db216c34e653575dbeaddaefd4787a5c91`. The new 1 KiB
+output-ownership buffer overlaps full-tile writeback with next-tile compute;
+direct prefetch and GEMV K-group fill/MAC overlap reuse the existing array and
+operand caches. The 256-MAC array, 128 KiB default SPAD, outstanding-read
+limit, ABI, and ownership rules are preserved.
+
+| Gate | Round 33 result |
+|---|---|
+| Fixed GEMM stretch | 32×32×64: 804→564 cycles PASS; 64×64×64: 2768→1606 PASS with reads held at 8192 B. 16×16×16 reaches 115 (stretch 105 missed by 10); 16×16×32 reaches 159 (stretch 145 missed by 14). |
+| Seeded 64×64×64 GEMM | 3550/3529/3546→2205/2209/2204 cycles at seeds 20261122/24/25; all pass 2800 stretch. |
+| Fixed GEMV stretch | 1×16×64: 146→130. 1×64×64: 358→313 (minimum met, stretch 300 missed by 13). 1×256×64: 1414→1249 (minimum met, stretch 1150 missed by 99). 1×64×256: 2261→2005 (minimum 2000 missed by 5; stretch 1700 remains open). All NMAForge signed INT32 Goldens pass. |
+| Seeded 1×64×64 GEMV | 442/483/475→406/429/423; minimum 450 passes for all three; stretch 400 misses for all three. |
+| TinyNPU matched L1 GEMM | Pinned native `gemm_ctrl` + `systolic_array` + actual 32 KiB ping-pong `banked_sram`, with matched INT8 operands, saturating INT8 output, independent Goldens, and 1 B/cycle effective service. NMAForge beats TinyNPU on all four GEMM shapes; geometric-mean Tiny/NMA cycle ratio 3.503×, exceeding the 1.05× GEMM objective. Tiny's B rereads and bytes are not hidden. |
+| TinyNPU GEMV/CNN | GEMV ≥1.20× remains NOT_CLOSED: native output precision differs and Tiny 1×64×256 fails its independent Golden because a 4-bit K-tile counter truncates 16 to zero. Tiny's pinned Product Top does not instantiate `graph_top`, so shared CNN L2 ≥1.10× is NOT_COMPARABLE. The 1×16×64, 1×64×64 and 1×256×64 Tiny native outputs pass, but no cross-GEMV ratio is claimed. |
+| Verification / guardrails | Matrix and Product Top simulation gates pass as recorded in the report. Formal is partial (new overlap 2/4, FSM 1/5 before 360 s timeout; GEMV request stability 1 non-vacuous assertion and cover pass). PPA is BLOCKED_ENV (`dc_shell` missing; `TSMC28_STDCELL_DB` unset). |
+| Overall | **PERFORMANCE_CLOSURE_PARTIAL**. Matched L1 GEMM evidence is positive, but small-shape/GEMV stretch goals, TinyNPU GEMV and CNN comparisons, formal convergence, and PPA remain open. No whole-system TinyNPU-dominance claim is supported. |
+
+Detailed before/after/TinyNPU rows, exclusive-cycle accounting, ablations,
+resource disclosure, verification status, source hashes, commands, and a
+compressed raw-log archive are in the
+[Round 33 report](../../benchmark/NMAFORGE_V1_3_ROUND33_PERFORMANCE_CLOSURE.md)
+and [`benchmark/performance_dominance/round33/`](../../../benchmark/performance_dominance/round33/).
+The exact L1 endpoint and limitations are binding; L0 direct-array numbers are
+not compared against Matrix Core + SPAD, and unsupported L2 remains
+`NOT_COMPARABLE`.
+
 ## Round 32 measured catch-up disposition — 2026-11-24
 
 This latest supplement supersedes the earlier Matrix baseline rows below for

@@ -1,6 +1,32 @@
 # NMAForge execution frontier
 
-## NMAForge V1.3 Round 32 catch-up frontier — 2026-11-24
+## NMAForge V1.3 Round 33 overlapped execution — 2026-11-25
+
+Round 33 is isolated on `research/nmaforge-v1.3-round33-overlapped-execution`,
+based on the verified Round 32 HEAD `651c32db216c34e653575dbeaddaefd4787a5c91`.
+The implementation preserves the 16×16/256-MAC array, default 128 KiB SPAD,
+ABI, DMA, command lifecycle, and sole SPAD arbiter. The complete measured
+status, comparison boundaries, and remaining work are in the
+[Round 33 report](../../benchmark/NMAFORGE_V1_3_ROUND33_PERFORMANCE_CLOSURE.md)
+and [evidence package](../../../benchmark/performance_dominance/round33/).
+
+| Gate | Round 33 status | Evidence and boundary |
+|---|---|---|
+| Fixed GEMM | CHALLENGE PASS for 32×32×64 and 64×64×64; small shapes miss stretch | Results: 115/159/564/1606 cycles for 16×16×16, 16×16×32, 32×32×64 and 64×64×64. The first two miss stretch by 10/14 cycles; larger two meet stretch. Fixed 64×64 reads remain 8192 B. |
+| Seeded 64×64 GEMM | CHALLENGE PASS | 2205/2209/2204 cycles at seeds 20261122/24/25; all below 2800 and Golden. |
+| GEMV | MINIMUM PARTIAL; stretch open | Fixed suite improves to 130/313/1249/2005 cycles. 1×64×64 and 1×256×64 meet minimum but miss stretch; 1×64×256 misses minimum by 5 cycles. Seeded 1×64×64 is 406/429/423, below minimum 450 but above stretch 400. |
+| TinyNPU L1 GEMM | GEMM OBJECTIVE PASS for four matched INT8 shapes | Pinned native controller + actual SRAM compares at matched effective 1 B/cycle service: NMAForge wins all four, geometric-mean Tiny/NMA cycle ratio 3.50×. Tiny rereads and actual byte counts are retained. L0 remains incomparable; Tiny GEMV precision and K=256 correctness prevent the GEMV objective from closing. |
+| TinyNPU L2 / CNN | NOT_COMPARABLE | Pinned TinyNPU Top does not instantiate `graph_top`; no shared native Product Top + DMA/runtime CNN endpoint exists. No cross-project CNN ratio is claimed. |
+| Functional verification | PASS for requested simulation gates | Matrix full regression: 18 numerical + 35 fault cases; overlap stress: 158 overlap cycles and 132 stalled-line checks; Product Top smoke, 20-case seed 12345, Compute Cluster UVM at 128/256/512 KiB, representative CNN and existing partial DeiT path pass. |
+| Formal / PPA | PARTIAL / BLOCKED_ENV | GEMV request-stability proves 1 non-vacuous property and reaches cover. New overlap proof proves 2/4 assertions; FSM guards prove 1/5 before 360 s timeouts. `dc_shell` and TSMC28 libraries are unavailable; no PPA claim. |
+| Overall | **PERFORMANCE_CLOSURE_PARTIAL** | The challenge request for full TinyNPU dominance is not established by GEMM-only matched evidence. See the report for exact misses, unsupported endpoints, hashes, and archived logs. |
+
+Reproduction entry points include `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261122`,
+`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`, and
+`make -C dv/uvm/sim uvm_compute_cluster_regress` at each SPAD capacity. Exact
+commands and raw-log archive checksums are in the Round 33 run manifest.
+
+## NMAForge V1.3 Round 32 catch-up frontier — historical, 2026-11-24
 
 Round 32 started from `8f2ed82c7d7a58885bc19f0b263490f7817a5f51` on an isolated
 worktree and branch `research/nmaforge-v1.3-round32-tinynpu-catchup`. The base

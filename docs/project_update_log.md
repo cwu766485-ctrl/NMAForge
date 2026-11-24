@@ -331,3 +331,49 @@ RTL was modified. Full details and hashes:
 `docs/research/NMAFORGE_V2_ROUND8_GATE1_GATE2_STATUS.md`; reproducible VCS
 artifacts are under `/tmp/nmaforge_round8_h64_dma_e2e` and
 `/tmp/nmaforge_round8_h64_host_e2e`.
+
+## 2026-11-25 — V1.3 Round 33 overlapped execution and performance closure
+
+Implemented on isolated branch
+`research/nmaforge-v1.3-round33-overlapped-execution`, based on verified
+Round 32 HEAD `651c32db216c34e653575dbeaddaefd4787a5c91`. The Matrix Core now
+overlaps full-tile writeback with next-tile compute using a 1 KiB output
+ownership buffer, directly kicks operand prefetch to remove controller
+bubbles, and overlaps GEMV K-group fill with valid MAC work. The 16×16 array,
+256 MAC count, default 128 KiB SPAD, read limit, ABI, and queue/SPAD ownership
+contracts remain unchanged.
+
+With VCS `V-2023.12-SP1_Full64`, fixed-memory GEMM measures 115/159/564/1606
+cycles for 16×16×16, 16×16×32, 32×32×64 and 64×64×64. The two large shapes
+meet the Round33 stretch targets; the small shapes miss by 10 and 14 cycles.
+The three seeded 64×64×64 results are 2205/2209/2204 cycles and meet stretch.
+Fixed GEMV measures 130/313/1249/2005 cycles for the four target shapes; the
+1×64×256 case misses its 2000-cycle minimum by 5 cycles. Every NMAForge
+wide-GEMV INT32 Golden passes. The 64×64 GEMM input traffic remains 8192 B.
+
+A fresh harness runs pinned TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d`
+through its native GEMM controller, array and actual banked SRAM. For the four
+matched INT8 L1 GEMMs, NMAForge wins every workload with a 3.503× geometric
+mean Tiny/NMA cycle ratio at matched effective 1 B/cycle service. This closes
+the specified ≥1.05× GEMM objective only. TinyNPU's 1×64×256 controller fails
+its independent Golden because a 4-bit K-tile count truncates 16 to zero;
+output precision also differs on other native GEMV cases. Its Product Top
+does not instantiate `graph_top`, so TinyNPU GEMV and shared-CNN ratios remain
+open or `NOT_COMPARABLE`. No overall TinyNPU superiority claim is made.
+
+Verification: full matrix regression passed 18 numerical and 35 fault cases;
+output-overlap stress passed 158 overlap cycles and 132 stalled-line checks;
+`make ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261122`,
+`make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`, Compute Cluster UVM at
+128/256/512 KiB, representative CNN (20,480 Golden words) and the existing
+partial DeiT path passed. GEMV request-stability Formal passed one
+non-vacuous property and a cover; the new overlap proof closed 2/4 properties
+and the FSM guard closed 1/5 before 360 s timeouts. PPA is `BLOCKED_ENV`:
+`dc_shell` is unavailable and `TSMC28_STDCELL_DB` is unset. Overall status is
+`PERFORMANCE_CLOSURE_PARTIAL`.
+
+The Round33 report, comparison/ablation/resource/verification CSVs, source
+hashes, exact command manifest, and compressed raw-log archive are under
+`docs/benchmark/NMAFORGE_V1_3_ROUND33_PERFORMANCE_CLOSURE.md` and
+`benchmark/performance_dominance/round33/`. GPT-2 retraining and 12-layer DeiT
+development were not started.
