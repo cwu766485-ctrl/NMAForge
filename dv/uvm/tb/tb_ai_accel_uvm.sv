@@ -151,7 +151,7 @@ module tb_ai_accel_uvm;
         dut.compute_cluster_u.tensor_matrix_u.perf_fifo_full_cycles;
     genvar matrix_profile_idx;
     generate
-        for (matrix_profile_idx = 0; matrix_profile_idx < 15;
+        for (matrix_profile_idx = 0; matrix_profile_idx < 16;
              matrix_profile_idx = matrix_profile_idx + 1) begin : g_matrix_profile
             assign compute_obs.matrix_profile_state_cycles[matrix_profile_idx] =
                 dut.compute_cluster_u.tensor_matrix_u.perf_state_cycles[matrix_profile_idx];

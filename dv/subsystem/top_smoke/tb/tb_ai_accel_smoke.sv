@@ -7988,11 +7988,12 @@ module tb_ai_accel_smoke;
         // operands, real CMDQ/validator/dispatcher/SPAD, shared Matrix MAC
         // array with K-fold reduction, and row-major INT32 output.
         begin : product_dense_gemv
-            integer rr_g, cc_g, kk_g, bank_g;
+            integer rr_g, cc_g, kk_g, bank_g, panel_g;
             integer a0_g, a1_g, a2_g, a3_g;
             integer b0_g, b1_g, b2_g, b3_g;
             integer accum_g, expected_g, expected_last_g, errors_before_g;
             reg [31:0] desc_result_g;
+            reg [31:0] matrix_cycles_before_g, matrix_cycles_after_g;
 
             errors_before_g = errors;
             for (rr_g = 0; rr_g < 4; rr_g = rr_g + 1)
@@ -8236,6 +8237,82 @@ module tb_ai_accel_smoke;
                        errors - errors_before_g);
             $display("MATRIX_PRODUCT_GEMV_M8_KTAIL_DESCRIPTOR_PASS opcode=0x52 shape=8x16x19 outputs=128 lines=%0d golden=bit-exact",
                      matrix_line_write_count);
+            axi_write(REG_CMDQ_SIZE, 32'd0);
+            axi_write(REG_CPLQ_SIZE, 32'd0);
+            clear_done_irq();
+
+            // A single ABI-v7 descriptor can now cover a 1x64x64 GEMV. The
+            // shared 16x16 array walks four N tiles internally, with dense
+            // row-major B and one ordered completion.
+            for (kk_g = 0; kk_g < 64; kk_g = kk_g + 16)
+                for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                    a0_g = ((kk_g + bank_g*4 + 0)*5 + 3) % 13 - 6;
+                    a1_g = ((kk_g + bank_g*4 + 1)*5 + 3) % 13 - 6;
+                    a2_g = ((kk_g + bank_g*4 + 2)*5 + 3) % 13 - 6;
+                    a3_g = ((kk_g + bank_g*4 + 3)*5 + 3) % 13 - 6;
+                    axi_write(SPAD_BASE + 32'h7000 + kk_g + bank_g*4,
+                              {a3_g[7:0],a2_g[7:0],a1_g[7:0],a0_g[7:0]});
+                end
+            for (kk_g = 0; kk_g < 64; kk_g = kk_g + 1)
+                for (panel_g = 0; panel_g < 4; panel_g = panel_g + 1)
+                    for (bank_g = 0; bank_g < 4; bank_g = bank_g + 1) begin
+                        b0_g = (kk_g*7 + (panel_g*16 + bank_g*4 + 0)*3 + 1) % 11 - 5;
+                        b1_g = (kk_g*7 + (panel_g*16 + bank_g*4 + 1)*3 + 1) % 11 - 5;
+                        b2_g = (kk_g*7 + (panel_g*16 + bank_g*4 + 2)*3 + 1) % 11 - 5;
+                        b3_g = (kk_g*7 + (panel_g*16 + bank_g*4 + 3)*3 + 1) % 11 - 5;
+                        axi_write(SPAD_BASE + 32'h8000 + kk_g*64 +
+                                  panel_g*16 + bank_g*4,
+                                  {b3_g[7:0],b2_g[7:0],b1_g[7:0],b0_g[7:0]});
+                    end
+            for (cc_g = 0; cc_g < 64; cc_g = cc_g + 1)
+                axi_write(SPAD_BASE + 32'h9000 + cc_g*4,
+                          32'hbad0_6400 + cc_g);
+            write_spad_desc_v3(32'h4dc0, OP_TENSOR_GEMV_KFOLD, 16'h0523,
+                               32'h7000, 32'h8000, 32'd0, 32'h9000,
+                               16'd1, 16'd64, 16'd64, 8'd0, 32'd0,
+                               5'd0, 2'd0, 32'd0, 32'd0, 32'd0,
+                               16'd0, 16'd0, 16'd0, 16'd0, 16'd0);
+            axi_write(SPAD_BASE + 32'h4dfc, 32'd7);
+            errors_before_g = errors;
+            axi_write(REG_CMDQ_BASE_LO, 32'h4dc0);
+            axi_write(REG_CMDQ_SIZE, 32'd2);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd1);
+            axi_write(REG_CPLQ_BASE_LO, 32'h4ec0);
+            axi_write(REG_CPLQ_SIZE, 32'd2);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            matrix_line_write_count = 0;
+            axi_read(REG_PERF_MATRIX_CYCLES, matrix_cycles_before_g);
+            axi_write(REG_DOORBELL, 32'd1);
+            wait_cpl_tail(32'd1, "product one-descriptor 1x64x64 GEMV completion");
+            axi_read(REG_PERF_MATRIX_CYCLES, matrix_cycles_after_g);
+            expected_last_g = 0;
+            for (cc_g = 0; cc_g < 64; cc_g = cc_g + 1) begin
+                accum_g = 0;
+                for (kk_g = 0; kk_g < 64; kk_g = kk_g + 1)
+                    accum_g = accum_g +
+                        ((((kk_g*5 + 3) % 13) - 6) *
+                         (((kk_g*7 + cc_g*3 + 1) % 11) - 5));
+                expected_g = accum_g;
+                expected_last_g = expected_g;
+                expect_read(SPAD_BASE + 32'h9000 + cc_g*4,
+                            expected_g, "product wide GEMV output");
+            end
+            if (matrix_line_write_count != 16) begin
+                $display("%0t ERROR: product wide GEMV line writes=%0d expected=16",
+                         $time, matrix_line_write_count);
+                errors = errors + 1;
+            end
+            expect_completion(32'h4ec0, 16'h0523, 4'h1, 4'd0,
+                              expected_last_g, 32'd64,
+                              "product wide GEMV descriptor");
+            if (errors != errors_before_g)
+                $fatal(1, "product one-descriptor GEMV path had %0d errors",
+                       errors - errors_before_g);
+            $display("MATRIX_PRODUCT_GEMV_WIDE_DESCRIPTOR_PASS opcode=0x52 shape=1x64x64 descriptors=1 lines=%0d matrix_perf_delta=%0d golden=bit-exact",
+                     matrix_line_write_count,
+                     matrix_cycles_after_g - matrix_cycles_before_g);
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();

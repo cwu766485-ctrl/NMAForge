@@ -1,5 +1,28 @@
 # Project update log
 
+## NMAForge V1.3 Round 32 — TinyNPU performance catch-up (2026-11-24)
+
+Implemented and measured a bounded Product RTL optimization on isolated branch
+`research/nmaforge-v1.3-round32-tinynpu-catchup`, based on
+`8f2ed82c7d7a58885bc19f0b263490f7817a5f51`. The 64×64×64 GEMM B-panel cache
+reduces fixed-memory cycles from 3,413 to 2,768 and SPAD reads from 20,480 B
+to 8,192 B; all three seeded runs are below the 3,800-cycle minimum. The
+minimum GEMV 1×64×64 target passes at 358 fixed cycles and 433/467/479 seeded
+cycles after packing the wide operation into one descriptor. The GEMM challenge
+cycle limit remains open; no TinyNPU cross-system ratio or PPA result is
+claimed. The existing 256-MAC array and default 128 KiB SPAD are preserved.
+
+`ai_smoke` (four random cases), seeded Top 20-case regression, descriptor
+validator, Compute Cluster UVM at 128/256/512 KiB, four-shape GEMM and GEMV
+Golden suites, TinyNPU direct-array cases, TinyNPU CNN Golden, and NMAForge
+Product Top ONNX Golden pass. Matrix FSM formal passes 5 assertions / 2 covers;
+GEMV request-stability formal timed out at 360 s without a result. PPA remains
+`BLOCKED_ENV` because `dc_shell` and `TSMC28_STDCELL_DB` are unavailable. Exact
+target disposition and source/log identities are in
+[`Round 32 report`](benchmark/NMAFORGE_V1_3_ROUND32_TINYNPU_CATCHUP.md),
+[`evidence manifest`](../benchmark/performance_dominance/round32/evidence/run_manifest.json),
+and the active [`execution frontier`](exec-plans/active/execution-frontier.md).
+
 ## NMAForge V1.2 integrated continuation — 2026-11-24
 
 Work is isolated on `research/nmaforge-v1.2-integrated-model-dv` from base

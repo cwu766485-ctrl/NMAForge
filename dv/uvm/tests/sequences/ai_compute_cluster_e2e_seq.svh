@@ -4155,10 +4155,10 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
         input int unsigned write_bytes_start
     );
         int unsigned state_sum;
-        int unsigned state_snapshot[0:14];
+        int unsigned state_snapshot[0:15];
         int unsigned state_idx;
         state_sum = 0;
-        for (state_idx = 0; state_idx < 15; state_idx++) begin
+        for (state_idx = 0; state_idx < 16; state_idx++) begin
             state_snapshot[state_idx] =
                 compute_vif.matrix_profile_state_cycles[state_idx];
             state_sum += state_snapshot[state_idx];
@@ -4174,7 +4174,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             "st_idle=%0d,st_a_req=%0d,st_a_wait=%0d,st_b_req=%0d,st_b_wait=%0d,",
             "st_bias_req=%0d,st_bias_wait=%0d,st_prep_mac=%0d,st_mac=%0d,",
             "st_write=%0d,st_next=%0d,st_done=%0d,st_error=%0d,",
-            "st_error_drain=%0d,st_prefetch_wait=%0d,",
+            "st_error_drain=%0d,st_prefetch_wait=%0d,st_gemv_b_fill=%0d,",
             "arbiter_stall=%0d,response_wait=%0d,writeback_wait=%0d,",
             "prefetch_a_req=%0d,prefetch_a_drain=%0d,prefetch_b_req=%0d,",
             "prefetch_b_drain=%0d,prefetch_overlap=%0d,prefetch_wait=%0d,",
@@ -4189,6 +4189,7 @@ class ai_compute_cluster_e2e_seq extends uvm_sequence #(ai_axil_item);
             state_snapshot[6], state_snapshot[7], state_snapshot[8],
             state_snapshot[9], state_snapshot[10], state_snapshot[11],
             state_snapshot[12], state_snapshot[13], state_snapshot[14],
+            state_snapshot[15],
             compute_vif.matrix_profile_arbiter_stall_cycles,
             compute_vif.matrix_profile_response_wait_cycles,
             compute_vif.matrix_profile_writeback_wait_cycles,

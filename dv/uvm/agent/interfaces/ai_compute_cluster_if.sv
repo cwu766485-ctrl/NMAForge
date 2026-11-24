@@ -66,7 +66,7 @@ interface ai_compute_cluster_if(input logic aclk);
     logic [31:0] matrix_a_cache_hits;
     logic [31:0] matrix_prefetch_overlap_cycles;
     logic [31:0] matrix_profile_cycle_count;
-    logic [31:0] matrix_profile_state_cycles[0:14];
+    logic [31:0] matrix_profile_state_cycles[0:15];
     logic [31:0] matrix_profile_arbiter_stall_cycles;
     logic [31:0] matrix_profile_response_wait_cycles;
     logic [31:0] matrix_profile_writeback_wait_cycles;

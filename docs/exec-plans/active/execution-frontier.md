@@ -1,41 +1,34 @@
 # NMAForge execution frontier
 
-## NMAForge V1.3 performance-dominance frontier — 2026-11-24
+## NMAForge V1.3 Round 32 catch-up frontier — 2026-11-24
 
-This is the active co-design objective and continues from
-`research/nmaforge-v1.2-integrated-model-dv` at `8737fa1c7c6d08a894913a904a8a52aff4fb5840`.
-The baseline source/ABI freeze is recorded in
-[`v1_3_source_freeze.json`](../../../benchmark/performance_dominance/v1_3_source_freeze.json).
-Work remains isolated on the research branch; the user's checkout and `main`
-are unchanged. No Product RTL was changed in this continuation.
+Round 32 started from `8f2ed82c7d7a58885bc19f0b263490f7817a5f51` on an isolated
+worktree and branch `research/nmaforge-v1.3-round32-tinynpu-catchup`. The base
+Product RTL tree was `d952771394c3743dd106d61b595c41054dc529b1`; ABI v7.4 and
+version register `0x1000_000a` are preserved. Product Top remains
+`rtl/top/ai_accel_top.v`, one 16×16/256-MAC array, and default 128 KiB SPAD.
+Evidence and raw-log paths are collected in the
+[Round 32 report](../../benchmark/NMAFORGE_V1_3_ROUND32_TINYNPU_CATCHUP.md)
+and [run manifest](../../../benchmark/performance_dominance/round32/evidence/run_manifest.json).
 
-### Progress this continuation
+### Round 32 disposition
 
 | Gate | Status | Evidence and boundary |
 |---|---|---|
-| Source, ABI and configuration identity | FROZEN | Source SHA `8737fa1c7c6d08a894913a904a8a52aff4fb5840`, RTL tree `d952771394c3743dd106d61b595c41054dc529b1`, Product Top SHA-256 `4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735`, ABI v7.4 / version register `0x1000_000a`; filelists and source-of-truth documents are hashed in the freeze JSON. |
-| Gate 1 Matrix baseline | PARTIAL — current-source NMAForge replay PASS | Rebuilt the saved Round 27 harness at frozen source `8737fa1c`: exact seed 20261122 reproduces 64×64×64 GEMM at 4,822 cycles under variable backpressure and 3,413 with fixed one-cycle memory. Seed 20261124 gives 4,746 cycles. The four-descriptor 1×64×64 GEMV reproduces 632/584 cycles with prefetch OFF/ON; all Golden outputs pass. Exclusive stalls and comparable TinyNPU endpoints remain open. See the [Gate 1 package](../../../benchmark/performance_dominance/v1_3_gate1_baseline/run_manifest.json). |
-| TinyNPU comparison | NOT COMPARABLE | Historical TinyNPU reports 3,166 direct-array cycles for GEMM and 790 for GEMV. Its endpoint excludes controller and memory service, while NMAForge's includes the Matrix controller and behavioral SPAD. No cross-project speedup is claimed; TinyNPU raw logs are absent from the historical package. |
-| P0 baseline/DV recovery | PARTIAL — current-source simulation revalidated | `ai_smoke` passes at seed 20261124; 20-case `ai_run` passes at seed 12345. Current Compute Cluster UVM passes at 128/256/512 KiB with seed 20261124 (3/3); each map keeps `access_bounds_checked=1`. Historical 9/9 capacity evidence is retained separately. Full RTM and cluster sign-off remain open. See the [current replay package](../../../benchmark/performance_dominance/v1_3_gate1_baseline/evidence/current_replay_8737fa1c/). |
-| Formal | PARTIAL — scoped serial and dispatcher proofs PASS | VC Formal V-2023.12-SP2 passes 3 serialization properties/7 covers and 5 dispatcher properties, 4 non-vacuous checks, and 23 pairwise covers. The initial 300-second attempt timed out; the separate 900-second retry passed. Full-top formal closure remains open. |
-| RTL mutation | PARTIAL — 7/7 injected mutants caught | Current-source real-RTL mutants for address, data, response ownership, WSTRB, completion error, missing done, and duplicate done each trigger their expected checker. Aggregate target exits 0; the harness does not preserve each simulator's native exit code. This is a focused mutation sample, not complete mutation closure. |
-| CNN fusion A/B | PASS — current source, bounded synthetic fixture | Product Top legacy/first/both fusion modes each match the same independent Golden over 20,480 words. Command cycles are 60,930/34,324/7,708, with unchanged input, weights, and output hashes. This is a fixed-seed untrained 1×1 pointwise CNN; it demonstrates a current-source dataflow/descriptor fusion result, not trained accuracy or TinyNPU dominance. See [fusion manifest](../../../benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.json) and [CSV](../../../benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.csv). |
-| GPT-2 | PARTIAL — independent software quality FAIL | Existing four-layer persistent-KV and prefix-recompute Product Top outputs are bit-exact; persistent KV saves 3.0195% measured command-path cycles and 15.5491% descriptor publications. New software-only evaluation on 64 independent Pride and Prejudice byte windows gives selected INT8 11.23% / PPL 216.50, versus FP32 30.76% / PPL 15.13 and same-window Bigram 27.64%. Independent-data Product Top logits were not run; the package remains below Bigram. Operator isolation, quality recovery, full Product Top qualification, and capacity/residency A/B remain open. See [KV scaling analysis](../../../benchmark/performance_dominance/v1_3_gpt2_persistent_kv_analysis_manifest.json) and [independent software evaluation](../../../benchmark/performance_dominance/v1_3_gpt2_independent_software_eval.json). |
-| DeiT-Tiny | PARTIAL | Historical Round 30 Product Top evidence runs three-head attention/AV for all 197 query rows, including the final five-row tail. Round 31 extends only 16 rows through Wo projection and checks 72,384 Golden words; 181 Wo rows, all of full Layer 0, 12 layers, classifier, and real-image accuracy remain open. The existing generator fixes 16 rows and the testbench rejects 13-block Wo mode. |
-| End-to-end dominance and PPA | NOT RUN | Existing Matrix endpoints do not establish a system comparison. No evidence supports an RTL expansion or Design Freeze. |
+| 64×64×64 GEMM | MINIMUM PASS; challenge PARTIAL | Fixed-SPAD cycles 3413→2768, seeded cycles 4783/4758/4745→3550/3529/3546, SPAD reads 20480→8192 B. All Golden checks pass. Minimum cycle/traffic goals pass; challenge cycle goals 2600/3200 do not. |
+| 1×64×64 GEMV | MINIMUM AND FIXED CHALLENGE PASS | One descriptor, fixed-SPAD 358 cycles and seeded 433/467/479 cycles, 4352 B reads, all 64 outputs Golden. Four-descriptor current path is 584 fixed and 818/841/845 seeded. |
+| GEMV shape suite | PASS | 1×16×64, 1×64×64, 1×256×64, and 1×64×256 all pass independent signed INT32 Golden at fixed SPAD and seeds 20261122/24/25. |
+| TinyNPU comparison | NOT_COMPARABLE | Pinned TinyNPU `8216c22b762011aa20c05fc2768423fd12dda59d` was rebuilt. Direct-array L0 cycles are retained, but they exclude service that NMAForge's Matrix+SPAD L1 includes. Shared `conv1x_mini.onnx` passes both sides; command/system endpoints still differ, so no speedup ratio is asserted. |
+| CNN fusion | PASS — bounded synthetic fixture | Current Product Top replays legacy/first/both at 60930/34324/7708 command cycles with 20,480 Golden words; shared ONNX workload also passes on both projects. |
+| Top/DV | PASS for requested smoke gates | Product Top `ai_smoke`, 20-case seed 12345, and Compute Cluster UVM at 128/256/512 KiB with seed 20261122 pass. Matrix FSM Formal passes 5/5 assertions and 2/2 covers; GEMV request-stability proof reaches the 360 s timeout without result. |
+| PPA | BLOCKED_ENV | `TSMC28_STDCELL_DB` is unset and `dc_shell` is unavailable; no area, timing, or frequency claim is made. |
+| Overall | **CATCH_UP_PARTIAL** | Minimum GEMM and GEMV targets pass, but GEMM challenge cycles and same-boundary TinyNPU performance gates remain open. |
 
-### Immediate next work
-
-1. Complete the current-source Gate 1 profile by separating exclusive stalls from overlapping event counters; keep the matched TinyNPU endpoint explicitly NOT COMPARABLE until resources and timing boundaries match.
-2. Use the negative independent-data result to drive GPT-2 operator/precision ablations and quality recovery, then rerun independent software evaluation and Product Top logits against that exact corpus and package.
-3. Extend the DeiT path from the proven block to all 197 queries, then close the remaining Layer 0 operators in one Product Top session without host activation refill.
-4. Execute model-level 128/256/512 KiB and weight-residency ablations using the same model package and timing boundaries; do not infer these results from UVM capacity runs or static maps.
-5. Build a unified counter schema separating exclusive stalls from overlapping events, then run matched Product Top/TinyNPU workloads before considering hardware changes. The CNN fusion A/B now has current-source Product Top evidence; extend profiling to the other engines and the pinned comparison target.
-
-The complete acceptance gates, evidence rules, and stretch targets are in
-[`performance-dominance-plan.md`](performance-dominance-plan.md). Historical
-V1.2 evidence is retained below as provenance; it does not close the V1.3
-gates.
+The complete commands, exact cycle/profile CSVs, independent ablations, PPA
+guardrail status, and source identities are in the
+[Round 32 package](../../../benchmark/performance_dominance/round32/).
+Historical V1.2/V1.3 records below remain provenance and do not replace this
+measured Round 32 disposition.
 
 ## NMAForge V1.2 integrated model/DV snapshot — superseded, 2026-11-24
 

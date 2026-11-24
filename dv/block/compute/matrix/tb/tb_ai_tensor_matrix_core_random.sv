@@ -1633,7 +1633,7 @@ module tb_ai_tensor_matrix_core_random;
                case_id,bank_read_count,bank_response_count,pending_bank,
                spad_read_count,spad_response_count,pending_spad);
       profile_state_sum=0;
-      for(profile_i=0;profile_i<=14;profile_i=profile_i+1)
+      for(profile_i=0;profile_i<=15;profile_i=profile_i+1)
         profile_state_sum=profile_state_sum+dut.perf_state_cycles[profile_i];
       if(profile_state_sum!==cycle_count)
         $fatal(1,"matrix case %0d profile states=%0d do not account for total cycles=%0d",

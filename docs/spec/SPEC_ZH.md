@@ -138,6 +138,8 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
 
+Product Matrix GEMV opcode `0x52` 使用共享的 16×16 INT8 阵列，仍采用 64 字节 ABI-v7 描述符。支持 `1<=M<=16`、`K>0`、`1<=N<=16`；宽输出形状还支持 `N=32,48,...,256`。有符号 INT8 A 按 row-major `[M,K]` 存储，每行补齐至 16 字节；B 按 row-major `[K,N]` 存储，每行 stride 为 `ceil(N/16)*16` 字节；输出是连续 INT32 `[M,N]`。不支持的 stride、转置、batch、保留字段和输入/输出重叠由 validator 拒绝；padding lane 不属于逻辑元素。宽 N 是 Round 32 对现有 opcode 的扩展，不增加 Matrix 阵列，也不改变描述符大小。
+
 Tensor GEMM descriptor ABI 与 4×4 tile-major SPAD operand 布局保持不变，M/N 仍须为 4 的倍数。Matrix controller 默认以 16×16 MAC array 执行宏 tile：每个 K word 从 SPAD 收集最多四组 4×4 A/B 数据，送入本地 operand buffer；尺寸大于 16 时按宏 tile 遍历，边缘 tile 只写有效元素。`ARRAY_SIZE=4/8/16` 参数配置均保留。
 
 Matrix banked-read 遵循 `valid/ready` 握手：普通背压期间，未接受请求的 `valid` 与地址保持稳定。若已接受的 Matrix 响应在本拍报告 parity error，Matrix 立即停止后续读请求并进入错误排空；此时可在同一拍撤销一笔仍未接受的 banked request，因为它不是已接受传输。此前所有已接受读取仍必须 drain，错误完成码为 `ERR_PARITY`，失败任务不得产生结果写回。该例外只适用于同拍 parity 响应导致的请求终止；普通 ready 背压仍必须保持请求稳定，Abort/Reset 依各自生命周期合同处理。

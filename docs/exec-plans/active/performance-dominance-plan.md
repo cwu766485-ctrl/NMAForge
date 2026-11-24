@@ -1,5 +1,27 @@
 # NMAForge V1.3 — Performance Dominance Execution Plan
 
+## Round 32 measured catch-up disposition — 2026-11-24
+
+This latest supplement supersedes the earlier Matrix baseline rows below for
+Round 32. Work was isolated from base `8f2ed82c7d7a58885bc19f0b263490f7817a5f51`
+on `research/nmaforge-v1.3-round32-tinynpu-catchup`; ABI v7.4, one 16×16
+256-MAC array, and default 128 KiB SPAD are preserved.
+
+| Gate | Round 32 result |
+|---|---|
+| GEMM 64×64×64 | Fixed cycles 3413→2768; seeds 20261122/24/25: 4783/4758/4745→3550/3529/3546; reads 20480→8192 B. All minimum goals and read-traffic challenge pass. Cycle challenges 2600 fixed / 3200 seeded remain unmet. |
+| GEMV 1×64×64 | One opcode `0x52` descriptor: 358 fixed cycles, 433/467/479 at seeds 20261122/24/25, 4352 B reads and 64/64 Golden. Fixed challenge 400 and seeded minimum 500 pass. The previous four-descriptor route measures 584 fixed and 818/841/845 seeded. |
+| GEMV fixed regression suite | `1×16×64`, `1×64×64`, `1×256×64`, and `1×64×256` each pass independent signed INT32 Golden at fixed memory and three random seeds. |
+| TinyNPU | Rebuilt at `8216c22b762011aa20c05fc2768423fd12dda59d`; L0 direct-array datapoints are fresh. NMAForge Matrix+SPAD L1 and TinyNPU direct-array L0 are NOT_COMPARABLE. The shared `conv1x_mini.onnx` passes both sides, but timing windows differ and no speedup is claimed. |
+| CNN | Current Product Top legacy/first/both fusion: 60930/34324/7708 command cycles; each matches its independent 20480-word Golden. Shared ONNX graph passes TinyNPU and NMAForge Goldens. |
+| Regression/formal/PPA | `ai_smoke`, 20-case seed 12345, and Cluster UVM 128/256/512 KiB pass. Matrix FSM formal is 5/5 assertions and 2/2 covers. GEMV request stability times out at 360 s. PPA is BLOCKED_ENV: private TSMC28 library unset and `dc_shell` unavailable. |
+| Overall | **CATCH_UP_PARTIAL**. Do not promote to PASS until common-boundary TinyNPU ratios and all challenge gates have evidence. |
+
+The full run manifest, before/after/TinyNPU table, exclusive-cycle breakdown,
+ablations, guardrail, and exact commands/logs are in
+[`benchmark/performance_dominance/round32/`](../../../benchmark/performance_dominance/round32/)
+and [`NMAFORGE_V1_3_ROUND32_TINYNPU_CATCHUP.md`](../../benchmark/NMAFORGE_V1_3_ROUND32_TINYNPU_CATCHUP.md).
+
 Status is tracked from isolated research branch
 `research/nmaforge-v1.2-integrated-model-dv`, baseline commit
 `8737fa1c7c6d08a894913a904a8a52aff4fb5840`. The objective is
@@ -27,11 +49,11 @@ first, then change RTL only when a measured bottleneck requires it.
 - Do not make an NMAForge/TinyNPU speedup claim until both run the same model,
   input, precision, memory service, and timing boundary. Product-level timing
   must include the corresponding controller/queue/memory work on both sides.
-- No speculative RTL upgrade. Preserve the ABI, SPAD protection, arbiter
+- Change RTL only for a measured bottleneck. Preserve the ABI, SPAD protection, arbiter
   ownership, registered-read behavior, AXI protocol, reset, abort, and ordered
   completion contracts.
 
-## Current gate disposition
+## Pre-Round-32 gate disposition (historical baseline)
 
 | Gate | Status | Exit criterion |
 |---|---|---|

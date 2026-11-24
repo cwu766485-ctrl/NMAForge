@@ -118,6 +118,16 @@ token zero keeps only score 0 and produces `[32768, 0, ...]`; normalization's
 nonzero epsilon default does not apply to this opcode. Software must provide a
 query index smaller than the vector length.
 
+Product Matrix GEMV opcode `0x52` uses the shared 16×16 INT8 array and keeps
+the 64-byte ABI-v7 descriptor. `1<=M<=16`, `K>0`, and `1<=N<=16` are accepted;
+wide output shapes additionally accept `N=32,48,...,256`. It reads signed INT8
+A as row-major `[M,K]` with each row padded to 16 bytes, B as row-major `[K,N]`
+with each row padded to `ceil(N/16)*16` bytes, and writes contiguous INT32
+`[M,N]` output. Operand/output aliasing, unsupported strides, transpose,
+batching, and reserved fields are rejected. Padding lanes are not logical
+elements. The wide-N path is a Round 32 extension of the existing opcode; it
+does not add a Matrix array or change descriptor size.
+
 ## Digital CNM datapath
 
 For banked VDOT/GEMV opcodes `0x20/0x21`, NMAForge implements a digital

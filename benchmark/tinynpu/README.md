@@ -46,7 +46,9 @@ set. It writes raw compile/run logs and binaries under `/tmp`, then updates
 [`cnn_summary.json`](cnn_summary.json). Raw logs and binaries stay under `/tmp`.
 
 The same signed INT8 input formulas and independent INT32 Golden are used for
-`16×16×16`, `16×16×32`, and `32×32×64`. TinyNPU tiles each problem across its
+`16×16×16`, `16×16×32`, `32×32×64`, and `64×64×64`. The harness also runs the
+`1×16×64`, `1×64×64`, `1×256×64`, and `1×64×256` GEMV vectors with matching
+row-major input fixtures. TinyNPU tiles each problem across its
 16×16 systolic array and checks every output (256, 256, and 1,024 values).
 NMAForge runs its actual Matrix controller and banked SPAD model and checks all
 output words against the independent Golden. The TinyNPU array interval is

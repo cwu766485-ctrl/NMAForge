@@ -96,7 +96,9 @@ module ai_descriptor_validator (
                                m_size[1:0] == 0 && n_size[1:0] == 0) ||
                               ((op == 8'h52) &&
                                (m_size >= 16'd1) && (m_size <= 16'd16) &&
-                               (n_size >= 16'd1) && (n_size <= 16'd16) &&
+                               (n_size >= 16'd1) && (n_size <= 16'd256) &&
+                               ((n_size <= 16'd16) ||
+                                (n_size[3:0] == 4'd0)) &&
                                (k_words != 16'd0)) ||
                               ((is_tensor_sfu && op != 8'h3a && op != 8'h3b) && length != 0) ||
                               (op == 8'h3a && length != 0 &&
@@ -205,12 +207,14 @@ module ai_descriptor_validator (
     // shared 16x16 Matrix array; unsupported strides, batching, and flags are
     // rejected before dispatch rather than silently ignored.
     // Opcode 0x52 consumes dense A rows padded to a 16-byte K stride, dense
-    // B rows of 16 bytes, and a contiguous INT32 output. Keep these byte-span
+    // B rows padded to a 16-byte N stride, and a contiguous INT32 output. Keep these byte-span
     // calculations in the validator so an in-place destination cannot
     // overwrite operands that later row/K tiles still need to read.
     wire [31:0] gemv_a_bytes =
         ((({16'd0,k_words} + 32'd15) & 32'hffff_fff0) * {16'd0,m_size});
-    wire [31:0] gemv_b_bytes = {16'd0,k_words} << 4;
+    wire [31:0] gemv_b_row_stride =
+        ({16'd0,n_size} + 32'd15) & 32'hffff_fff0;
+    wire [31:0] gemv_b_bytes = {16'd0,k_words} * gemv_b_row_stride;
     wire [31:0] gemv_dst_bytes =
         {16'd0,m_size} * {16'd0,n_size} * 32'd4;
     wire [31:0] gemv_bias_bytes = {16'd0,n_size} << 2;

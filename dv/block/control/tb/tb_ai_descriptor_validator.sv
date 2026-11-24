@@ -231,6 +231,17 @@ module tb_ai_descriptor_validator;
         src1=32'hffff_fff0;
         check_invalid("0x52 B span address overflow");
 
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd64; k_words=16'd64;
+        src0=32'h0000_1000; src1=32'h0000_2000; dst=32'h0000_4000;
+        check_boundary_accept("0x52 single-descriptor 1x64x64 dense B span");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd256; k_words=16'd64;
+        src0=32'h0000_1000; src1=32'h0000_2000; dst=32'h0000_8000;
+        check_boundary_accept("0x52 maximum N tile span 1x256x64");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd18; k_words=16'd64;
+        check_boundary_reject("0x52 wide N requires complete 16-column tiles");
+        set_legal_defaults(8'h52); m_size=16'd1; n_size=16'd272; k_words=16'd64;
+        check_boundary_reject("0x52 N above shared-array mapping limit");
+
         // Opcode 0x53 tile capture/consume bits are additive ABI-v7 fields;
         // old Matrix opcodes remain untouched.
         set_legal_defaults(8'h53); version=8'd7; m_size=16'd16; n_size=16'd16;
@@ -369,10 +380,10 @@ module tb_ai_descriptor_validator;
         boundary_reject_checks = boundary_reject_checks + 1;
 
         if (legal_opcode_checks != 30 || invalid_rule_checks != 40 ||
-            boundary_accept_checks != 47 || boundary_reject_checks != 26)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/40/47/26",
+            boundary_accept_checks != 49 || boundary_reject_checks != 28)
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/40/49/28",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=47/47 boundary_reject=26/26 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=49/49 boundary_reject=28/28 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
         $finish;
     end
 endmodule

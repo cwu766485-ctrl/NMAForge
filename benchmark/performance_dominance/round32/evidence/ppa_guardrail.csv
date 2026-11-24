@@ -1,0 +1,3 @@
+guardrail,target,result,status,evidence,notes
+area growth,<=10% vs pre-R32 product RTL,,BLOCKED_ENV,dc_shell unavailable; TSMC28_STDCELL_DB unset,No synthesis or area claim.
+timing/critical path,configured 4.0 ns target; no new critical-path regression,,BLOCKED_ENV,dc_shell unavailable; private TSMC28 cell and SRAM libraries not configured,No mapped timing or signoff claim.
