@@ -1745,3 +1745,22 @@ ai_deit_round31_attention_output_projection_256k:
 	test "$$(grep -c '^DEIT_R30_STREAM_BATCH_PASS ' "$(AI_DEIT_R31_WO_RUN)/run.log")" -eq 64
 	grep -q '^DEIT_R31_ATTENTION_OUTPUT_PROJECTION_PARTIAL_PASS prefix_desc=468 attention_desc=744 output_projection_desc=120 total_desc=1332 batches=64 query_blocks=1 valid_query_rows=16 ring_wraps=2 .*host_intermediate_tensor_readback=0 host_intermediate_tensor_writeback=0 ' \
 		"$(AI_DEIT_R31_WO_RUN)/run.log"
+
+# Round 35: run a compiler-generated program (sw/compiler) on Product Top at
+# the 512 KiB standard SPAD.  AI_COMPILED_DIR must be a short path (TB file
+# paths are 128 characters).
+AI_COMPILED_DIR ?=
+AI_COMPILED_RUN ?= $(AI_COMPILED_DIR)/sim
+.PHONY: ai_compiled_program
+ai_compiled_program:
+	test -n "$(AI_COMPILED_DIR)" && test -f "$(AI_COMPILED_DIR)/program.memh"
+	mkdir -p "$(AI_COMPILED_RUN)"
+	$(VCS) -full64 -sverilog -timescale=1ns/1ps +define+VCS +define+AI_COMPILED_PROGRAM +define+AI_REPRESENTATIVE_LONG_TASK \
+		+define+AI_SPAD_WORDS_PER_BANK=32768 \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
+		+incdir+../fixtures -Mdir=$(AI_COMPILED_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
+		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_COMPILED_RUN)/simv -l $(AI_COMPILED_RUN)/compile.log
+	$(AI_COMPILED_RUN)/simv +ntb_random_seed=1 +AI_RANDOM_CASES=0 +AI_SEED=1 +ACLK_PERIOD_NS=10.0 \
+		+AI_COMPILED_PROGRAM +AI_COMPILED_DIR=$(AI_COMPILED_DIR) -l $(AI_COMPILED_RUN)/run.log
+	grep -q '^COMPILED_PROGRAM_PASS ' $(AI_COMPILED_RUN)/run.log

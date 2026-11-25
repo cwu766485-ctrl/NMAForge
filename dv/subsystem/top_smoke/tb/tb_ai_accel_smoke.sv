@@ -94,7 +94,9 @@ module tb_ai_accel_smoke;
     localparam REG_EVENT_STATUS    = 32'h0000_0168;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
-`ifdef AI_H64_WEIGHT_DMA
+`ifdef AI_COMPILED_PROGRAM
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 2097152 * 4;
+`elsif AI_H64_WEIGHT_DMA
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 16384 * 4;
 `elsif AI_DEIT_R19_STREAM
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 100000 * 4;
@@ -1701,7 +1703,9 @@ module tb_ai_accel_smoke;
         .m_axi_bready  (m_axi_bready)
     );
 
-`ifdef AI_H64_WEIGHT_DMA
+`ifdef AI_COMPILED_PROGRAM
+    axi_memory_model #(.WORDS(2097152)) axi_mem_u(
+`elsif AI_H64_WEIGHT_DMA
     axi_memory_model #(.WORDS(32768)) axi_mem_u(
 `elsif AI_DEIT_R19_STREAM
     axi_memory_model #(.WORDS(100000)) axi_mem_u(
@@ -2656,6 +2660,133 @@ module tb_ai_accel_smoke;
             axi_write(REG_CMDQ_SIZE, 32'd0);
             axi_write(REG_CPLQ_SIZE, 32'd0);
             clear_done_irq();
+        end
+    endtask
+
+    // ------------------------------------------------------------------
+    // Round 35 compiled-program runtime (sw/compiler).  Segments of fenced
+    // AXI DMA loads followed by resident-ring descriptor batches; ordering is
+    // the descriptors' ABI completion-event chain.  Checkpoints are compared
+    // through the passive behavioral-SPAD backdoor at the exact cycle each
+    // descriptor's completion becomes visible; final words after the last
+    // segment.  No host SPAD data writes: all data enters through the DMA.
+`ifdef AI_COMPILED_PROGRAM
+    reg [31:0] cp_prog [0:8388607];
+`else
+    reg [31:0] cp_prog [0:15];
+`endif
+    task run_compiled_program;
+        reg [1023:0] cp_dir;
+        reg [1023:0] cp_file;
+        reg [31:0] dw [0:15];
+        reg [31:0] cw [0:3];
+        reg [31:0] st, ch, ct, rv;
+        reg dma_ok, idle_ok;
+        integer cur, nseg, seg, ndma, ndesc, nck, i, w, qsize, dbase, cbase;
+        integer cum, seg_start, observed, done_cnt, poll, nfinal, slot, tail, ck_cur, ck_end;
+        integer t_dma, t_stage, t_compute, t0, total_desc, total_ck, bad;
+        begin
+            if (!$value$plusargs("AI_COMPILED_DIR=%s", cp_dir))
+                $fatal(1, "AI_COMPILED_PROGRAM requires +AI_COMPILED_DIR");
+            $sformat(cp_file, "%0s/program.memh", cp_dir);
+            $readmemh(cp_file, cp_prog);
+            $sformat(cp_file, "%0s/ddr.memh", cp_dir);
+            $readmemh(cp_file, axi_mem_u.mem);
+            if (cp_prog[0] !== 32'h4E4D4146 || cp_prog[1] !== 32'd1)
+                $fatal(1, "compiled program magic/version mismatch %08h %08h", cp_prog[0], cp_prog[1]);
+            qsize = cp_prog[2]; dbase = cp_prog[3]; cbase = cp_prog[4]; nseg = cp_prog[5];
+            axi_write(REG_CMDQ_CTRL, 32'd0);
+            axi_write(REG_CMDQ_BASE_LO, dbase);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, qsize);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, cbase);
+            axi_write(REG_CPLQ_SIZE, qsize);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            cur = 6; cum = 0; t_dma = 0; t_stage = 0; t_compute = 0; total_desc = 0; total_ck = 0;
+            for (seg = 0; seg < nseg; seg = seg + 1) begin
+                ndma = cp_prog[cur]; ndesc = cp_prog[cur + 1]; nck = cp_prog[cur + 2]; cur = cur + 3;
+                t0 = transformer_top_cycle_counter;
+                for (i = 0; i < ndma; i = i + 1) begin
+                    axi_write(REG_DMA_EXT_ADDR, cp_prog[cur]);
+                    axi_write(REG_DMA_SPAD_ADDR, cp_prog[cur + 1]);
+                    axi_write(REG_DMA_LENGTH, cp_prog[cur + 2]);
+                    axi_write(REG_DMA_CTRL, 32'd1);
+                    runtime_wait_dma_fence(dma_ok);
+                    if (!dma_ok) $fatal(1, "compiled DMA failed segment=%0d entry=%0d", seg, i);
+                    cur = cur + 3;
+                end
+                t_dma = t_dma + (transformer_top_cycle_counter - t0);
+                if (ndesc >= qsize) $fatal(1, "compiled segment %0d exceeds queue", seg);
+                t0 = transformer_top_cycle_counter;
+                seg_start = cum % qsize;
+                for (i = 0; i < ndesc; i = i + 1) begin
+                    for (w = 0; w < 16; w = w + 1) dw[w] = cp_prog[cur + i * 16 + w];
+                    runtime_write_descriptor_words(dbase + ((seg_start + i) % qsize) * 64, dw);
+                end
+                t_stage = t_stage + (transformer_top_cycle_counter - t0);
+                ck_cur = cur + ndesc * 16;
+                ck_end = ck_cur + nck * 3;
+                t0 = transformer_top_cycle_counter;
+                tail = (seg_start + ndesc) % qsize;
+                if (ndesc > 0) begin
+                    axi_write(REG_CMDQ_TAIL, tail);
+                    axi_write(REG_DOORBELL, 32'd1);
+                end
+                observed = 0; poll = 0;
+                while (observed < ndesc) begin
+                    @(posedge aclk); #1;
+                    done_cnt = (dut.processor_cplq_tail + qsize - seg_start) % qsize;
+                    while (observed < done_cnt && observed < ndesc) begin
+                        slot = (seg_start + observed) % qsize;
+                        for (w = 0; w < 4; w = w + 1)
+                            cw[w] = representative_spad_backdoor_read(cbase + slot * 16 + w * 4);
+                        if (cw[0] !== cp_prog[cur + observed * 16][31:16] || cw[1] !== 32'd1)
+                            $fatal(1, "COMPILED_COMPLETION_FAIL segment=%0d desc=%0d task=%08h status=%08h",
+                                   seg, observed, cw[0], cw[1]);
+                        bad = 0;
+                        while (ck_cur < ck_end && cp_prog[ck_cur] == observed) begin
+                            rv = representative_spad_backdoor_read(cp_prog[ck_cur + 1]);
+                            if (rv !== cp_prog[ck_cur + 2]) begin
+                                if (bad < 6)
+                                    $display("COMPILED_CHECKPOINT_MISMATCH segment=%0d desc=%0d addr=%08h expected=%08h observed=%08h",
+                                             seg, observed, cp_prog[ck_cur + 1], cp_prog[ck_cur + 2], rv);
+                                bad = bad + 1;
+                            end
+                            total_ck = total_ck + 1;
+                            ck_cur = ck_cur + 3;
+                        end
+                        if (bad) $fatal(1, "COMPILED_CHECKPOINT_FAIL segment=%0d desc=%0d mismatches=%0d", seg, observed, bad);
+                        observed = observed + 1;
+                    end
+                    poll = poll + 1;
+                    if (poll > 20000000) $fatal(1, "compiled segment %0d timeout observed=%0d/%0d", seg, observed, ndesc);
+                end
+                if (ndesc > 0) begin
+                    runtime_wait_queue_idle(tail, tail, idle_ok, st, ch, ct);
+                    if (!idle_ok) $fatal(1, "compiled segment %0d did not retire", seg);
+                    axi_write(REG_CPLQ_HEAD, tail);
+                end
+                t_compute = t_compute + (transformer_top_cycle_counter - t0);
+                if (ck_cur != ck_end) $fatal(1, "compiled checkpoint records unconsumed segment=%0d", seg);
+                cur = ck_end;
+                cum = cum + ndesc; total_desc = total_desc + ndesc;
+            end
+            nfinal = cp_prog[cur]; cur = cur + 1; bad = 0;
+            for (i = 0; i < nfinal; i = i + 1) begin
+                rv = representative_spad_backdoor_read(cp_prog[cur + 2 * i]);
+                if (rv !== cp_prog[cur + 2 * i + 1]) begin
+                    if (bad < 6)
+                        $display("COMPILED_FINAL_MISMATCH addr=%08h expected=%08h observed=%08h",
+                                 cp_prog[cur + 2 * i], cp_prog[cur + 2 * i + 1], rv);
+                    bad = bad + 1;
+                end
+            end
+            if (bad) $fatal(1, "COMPILED_FINAL_FAIL mismatches=%0d/%0d", bad, nfinal);
+            $display("COMPILED_PROGRAM_PASS segments=%0d descriptors=%0d checkpoint_words=%0d final_words=%0d compute_window_cycles=%0d dma_fenced_cycles=%0d descriptor_staging_cycles=%0d host_spad_data_writes=0",
+                     nseg, total_desc, total_ck, nfinal, t_compute, t_dma, t_stage);
         end
     endtask
 
@@ -7176,6 +7307,11 @@ module tb_ai_accel_smoke;
             if (errors != 0)
                 $fatal(1, "H16 incremental decode had %0d mismatches", errors);
             $display("H16_INCREMENTAL_TOP_PASS");
+            $finish;
+        end
+
+        if ($test$plusargs("AI_COMPILED_PROGRAM")) begin
+            run_compiled_program();
             $finish;
         end
 
