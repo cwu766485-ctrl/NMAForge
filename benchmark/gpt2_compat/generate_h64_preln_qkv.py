@@ -217,7 +217,17 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
              queue_slots_override: int | None = None,
              model_override: dict[str, np.ndarray] | None = None,
              numeric_profile: str = "frozen",
-             kv_cache_initial: dict[str, list[int]] | None = None) -> dict:
+             kv_cache_initial: dict[str, list[int]] | None = None,
+             active_row_lo: int | None = None) -> dict:
+    """Generate one H64 decoder layer.
+
+    ``active_row_lo`` enables active-row mapping: row-wise SFU commands
+    (residual, LayerNorm, Requant/pack, GELU, causal Softmax) process only
+    token rows ``[active_row_lo, len(tokens))``.  Matrix commands still use
+    the fixed 16-row physical tiles.  The software Golden is unchanged and
+    still covers every row; callers must restrict Product checks to the active
+    rows.  ``None`` keeps the historical fixed 16-row SFU schedule.
+    """
     if numeric_profile not in {"frozen", "round21_residual_gelu_aligned"}:
         raise ValueError(f"unsupported numeric profile: {numeric_profile}")
     if include_ffn and not include_attention:
@@ -243,6 +253,63 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     if kv_append_from and (not include_kv_attention or kv_k_write_mode not in {
             "qk-compatible-append", "token-append"}):
         raise ValueError("incremental KV append requires supported cache-backed attention")
+    if active_row_lo is not None:
+        if not include_kv_attention:
+            raise ValueError("active-row mapping requires cache-backed attention")
+        if not 0 <= active_row_lo < len(tokens) or active_row_lo > kv_append_from:
+            raise ValueError("active rows must start at or before the first appended KV token")
+        row_lo, row_hi = active_row_lo, len(tokens)
+    else:
+        row_lo, row_hi = 0, ROWS
+    active_count = row_hi - row_lo
+
+    def add_requant_pack_rows(prefix: str, src, dst, n: int, shift: int,
+                              dst_base_offset: int = 0,
+                              dst_row_group_words: int | None = None,
+                              src_row_words: int | None = None,
+                              max_span: int = ROWS) -> None:
+        """Emit Matrix-A packed Requant for the row groups holding active rows.
+
+        Matrix-A packing stores element (r, c) at word
+        ``(r // 4) * group_words + (c // 4) * 4 + r % 4``.  The ABI requires a
+        packed Requant ``m_size`` that is a multiple of four, so the active
+        rows are covered by whole aligned four-row groups.  Rows of a group
+        outside the active range are physical padding: a Matrix output row
+        depends only on its own A row, and KV append/Softmax consume only
+        active rows, so their values never reach a checked active output.
+        """
+        group_words = n if dst_row_group_words is None else dst_row_group_words
+        row_words = n if src_row_words is None else src_row_words
+        if active_row_lo is None:
+            mapper.add(prefix, OP_REQUANT, src, dst, m=ROWS, n=n,
+                       k_or_length=ROWS * n,
+                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=shift, aux0=1,
+                       dst_offset=dst_base_offset)
+            return
+        # The SFU advances one row group by n_size words, so a destination
+        # whose row-group stride differs from n (head concat) is emitted one
+        # group per command.
+        groups_per_cmd = max(1, max_span // 4) if group_words == n else 1
+        group = row_lo // 4
+        last_group = (row_hi - 1) // 4
+        while group <= last_group:
+            count = min(groups_per_cmd, last_group - group + 1)
+            row = group * 4
+            mapper.add(f"{prefix}_r{row}_{row + 4 * count}", OP_REQUANT, src, dst,
+                       m=4 * count, n=n, k_or_length=4 * count * n,
+                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=shift,
+                       aux0=1, src0_offset=row * row_words * 4,
+                       dst_offset=dst_base_offset + group * group_words * 4)
+            group += count
+
+    def add_rowwise(name: str, op: int, src, dst, width: int, src1=None,
+                    **kwargs) -> None:
+        """Emit one contiguous row-major elementwise command over active rows."""
+        if src1 is not None:
+            kwargs["src1"] = src1.addr + row_lo * width * 4
+        mapper.add(name, op, src, dst, k_or_length=active_count * width,
+                   src0_offset=row_lo * width * 4, dst_offset=row_lo * width * 4,
+                   **kwargs)
     model = make_model(seed) if model_override is None else {
         name: np.asarray(value).copy() for name, value in model_override.items()
     }
@@ -298,8 +365,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                "row-major", position.reshape(-1).tolist())
     combined_t = mapper.tensor("embedding_plus_position_i32", (ROWS, HIDDEN), "i32",
                                "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
-    mapper.add("embedding_position_residual", OP_RESIDUAL, embedding_t, combined_t,
-               src1=position_t, k_or_length=ROWS * HIDDEN, aux0=1)
+    add_rowwise("embedding_position_residual", OP_RESIDUAL, embedding_t, combined_t,
+                HIDDEN, src1=position_t, aux0=1)
 
     if include_ffn:
         gamma_values = [int(value) * 1024 for value in layer_params["ln1_gamma"]]
@@ -321,11 +388,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     combined_rows = combined.reshape(ROWS, HIDDEN)
     norm = np.zeros_like(combined_rows)
     for row in range(ROWS):
-        mapper.add(f"preln_row{row}", OP_LAYERNORM, combined_t, norm_t,
-                   src1=gamma_t, bias=beta_t, k_or_length=HIDDEN,
-                   flags=FLAG_BIAS, aux0=1,
-                   src0_offset=row * HIDDEN * 4,
-                   dst_offset=row * HIDDEN * 4)
+        if row_lo <= row < row_hi:
+            mapper.add(f"preln_row{row}", OP_LAYERNORM, combined_t, norm_t,
+                       src1=gamma_t, bias=beta_t, k_or_length=HIDDEN,
+                       flags=FLAG_BIAS, aux0=1,
+                       src0_offset=row * HIDDEN * 4,
+                       dst_offset=row * HIDDEN * 4)
         norm[row] = layernorm_q15(combined_rows[row].tolist(), gamma_values, beta_values)
 
     packed_values = _pack_matrix_a_physical(
@@ -333,9 +401,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
     )
     packed_t = mapper.tensor("preln_matrix_a_i8", (ROWS, HIDDEN), "i8_packed",
                              "matrix_a_tile", [0xA55AA55A] * len(packed_values), False)
-    mapper.add("preln_requant_pack_matrix_a", OP_REQUANT, norm_t, packed_t,
-               m=ROWS, n=HIDDEN, k_or_length=ROWS * HIDDEN,
-               flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+    add_requant_pack_rows("preln_requant_pack_matrix_a", norm_t, packed_t, HIDDEN, 0)
 
     projection_golden: dict[int, int] = {}
     projection_tiles = {}
@@ -411,12 +477,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                  "matrix_a_tile", [0xA55AA55A] * 64, False)
             k8_t = mapper.tensor(f"attn_k_h{head}_i8", (ROWS, 16), "i8_packed",
                                  "matrix_a_tile", [0xA55AA55A] * 64, False)
-            mapper.add(f"attn_q_h{head}_requant", OP_REQUANT, q_raw, q8_t,
-                       m=ROWS, n=16, k_or_length=ROWS * 16,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
-            mapper.add(f"attn_k_h{head}_requant", OP_REQUANT, k_raw, k8_t,
-                       m=ROWS, n=16, k_or_length=ROWS * 16,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+            add_requant_pack_rows(f"attn_q_h{head}_requant", q_raw, q8_t, 16, 0)
+            add_requant_pack_rows(f"attn_k_h{head}_requant", k_raw, k8_t, 16, 0)
             if include_ffn:
                 for packed_tensor, values in ((q8_t, q_values), (k8_t, k_values)):
                     for word, value in enumerate(_pack_matrix_a_physical(values)):
@@ -438,11 +500,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                     f"attn_v_h{head}_cache_source_i8", (ROWS, 16), "i8_packed",
                     "matrix_a_tile", [0xA55AA55A] * 64, False,
                 )
-                mapper.add(f"attn_v_h{head}_cache_requant", OP_REQUANT,
-                           v_raw, v_cache_src, m=ROWS, n=16,
-                           k_or_length=ROWS * 16,
-                           flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-                           shift=0, aux0=1)
+                add_requant_pack_rows(f"attn_v_h{head}_cache_requant",
+                                      v_raw, v_cache_src, 16, 0)
                 for word, value in enumerate(_pack_matrix_a_physical(v_values)):
                     attention_golden[v_cache_src.addr + word * 4] = value & 0xFFFFFFFF
 
@@ -595,11 +654,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                    "row-major", prob_init, True)
             probs = [[0] * ROWS for _ in range(ROWS)]
             for row in range(len(tokens)):
-                mapper.add(f"attn_h{head}_causal_softmax_t{row}",
-                           OP_CAUSAL_SOFTMAX, score_t, prob_t,
-                           k_or_length=ROWS, aux0=row,
-                           src0_offset=row * ROWS * 4,
-                           dst_offset=row * ROWS * 4)
+                if row >= row_lo:
+                    mapper.add(f"attn_h{head}_causal_softmax_t{row}",
+                               OP_CAUSAL_SOFTMAX, score_t, prob_t,
+                               k_or_length=ROWS, aux0=row,
+                               src0_offset=row * ROWS * 4,
+                               dst_offset=row * ROWS * 4)
                 masked = [scores[row][col] if col <= row else -(1 << 31)
                           for col in range(ROWS)]
                 probs[row] = softmax_q15(masked)
@@ -614,10 +674,7 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             p8 = [requant_i8(row, 8) for row in probs]
             p8_t = mapper.tensor(f"attn_h{head}_prob_i8", (ROWS, ROWS), "i8_packed",
                                  "matrix_a_tile", [0xA55AA55A] * 64, False)
-            mapper.add(f"attn_h{head}_prob_requant", OP_REQUANT, prob_t, p8_t,
-                       m=ROWS, n=ROWS, k_or_length=ROWS * ROWS,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-                       shift=8, aux0=1)
+            add_requant_pack_rows(f"attn_h{head}_prob_requant", prob_t, p8_t, ROWS, 8)
             if include_ffn:
                 for word, value in enumerate(_pack_matrix_a_physical(p8)):
                     attention_golden[p8_t.addr + word * 4] = value & 0xFFFFFFFF
@@ -674,14 +731,21 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                         av[row][col] & 0xFFFFFFFF
                     merged_i8[row][head * 16 + col] = max(-128, min(127, av[row][col]))
             attention_checkpoints.append((av_t.name, av_t))
+            if active_row_lo is not None:
+                # Head-concat requant only for active rows; the 16-column head
+                # slice starts at word head*16 inside each 64-word row group.
+                add_requant_pack_rows(f"attn_h{head}_av_requant_concat", av_t,
+                                      merged_t, 16, 0, dst_base_offset=head * 16 * 4,
+                                      dst_row_group_words=HIDDEN)
             for row_group in range(ROWS // 4):
-                mapper.add(f"attn_h{head}_av_requant_concat_rg{row_group}",
-                           OP_REQUANT, av_t, merged_t, m=4, n=16,
-                           k_or_length=4 * 16,
-                           flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-                           shift=0, aux0=1,
-                           src0_offset=row_group * 4 * 16 * 4,
-                           dst_offset=(row_group * 64 + head * 16) * 4)
+                if active_row_lo is None:
+                    mapper.add(f"attn_h{head}_av_requant_concat_rg{row_group}",
+                               OP_REQUANT, av_t, merged_t, m=4, n=16,
+                               k_or_length=4 * 16,
+                               flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
+                               shift=0, aux0=1,
+                               src0_offset=row_group * 4 * 16 * 4,
+                               dst_offset=(row_group * 64 + head * 16) * 4)
                 packed_group = _pack_matrix_a_physical(
                     [row[head * 16:(head + 1) * 16]
                      for row in merged_i8[row_group * 4:(row_group + 1) * 4]],
@@ -709,8 +773,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
 
         residual1_t = mapper.tensor("residual1_i32", (ROWS, HIDDEN), "i32",
                                    "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
-        mapper.add("attn_residual1", OP_RESIDUAL, combined_t, residual1_t,
-                   src1=output_t, k_or_length=ROWS * HIDDEN, aux0=1)
+        add_rowwise("attn_residual1", OP_RESIDUAL, combined_t, residual1_t,
+                    HIDDEN, src1=output_t, aux0=1)
         residual1 = np.zeros((ROWS, HIDDEN), dtype=np.int32)
         for row in range(ROWS):
             for col in range(HIDDEN):
@@ -723,11 +787,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                 "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
         norm2_matrix = np.zeros((ROWS, HIDDEN), dtype=np.int32)
         for row in range(ROWS):
-            mapper.add(f"ln2_row{row}", OP_LAYERNORM, residual1_t, norm2_t,
-                       src1=gamma2_t, bias=beta2_t, k_or_length=HIDDEN,
-                       flags=FLAG_BIAS, aux0=1,
-                       src0_offset=row * HIDDEN * 4,
-                       dst_offset=row * HIDDEN * 4)
+            if row_lo <= row < row_hi:
+                mapper.add(f"ln2_row{row}", OP_LAYERNORM, residual1_t, norm2_t,
+                           src1=gamma2_t, bias=beta2_t, k_or_length=HIDDEN,
+                           flags=FLAG_BIAS, aux0=1,
+                           src0_offset=row * HIDDEN * 4,
+                           dst_offset=row * HIDDEN * 4)
             norm2 = layernorm_q15(residual1[row].tolist(), gamma2_values, beta2_values)
             for col, value in enumerate(norm2):
                 norm2_matrix[row, col] = int(value)
@@ -747,10 +812,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             "l0.ffn_input_i8_matrix_a", (ROWS, HIDDEN), "i8_packed",
             "matrix_a_tile", [0xA55AA55A] * len(packed_ffn_values), False,
         )
-        mapper.add("l0.ffn_input_requant_pack", OP_REQUANT, norm2_t,
-                   packed_ffn_t, m=ROWS, n=HIDDEN, k_or_length=ROWS * HIDDEN,
-                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A,
-                   shift=0, aux0=1)
+        add_requant_pack_rows("l0.ffn_input_requant_pack", norm2_t, packed_ffn_t,
+                              HIDDEN, 0)
         for word, value in enumerate(packed_ffn_values):
             ffn_golden[packed_ffn_t.addr + word * 4] = value & 0xFFFFFFFF
 
@@ -773,12 +836,11 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
             mapper.add(f"l0.ffn_up_n{tile}", OP_GEMM, packed_ffn_t, up_t,
                        src1=weight_t, m=ROWS, n=16, k_or_length=HIDDEN // 4,
                        aux0=1)
-            mapper.add(f"l0.ffn_gelu_n{tile}", OP_GELU, up_t, gelu_t,
-                       m=ROWS, n=16, k_or_length=ROWS * 16, aux0=1)
+            add_rowwise(f"l0.ffn_gelu_n{tile}", OP_GELU, up_t, gelu_t, 16,
+                        m=ROWS, n=16, aux0=1)
             gelu_shift = 5 if numeric_profile == "round21_residual_gelu_aligned" else 0
-            mapper.add(f"l0.ffn_requant_pack_n{tile}", OP_REQUANT, gelu_t, out_t,
-                       m=ROWS, n=16, k_or_length=ROWS * 16,
-                       flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=gelu_shift, aux0=1)
+            add_requant_pack_rows(f"l0.ffn_requant_pack_n{tile}", gelu_t, out_t, 16,
+                                  gelu_shift)
             up_values = gemm_i8_i32(ln2_i8, weight)
             gelu_values = [[gelu_q8_8(value) for value in row]
                            for row in up_values]
@@ -822,13 +884,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                 for col in range(HIDDEN):
                     down_values[row][col] += partial_values[row][col]
             if tile:
-                mapper.add(f"l0.ffn_down_accumulate_k{tile}", OP_RESIDUAL,
-                           down_acc, down_acc, src1=down_partial,
-                           k_or_length=ROWS * HIDDEN, aux0=1)
+                add_rowwise(f"l0.ffn_down_accumulate_k{tile}", OP_RESIDUAL,
+                            down_acc, down_acc, HIDDEN, src1=down_partial, aux0=1)
         residual2_t = mapper.tensor("l0.residual2_i32", (ROWS, HIDDEN), "i32",
                                     "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
-        mapper.add("l0.ffn_residual2", OP_RESIDUAL, down_acc, residual2_t,
-                   src1=residual1_t, k_or_length=ROWS * HIDDEN, aux0=1)
+        add_rowwise("l0.ffn_residual2", OP_RESIDUAL, down_acc, residual2_t,
+                    HIDDEN, src1=residual1_t, aux0=1)
         for row in range(ROWS):
             for col in range(HIDDEN):
                 offset = 4 * (row * HIDDEN + col)
@@ -852,11 +913,12 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
                                    "row-major", [0xA55AA55A] * (ROWS * HIDDEN), False)
         final_ln = np.zeros((ROWS, HIDDEN), dtype=np.int32)
         for row in range(ROWS):
-            mapper.add(f"final_ln_row{row}", OP_LAYERNORM, residual2_t, final_ln_t,
-                       src1=final_gamma_t, bias=final_beta_t,
-                       k_or_length=HIDDEN, flags=FLAG_BIAS, aux0=1,
-                       src0_offset=row * HIDDEN * 4,
-                       dst_offset=row * HIDDEN * 4)
+            if row_lo <= row < row_hi:
+                mapper.add(f"final_ln_row{row}", OP_LAYERNORM, residual2_t, final_ln_t,
+                           src1=final_gamma_t, bias=final_beta_t,
+                           k_or_length=HIDDEN, flags=FLAG_BIAS, aux0=1,
+                           src0_offset=row * HIDDEN * 4,
+                           dst_offset=row * HIDDEN * 4)
             final_ln[row] = layernorm_q15(final_input[row], final_gamma, final_beta)
             for col in range(HIDDEN):
                 final_output_golden[final_ln_t.addr + 4 * (row * HIDDEN + col)] = \
@@ -868,10 +930,8 @@ def generate(out: Path, seed: int = 20261114, include_attention: bool = False,
         final_packed_t = mapper.tensor(
             "final_ln_matrix_a_i8", (ROWS, HIDDEN), "i8_packed", "matrix_a_tile",
             [0xA55AA55A] * len(final_packed_words), False)
-        mapper.add("final_ln_requant_pack_matrix_a", OP_REQUANT, final_ln_t,
-                   final_packed_t, m=ROWS, n=HIDDEN,
-                   k_or_length=ROWS * HIDDEN,
-                   flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A, shift=0, aux0=1)
+        add_requant_pack_rows("final_ln_requant_pack_matrix_a", final_ln_t,
+                              final_packed_t, HIDDEN, 0)
         for word, value in enumerate(final_packed_words):
             final_output_golden[final_packed_t.addr + word * 4] = value & 0xFFFFFFFF
 

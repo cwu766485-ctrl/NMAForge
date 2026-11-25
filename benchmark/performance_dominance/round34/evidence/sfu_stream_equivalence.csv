@@ -1,0 +1,7 @@
+log,cases,fault_cases,fast_path_cases,legacy_fallback_cases,legacy_cycles,fast_cycles,stall,stability_checks
+/tmp/nmaf34/eq_fixed/run_20261125.log,491,60,431,60,573978,239964,0,0
+/tmp/nmaf34/eq_fixed/run_20261126.log,491,60,439,52,611202,247028,0,0
+/tmp/nmaf34/eq_fixed/run_20261127.log,491,60,433,58,593981,227071,0,0
+/tmp/nmaf34/eq_stall/run_20261125.log,491,60,431,60,716651,300011,1,40078
+/tmp/nmaf34/eq_stall/run_20261126.log,491,60,439,52,762374,309893,1,42991
+/tmp/nmaf34/eq_stall/run_20261127.log,491,60,433,58,740561,287218,1,41938

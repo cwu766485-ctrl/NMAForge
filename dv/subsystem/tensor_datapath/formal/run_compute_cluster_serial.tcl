@@ -11,6 +11,7 @@ set RTL_FILES [list \
     [file join $RTL compute matrix ai_tensor_matrix_datapath.v] \
     [file join $RTL compute matrix ai_tensor_matrix_core.v] \
     [file join $RTL compute sfu ai_tensor_sfu_math.v] \
+    [file join $RTL compute sfu ai_tensor_sfu_stream.v] \
     [file join $RTL compute sfu ai_tensor_sfu_core.v] \
     [file join $RTL compute cnn ai_conv3x3_linebuffer_core.v] \
     [file join $RTL compute kv ai_kv_cache_engine.v] \

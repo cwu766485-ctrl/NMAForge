@@ -101,8 +101,13 @@ def patch_cache_before(previous: Path, current: Path) -> None:
 
 def compare_with_prefix_recompute(incremental: Path, seed: int,
                                   tokens: list[int], model_override: dict | None,
-                                  numeric_profile: str) -> int:
-    """Check every Product checkpoint against a fresh full-prefix Golden."""
+                                  numeric_profile: str, active_rows: bool = False) -> int:
+    """Check every Product checkpoint against a fresh full-prefix Golden.
+
+    In active-row mode the incremental checkpoints cover only the new token
+    row (plus complete KV readbacks); every checked word must still exist in
+    and equal the independent fixed-row prefix-recompute Golden.
+    """
     with tempfile.TemporaryDirectory(prefix="nmaforge_h64_kv_reference_") as temp:
         reference = Path(temp) / "prefix"
         build(reference, seed, tokens, model_override, numeric_profile)
@@ -113,7 +118,17 @@ def compare_with_prefix_recompute(incremental: Path, seed: int,
                 name = spec["tensor_id"]
                 got = checkpoint_record(incremental, layer, name)
                 want = checkpoint_record(reference, layer, name)
-                if got != want:
+                if active_rows:
+                    if not got:
+                        raise ValueError(f"active-row checkpoint is empty: layer={layer} tensor={name}")
+                    mismatch = [addr for addr, value in got.items() if want.get(addr) != value]
+                    if mismatch:
+                        address = mismatch[0]
+                        raise ValueError(
+                            f"active-row incremental differs from prefix recompute: "
+                            f"layer={layer} tensor={name} address={address:#x} "
+                            f"incremental={got.get(address)} prefix={want.get(address)}")
+                elif got != want:
                     address = next((addr for addr in sorted(set(got) | set(want))
                                     if got.get(addr) != want.get(addr)), None)
                     raise ValueError(
@@ -127,7 +142,8 @@ def compare_with_prefix_recompute(incremental: Path, seed: int,
 def build_session(out: Path, seed: int, prompt: list[int], generated: int,
                   model_override: dict | None = None,
                   numeric_profile: str = "frozen",
-                  kv_mode: str = "prefix_recompute") -> dict:
+                  kv_mode: str = "prefix_recompute",
+                  active_rows: bool = False) -> dict:
     if len(prompt) != 4 or generated < 1 or len(prompt) + generated > 16:
         raise ValueError("requires a four-token prompt and 1..12 generated tokens")
     if kv_mode not in {"prefix_recompute", "persistent_incremental"}:
@@ -137,7 +153,8 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
     current_tokens = list(prompt)
     current_dir = out
     current_manifest = build(current_dir, seed, current_tokens, model_override,
-                             numeric_profile, kv_append_from=0)
+                             numeric_profile, kv_append_from=0,
+                             active_rows=active_rows)
     raw_model = np.load(current_dir / "raw_layer0/canonical_h64_model.npz")
     embedding = raw_model["embedding"].astype(np.int32)
     position = raw_model["position"].astype(np.int32)
@@ -181,6 +198,7 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
             next_dir, seed, current_tokens, model_override, numeric_profile,
             kv_append_from=append_from,
             kv_cache_before_by_layer=cache_before,
+            active_rows=active_rows,
         )
         previous_allocations = {item["tensor_id"]: item
                                 for item in current_manifest["allocation_records"]}
@@ -194,7 +212,8 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
         equivalent_words = 0
         if kv_mode == "persistent_incremental":
             equivalent_words = compare_with_prefix_recompute(
-                next_dir, seed, current_tokens, model_override, numeric_profile)
+                next_dir, seed, current_tokens, model_override, numeric_profile,
+                active_rows)
         patch_cache_before(current_dir, next_dir)
         records[-1]["next_context"] = str(next_dir.relative_to(out))
         records[-1]["kv_append_from"] = append_from
@@ -213,6 +232,7 @@ def build_session(out: Path, seed: int, prompt: list[int], generated: int,
                  if kv_mode == "persistent_incremental" else
                  "four_layer_prefix_recompute_same_top_instance"),
         "kv_mode": kv_mode,
+        "row_mapping": ("active_rows_new_token_only" if active_rows else "fixed_16_row_tiles"),
         "seed": seed,
         "prompt_tokens": prompt,
         "expected_generated_tokens": generated_tokens,
@@ -250,6 +270,8 @@ def main() -> None:
                         default="frozen", help="fixed-point projection/GELU contract")
     parser.add_argument("--kv-mode", choices=("prefix_recompute", "persistent_incremental"),
                         default="prefix_recompute")
+    parser.add_argument("--active-rows", action="store_true",
+                        help="map row-wise SFU work to the context's new token rows only")
     args = parser.parse_args()
     prompt = [int(item, 0) for item in args.prompt.split(",") if item]
     model_override = None
@@ -257,7 +279,7 @@ def main() -> None:
         with np.load(args.model_npz, allow_pickle=False) as archive:
             model_override = {name: archive[name] for name in archive.files}
     build_session(args.out, args.seed, prompt, args.generated, model_override,
-                  args.numeric_profile, args.kv_mode)
+                  args.numeric_profile, args.kv_mode, args.active_rows)
 
 
 if __name__ == "__main__":

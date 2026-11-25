@@ -1,5 +1,27 @@
 # Project update log
 
+## NMAForge V1.3 Round 34 — Transformer operators, GPT-2 runtime and SFU fast path (2026-11-25)
+
+Isolated branch `research/nmaforge-v1.3-round34-transformer-sfu` (base Round 33
+`49221642`, uncommitted working tree; delta hash in the run manifest).
+
+- **Operator comparison.** A matched start-to-done comparison against pinned
+  TinyNPU first showed the legacy SFU at 1.5–4.8× more cycles. The new
+  streaming fast path is 1.98× faster on GELU, 2.11× on Softmax(197) and 1.08×
+  on LayerNorm(197), and ties on Residual. It is bit-exact; TinyNPU's INT8
+  LayerNorm is numerically invalid on these inputs.
+- **GPT-2 H64 decode.** Active-row SFU mapping, batch resident publication
+  and zero-time checkpoints give 7.65×. Adding the SFU fast path gives 10.9×:
+  4,190,904 → 384,617 cycles for three tokens, with every logit bit-exact.
+- **DeiT.** The Round 31 attention+Wo 16-query slice drops from 811,476 to
+  418,662 cycles.
+- **Regressions.** SFU legacy-vs-fast differential (3 seeds × 2 timing modes),
+  legacy SFU random, `ai_smoke`, the 20-case seeded Top regression and
+  Compute Cluster UVM at 128/256/512 KiB all pass.
+- **Not run.** DC/PPA, SpyGlass and formal on the new module.
+
+See the [Round 34 report](benchmark/NMAFORGE_V1_3_ROUND34_TRANSFORMER_SFU.md).
+
 ## NMAForge V1.3 Round 32 — TinyNPU performance catch-up (2026-11-24)
 
 Implemented and measured a bounded Product RTL optimization on isolated branch

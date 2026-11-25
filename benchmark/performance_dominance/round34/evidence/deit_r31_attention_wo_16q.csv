@@ -1,0 +1,3 @@
+sfu,prefix_desc,attention_desc,output_projection_desc,total_desc,batches,query_blocks,valid_query_rows,ring_wraps,wo_dma_events,wo_dma_bytes,wo_dma_cycles,golden_words,runtime_cycles,reset_events,host_intermediate_tensor_readback,host_intermediate_tensor_writeback
+legacy_sequential,468,744,120,1332,64,1,16,2,48,37632,11670,72384,811476,0,0,0
+stream_fast_path,468,744,120,1332,64,1,16,2,48,37632,11670,72384,418662,0,0,0

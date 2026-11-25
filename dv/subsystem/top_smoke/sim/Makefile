@@ -1401,6 +1401,20 @@ AI_H64_NUMERIC_PROFILE ?= frozen
 AI_H64_FOUR_LAYER_LOGITS_ROW ?= $(shell printf '%s\n' '$(AI_H64_FOUR_LAYER_TOKENS)' | awk -F, '{print NF-1}')
 AI_H64_AUTOREGRESSIVE ?= 0
 AI_H64_AUTOREGRESSIVE_KV_MODE ?= prefix_recompute
+# Round 34 runtime options (default off = historical flow):
+# AI_H64_ACTIVE_ROWS=1 maps row-wise SFU work to each context's new token rows
+# (autoregressive persistent-incremental mode only); AI_H64_BATCH_PUBLISH=1
+# stages each layer program as a resident ring program and publishes it in
+# event-chained segments with passive zero-time checkpoint observation.
+AI_H64_ACTIVE_ROWS ?= 0
+AI_H64_BATCH_PUBLISH ?= 0
+AI_H64_RUNTIME_PLUSARGS := $(if $(filter 1,$(AI_H64_ACTIVE_ROWS)),+AI_H64_ACTIVE_ROWS,) \
+	$(if $(filter 1,$(AI_H64_BATCH_PUBLISH)),+AI_H64_BATCH_PUBLISH,)
+ifeq ($(AI_H64_ACTIVE_ROWS),1)
+ifneq ($(AI_H64_AUTOREGRESSIVE)$(AI_H64_AUTOREGRESSIVE_KV_MODE),1persistent_incremental)
+$(error AI_H64_ACTIVE_ROWS=1 requires AI_H64_AUTOREGRESSIVE=1 and AI_H64_AUTOREGRESSIVE_KV_MODE=persistent_incremental)
+endif
+endif
 ifeq ($(AI_H64_AUTOREGRESSIVE),1)
 AI_H64_FOUR_LAYER_PREPARER := ../../../../benchmark/gpt2_compat/prepare_h64_autoregressive.py
 AI_H64_FOUR_LAYER_TOKEN_OPTION := --prompt
@@ -1432,6 +1446,7 @@ ai_h64_four_layer_top:
 		$(if $(AI_H64_FOUR_LAYER_MODEL_NPZ),--model-npz "$(AI_H64_FOUR_LAYER_MODEL_NPZ)",) \
 		--numeric-profile "$(AI_H64_NUMERIC_PROFILE)" $(AI_H64_FOUR_LAYER_KV_OPTION) \
 		$(if $(filter 1,$(AI_H64_AUTOREGRESSIVE)),--generated 4,) \
+		$(if $(filter 1,$(AI_H64_ACTIVE_ROWS)),--active-rows,) \
 		--out "$(AI_H64_FOUR_LAYER_RUN)"
 	$(VCS) -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps +define+VCS \
 		+define+AI_REPRESENTATIVE_LONG_TASK +define+AI_H64_WEIGHT_DMA \
@@ -1449,6 +1464,7 @@ ai_h64_four_layer_top:
 		+AI_H64_LOGITS_BASE=$$($(AI_H64_FOUR_LAYER_PYTHON) -c 'import json; j=json.load(open("$(AI_H64_FOUR_LAYER_RUN)/four_layer_manifest.json")); print(next(t["start"] for t in j["allocation_records"] if t["tensor_id"] == "logits_i32_physical_16x256"))') \
 		+AI_H64_LOGITS_ROW=$(AI_H64_FOUR_LAYER_LOGITS_ROW) \
 		$(AI_H64_AUTOREGRESSIVE_PLUSARGS) $(AI_H64_AUTOREGRESSIVE_KV_PLUSARGS) \
+		$(AI_H64_RUNTIME_PLUSARGS) \
 		+AI_H64_LOGITS_DUMP=$(AI_H64_FOUR_LAYER_RUN)/rtl_logits.csv \
 		+AI_REPRESENTATIVE_MEMORY=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_memory.memh \
 		+AI_REPRESENTATIVE_GOLDEN=$(AI_H64_FOUR_LAYER_RUN)/stage0/model_golden.memh \

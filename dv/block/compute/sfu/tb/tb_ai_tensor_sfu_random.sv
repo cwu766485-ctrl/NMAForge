@@ -36,7 +36,13 @@ module tb_ai_tensor_sfu_random;
 
   always #5 clk=~clk;
 
-  ai_tensor_sfu_core dut(
+  // This bench verifies the legacy sequential FSM (state reachability,
+
+  // per-state reset, exact legacy access counts).  The Round 34 streaming
+
+  // fast path is verified against this FSM by tb_sfu_stream_equiv.sv.
+
+  ai_tensor_sfu_core #(.FAST_PATH_ENABLE_P(0)) dut(
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.beta_base(beta_base),
     .beta_enable(beta_enable),.pack_enable(pack_enable),

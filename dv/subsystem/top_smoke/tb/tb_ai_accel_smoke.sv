@@ -921,6 +921,24 @@ module tb_ai_accel_smoke;
         end
     end
 
+    // Round 34 H64 decode-window engine occupancy (overlapping busy counts;
+    // idle = no compute engine busy, i.e. dispatch/fetch/completion/host).
+    reg h64_profile_active = 1'b0;
+    integer h64_prof_sfu = 0, h64_prof_matrix = 0, h64_prof_kv = 0;
+    integer h64_prof_any = 0, h64_prof_idle = 0;
+    always @(posedge aclk) begin
+        if (h64_profile_active) begin
+            if (dut.compute_cluster_u.sfu_busy) h64_prof_sfu = h64_prof_sfu + 1;
+            if (dut.compute_cluster_u.matrix_busy) h64_prof_matrix = h64_prof_matrix + 1;
+            if (dut.compute_cluster_u.kv_busy) h64_prof_kv = h64_prof_kv + 1;
+            if (dut.compute_cluster_u.sfu_busy || dut.compute_cluster_u.matrix_busy ||
+                dut.compute_cluster_u.kv_busy)
+                h64_prof_any = h64_prof_any + 1;
+            else
+                h64_prof_idle = h64_prof_idle + 1;
+        end
+    end
+
     // Round 9 SFU profiler. Pass buckets are mutually exclusive FSM states;
     // request/response/divider counters are overlapping stall/operation
     // observations and must not be added to the pass totals.
@@ -2718,6 +2736,16 @@ module tb_ai_accel_smoke;
         integer tail;
         integer start_cycle;
         integer end_cycle;
+        integer batch_segments;
+        integer batch_staging_cycles;
+        integer batch_stage_start;
+        integer batch_seg_start;
+        integer batch_seg_end;
+        integer batch_observed;
+        integer batch_done;
+        integer batch_poll;
+        integer weight_dma_start;
+        integer weight_dma_cycles;
         integer logits_fd;
         integer logits_row;
         integer logits_tile;
@@ -2773,7 +2801,11 @@ module tb_ai_accel_smoke;
                 // Only live token rows form the inter-layer tensor contract;
                 // fixed-width padded query rows are unspecified scratch.
                 if (active_token_count < 1 || active_token_count > 16 ||
-                    handoff_count != active_token_count * 64)
+                    (!$test$plusargs("AI_H64_ACTIVE_ROWS") &&
+                     handoff_count != active_token_count * 64) ||
+                    ($test$plusargs("AI_H64_ACTIVE_ROWS") &&
+                     (handoff_count < 64 || handoff_count > active_token_count * 64 ||
+                      handoff_count % 64 != 0)))
                     $fatal(1, "H64 four-layer handoff word count invalid layer=%0d count=%0d",
                            stage_number, handoff_count);
                 for (pair_index = 0; pair_index < handoff_count; pair_index = pair_index + 1) begin
@@ -2838,6 +2870,7 @@ module tb_ai_accel_smoke;
             dma_count = representative_dma_plan_words[0];
             if (dma_count < 1 || dma_count > 85)
                 $fatal(1, "H64 stage1 inherited DMA plan is invalid");
+            weight_dma_start = transformer_top_cycle_counter;
             for (dma_index = 0; dma_index < dma_count; dma_index = dma_index + 1) begin
                 axi_write(REG_DMA_EXT_ADDR,
                           representative_dma_plan_words[1 + dma_index * 3]);
@@ -2851,6 +2884,7 @@ module tb_ai_accel_smoke;
                     $fatal(1, "H64 stage1 weight DMA fence failed transaction=%0d",
                            dma_index);
             end
+            weight_dma_cycles = transformer_top_cycle_counter - weight_dma_start;
             late_dma_count = 0;
             if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
                 $sformat(stage_dma_plan_file, "%0s/late_dma_plan.memh", stage_root);
@@ -2906,7 +2940,8 @@ module tb_ai_accel_smoke;
             if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
                 $readmemh(output_init_events_file, representative_image_words);
                 output_init_event_count = representative_image_words[0];
-                if (output_init_event_count <= 0 || output_init_event_count > 64)
+                if ((output_init_event_count <= 0 && !$test$plusargs("AI_H64_ACTIVE_ROWS")) ||
+                    output_init_event_count < 0 || output_init_event_count > 64)
                     $fatal(1, "H64 output-init event count invalid layer=%0d count=%0d",
                            stage_number, output_init_event_count);
                 output_init_cursor = 1;
@@ -2944,6 +2979,143 @@ module tb_ai_accel_smoke;
             if (cmd_head != first_count || cpl_tail != first_count)
                 $fatal(1, "H64 stage1 ring did not inherit stage0 pointers cmd=%0d cpl=%0d first=%0d",
                        cmd_head, cpl_tail, first_count);
+            batch_segments = 0;
+            batch_staging_cycles = 0;
+            if ($test$plusargs("AI_H64_BATCH_PUBLISH")) begin
+                // Resident descriptor program: the whole layer program is
+                // written into retired ring slots before the timed window.
+                // Its AXI-Lite cost is reported separately as staging.
+                if (second_count >= queue_size)
+                    $fatal(1, "H64 batch stage does not fit the queue count=%0d size=%0d",
+                           second_count, queue_size);
+                batch_stage_start = transformer_top_cycle_counter;
+                for (index = 0; index < second_count; index = index + 1) begin
+                    ring_slot = (first_count + index) % queue_size;
+                    for (word_index = 0; word_index < 16; word_index = word_index + 1)
+                        descriptor_words[word_index] =
+                            h64_persistent_descriptor_words[1 + index * 16 + word_index];
+                    if (descriptor_words[0][31:16] != 16'h7100 + index)
+                        $fatal(1, "H64 stage1 task ID mismatch index=%0d id=%08h",
+                               index, descriptor_words[0]);
+                    runtime_write_descriptor_words(descriptor_base + ring_slot * 64,
+                                                   descriptor_words);
+                end
+                batch_staging_cycles = transformer_top_cycle_counter - batch_stage_start;
+                h64_prof_sfu = 0; h64_prof_matrix = 0; h64_prof_kv = 0;
+                h64_prof_any = 0; h64_prof_idle = 0; h64_profile_active = 1'b1;
+                start_cycle = transformer_top_cycle_counter;
+                batch_seg_start = 0;
+                batch_observed = 0;
+                while (batch_seg_start < second_count) begin
+                    // Weight DMA due before this segment's first command.
+                    for (late_dma_index = 0; late_dma_index < late_dma_count;
+                         late_dma_index = late_dma_index + 1)
+                        if (late_dma_trigger[late_dma_index] == batch_seg_start) begin
+                            axi_write(REG_DMA_EXT_ADDR, late_dma_ext[late_dma_index]);
+                            axi_write(REG_DMA_SPAD_ADDR, late_dma_spad[late_dma_index]);
+                            axi_write(REG_DMA_LENGTH, late_dma_words[late_dma_index]);
+                            axi_write(REG_DMA_CTRL, 32'd1);
+                            runtime_wait_dma_fence(dma_ok);
+                            if (!dma_ok)
+                                $fatal(1, "H64 late weight DMA fence failed event=%0d trigger=%0d",
+                                       late_dma_index, late_dma_trigger[late_dma_index]);
+                            $display("H64_FOUR_LAYER_LATE_WEIGHT_DMA_PASS layer=%0d before_desc=%0d event=%0d spad=%08h bytes=%0d completion_fence=1",
+                                     stage_number, batch_seg_start, late_dma_index,
+                                     late_dma_spad[late_dma_index],
+                                     late_dma_words[late_dma_index] * 4);
+                        end
+                    // A segment ends before the next DMA/runtime-init event;
+                    // inside it, ordering comes from the descriptors' ABI
+                    // completion-event chain, not from host round trips.
+                    batch_seg_end = second_count;
+                    for (late_dma_index = 0; late_dma_index < late_dma_count;
+                         late_dma_index = late_dma_index + 1)
+                        if (late_dma_trigger[late_dma_index] > batch_seg_start &&
+                            late_dma_trigger[late_dma_index] < batch_seg_end)
+                            batch_seg_end = late_dma_trigger[late_dma_index];
+                    for (output_init_event_index = 0;
+                         output_init_event_index < output_init_event_count;
+                         output_init_event_index = output_init_event_index + 1)
+                        if (output_init_desc[output_init_event_index] + 1 > batch_seg_start &&
+                            output_init_desc[output_init_event_index] + 1 < batch_seg_end)
+                            batch_seg_end = output_init_desc[output_init_event_index] + 1;
+                    tail = (first_count + batch_seg_end) % queue_size;
+                    axi_write(REG_CMDQ_TAIL, tail);
+                    axi_write(REG_DOORBELL, 32'd1);
+                    // Zero-time passive observer: at the cycle each
+                    // completion becomes visible, compare its completion
+                    // record and checkpoints through the behavioral SPAD
+                    // backdoor before any later command can reuse scratch.
+                    batch_poll = 0;
+                    while (batch_observed < batch_seg_end) begin
+                        @(posedge aclk);
+                        #1;
+                        batch_done = (dut.processor_cplq_tail + queue_size - first_count) %
+                                     queue_size;
+                        if (batch_done > batch_seg_end)
+                            $fatal(1, "H64 batch completion overran segment done=%0d end=%0d",
+                                   batch_done, batch_seg_end);
+                        while (batch_observed < batch_done) begin
+                            index = batch_observed;
+                            ring_slot = (first_count + index) % queue_size;
+                            for (word_index = 0; word_index < 4; word_index = word_index + 1)
+                                completion_words[word_index] = representative_spad_backdoor_read(
+                                    completion_base + ring_slot * 16 + word_index * 4);
+                            if (completion_words[0] !== (32'h7100 + index) ||
+                                completion_words[1] !== 32'd1)
+                                $fatal(1, "H64 batch completion failed desc=%0d task=%08h status=%08h",
+                                       index, completion_words[0], completion_words[1]);
+                            for (record_index = 0; record_index < checkpoint_count;
+                                 record_index = record_index + 1)
+                                if (checkpoint_desc[record_index] == index) begin
+                                    for (pair_index = 0; pair_index < checkpoint_words[record_index];
+                                         pair_index = pair_index + 1) begin
+                                        read_value = representative_spad_backdoor_read(
+                                            representative_checkpoint_words[
+                                                checkpoint_start[record_index] + pair_index * 2]);
+                                        if (read_value !== representative_checkpoint_words[
+                                                checkpoint_start[record_index] + pair_index * 2 + 1])
+                                            $fatal(1, "H64_PERSISTENT_TENSOR_MISMATCH desc=%0d record=%0d word=%0d addr=%08h expected=%08h observed=%08h method=passive_backdoor",
+                                                   index, record_index, pair_index,
+                                                   representative_checkpoint_words[
+                                                       checkpoint_start[record_index] + pair_index * 2],
+                                                   representative_checkpoint_words[
+                                                       checkpoint_start[record_index] + pair_index * 2 + 1],
+                                                   read_value);
+                                    end
+                                    $display("H64_PERSISTENT_TENSOR_PASS desc=%0d record=%0d words=%0d method=passive_backdoor",
+                                             index, record_index, checkpoint_words[record_index]);
+                                end
+                            batch_observed = batch_observed + 1;
+                        end
+                        batch_poll = batch_poll + 1;
+                        if (batch_poll > 4000000)
+                            $fatal(1, "H64 batch segment timeout start=%0d end=%0d observed=%0d",
+                                   batch_seg_start, batch_seg_end, batch_observed);
+                    end
+                    // Host completion detection and CPLQ consumption.
+                    runtime_wait_queue_idle(tail, tail, idle_ok, status_word,
+                                            cmd_head, cpl_tail);
+                    if (!idle_ok)
+                        $fatal(1, "H64 batch segment did not retire end=%0d cmd=%0d cpl=%0d status=%08h",
+                               batch_seg_end, cmd_head, cpl_tail, status_word);
+                    axi_write(REG_CPLQ_HEAD, tail);
+                    for (output_init_event_index = 0;
+                         output_init_event_index < output_init_event_count;
+                         output_init_event_index = output_init_event_index + 1)
+                        if (output_init_desc[output_init_event_index] == batch_seg_end - 1)
+                            for (pair_index = 0;
+                                 pair_index < output_init_words[output_init_event_index];
+                                 pair_index = pair_index + 1)
+                                axi_write(SPAD_BASE + representative_image_words[
+                                              output_init_start[output_init_event_index] +
+                                              pair_index * 2], 32'd0);
+                    batch_segments = batch_segments + 1;
+                    batch_seg_start = batch_seg_end;
+                end
+            end else begin
+            h64_prof_sfu = 0; h64_prof_matrix = 0; h64_prof_kv = 0;
+            h64_prof_any = 0; h64_prof_idle = 0; h64_profile_active = 1'b1;
             start_cycle = transformer_top_cycle_counter;
             for (index = 0; index < second_count; index = index + 1) begin
                 for (late_dma_index = 0; late_dma_index < late_dma_count;
@@ -3042,7 +3214,9 @@ module tb_ai_accel_smoke;
                     $display("H64_PERSISTENT_RETIRE desc=%0d task=%08h ring_slot=%0d next=%0d",
                              index, completion_words[0], ring_slot, tail);
             end
+            end
             end_cycle = transformer_top_cycle_counter;
+            h64_profile_active = 1'b0;
             for (pair_index = 0; pair_index < golden_count; pair_index = pair_index + 1) begin
                 runtime_read_word_retry(
                     SPAD_BASE + representative_golden_words[1 + pair_index * 2],
@@ -3113,6 +3287,12 @@ module tb_ai_accel_smoke;
                 $display("H64_FOUR_LAYER_STAGE_PASS layer=%0d descriptors=%0d cycles=%0d handoff_words=%0d weight_dma_transactions=%0d",
                          stage_number, second_count, stage_elapsed_cycles,
                          handoff_count, dma_count + late_dma_count);
+            $display("H64_STAGE_TIMING context=%0d layer=%0d descriptors=%0d window_cycles=%0d sfu_busy=%0d matrix_busy=%0d kv_busy=%0d engine_any_busy=%0d engine_idle=%0d pre_window_weight_dma_cycles=%0d pre_window_descriptor_staging_cycles=%0d segments=%0d publish_mode=%0s row_mapping=%0s",
+                     context_number, stage_number, second_count, stage_elapsed_cycles,
+                     h64_prof_sfu, h64_prof_matrix, h64_prof_kv, h64_prof_any, h64_prof_idle,
+                     weight_dma_cycles, batch_staging_cycles, batch_segments,
+                     $test$plusargs("AI_H64_BATCH_PUBLISH") ? "batch_resident_program" : "per_descriptor_axil",
+                     $test$plusargs("AI_H64_ACTIVE_ROWS") ? "active_rows" : "fixed_16_rows");
         end
     endtask
 
@@ -7054,7 +7234,8 @@ module tb_ai_accel_smoke;
                 if ($test$plusargs("AI_H64_FOUR_LAYER")) begin
                     if (persistent_stage_count != 3)
                         $fatal(1, "H64 four-layer runtime requires three post-layer-0 stages");
-                    if (persistent_publications != persistent_expected_publications)
+                    if (!$test$plusargs("AI_H64_ACTIVE_ROWS") &&
+                        persistent_publications != persistent_expected_publications)
                         $fatal(1, "H64 four-layer runtime publication count mismatch expected=%0d got=%0d",
                                persistent_expected_publications, persistent_publications);
                     $display("H64_FINAL_LN_LM_HEAD_PASS active_rows=%0d logit_words=%0d descriptor_count=33 method=Product_SFU_REQUANT_GEMM golden_checked=1",
@@ -7103,6 +7284,8 @@ module tb_ai_accel_smoke;
                             // no hidden/intermediate tensor is host-written.
                             for (ar_input_row = 0; ar_input_row < ar_input_count;
                                  ar_input_row = ar_input_row + 1) begin
+                                if (!$test$plusargs("AI_H64_ACTIVE_ROWS") ||
+                                    ar_input_row == ar_input_count - 1)
                                 for (ar_word = 0; ar_word < 64; ar_word = ar_word + 1) begin
                                     axi_write(SPAD_BASE + ar_embedding_base +
                                               ar_input_row * 256 + ar_word * 4,

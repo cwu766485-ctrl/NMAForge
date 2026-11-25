@@ -91,7 +91,7 @@ def write_checkpoint_file(path: Path, records: list[tuple[int, dict[int, int]]])
 
 def runtime_live_tensor_pairs(name: str, pairs: dict[int, int],
                               tensor_map: dict[str, dict], target_start: int,
-                              valid_rows: int) -> dict[int, int]:
+                              valid_rows: int, row_lo: int = 0) -> dict[int, int]:
     """Select semantically live sequence rows for Product-Top checking.
 
     A prefix-recompute invocation issues fixed 16-row descriptors. Rows beyond
@@ -109,19 +109,20 @@ def runtime_live_tensor_pairs(name: str, pairs: dict[int, int],
         return pairs
 
     selected_offsets: set[int] = set()
+    live_rows = range(row_lo, valid_rows)
     if layout == "matrix_a_tile":
         k_groups = shape[1] // 4
-        for row in range(valid_rows):
+        for row in live_rows:
             for k_group in range(k_groups):
                 word_index = (((row // 4) * k_groups + k_group) * 4 + (row % 4))
                 selected_offsets.add(word_index * 4)
     elif layout == "matrix_n_tile_major_16x16":
-        for row in range(valid_rows):
+        for row in live_rows:
             for column in range(shape[1]):
                 tile, tile_column = divmod(column, 16)
                 selected_offsets.add((tile * 16 * 16 + row * 16 + tile_column) * 4)
     else:
-        for row in range(valid_rows):
+        for row in live_rows:
             for column in range(shape[1]):
                 selected_offsets.add((row * shape[1] + column) * 4)
 
@@ -177,14 +178,22 @@ def remap_descriptor_words(raw_words: list[int], manifest: dict,
                            plan_records: list[dict], layer: int,
                            previous_output_start: int | None,
                            zero_position_start: int,
-                           base_descriptor_count: int) -> list[list[int]]:
+                           base_descriptor_count: int | None) -> list[list[int]]:
     descriptors = []
     template_records = manifest["tensor_allocation"]["records"]
     plan_by_template = layer_plan_map(plan_records, layer)
     count = int(manifest["descriptor_count"])
-    expected_count = base_descriptor_count + (33 if layer == LAYERS - 1 else 0)
-    if count != expected_count:
-        raise ValueError(f"unexpected layer {layer} descriptor count {count}; expected {expected_count}")
+    if base_descriptor_count is not None:
+        expected_count = base_descriptor_count + (33 if layer == LAYERS - 1 else 0)
+        if count != expected_count:
+            raise ValueError(f"unexpected layer {layer} descriptor count {count}; expected {expected_count}")
+    else:
+        # Active-row mapping issues an order-preserving subset of the
+        # fixed-row template; addresses still come from the template plan.
+        final_ops = sum(1 for d in manifest["descriptor_contract"]
+                        if d["name"].startswith(("final_ln", "lm_head")))
+        if (final_ops > 0) != (layer == LAYERS - 1):
+            raise ValueError(f"unexpected final LN/LM-head ownership in layer {layer}")
     for index in range(count):
         words = raw_words[index * 16:(index + 1) * 16]
         if len(words) != 16:
@@ -193,8 +202,12 @@ def remap_descriptor_words(raw_words: list[int], manifest: dict,
         if layer > 0 and index == 0:
             if "embedding_position_residual" not in desc_name or previous_output_start is None:
                 raise ValueError("layer handoff descriptor contract mismatch")
-            words[1] = previous_output_start
-            words[2] = zero_position_start
+            # Preserve any row offset inside the source tensors (active-row
+            # mapping starts at the first appended token row; 0 otherwise).
+            src0_owner = resolve_owner(template_records, words[1], index, "src")
+            src1_owner = resolve_owner(template_records, words[2], index, "src")
+            words[1] = previous_output_start + words[1] - src0_owner["start"]
+            words[2] = zero_position_start + words[2] - src1_owner["start"]
             # Keep the destination in the current layer's planned activation
             # allocation. Leaving the template address here can alias the
             # shared zero-position source (the original one-layer graph does
@@ -313,12 +326,22 @@ def remap_dma(run_dir: Path, manifest: dict, plan_records: list[dict],
 def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
           model_override: dict | None = None,
           numeric_profile: str = "frozen", kv_append_from: int = 0,
-          kv_cache_before_by_layer: dict[int, dict[str, list[int]]] | None = None) -> dict:
+          kv_cache_before_by_layer: dict[int, dict[str, list[int]]] | None = None,
+          active_rows: bool = False) -> dict:
+    """Build a four-layer stage set.
+
+    ``active_rows`` maps every row-wise SFU command to token rows
+    ``[kv_append_from, len(tokens))`` only; Product checks, inter-layer handoff
+    and the final Golden are restricted to the same rows.  Padded and already
+    retired rows are never consumed by active-row outputs, so no runtime
+    padding initialization is published.
+    """
     if not tokens or len(tokens) > 16 or any(token < 0 or token > 255 for token in tokens):
         raise ValueError("four-layer Top prompt must contain 1..16 token IDs in [0,255]")
     if not 0 <= kv_append_from < len(tokens):
         raise ValueError("KV append position must select a live token row")
     out.mkdir(parents=True, exist_ok=False)
+    row_lo = kv_append_from if active_rows else 0
     template_manifest = build_template(tokens, seed, model_override,
                                        kv_append_from, numeric_profile)
     plan_records, desc_base, cpl_base, kv_map, stats = make_records(template_manifest)
@@ -343,6 +366,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             numeric_profile=numeric_profile,
             kv_cache_initial=(None if kv_cache_before_by_layer is None else
                               kv_cache_before_by_layer[layer]),
+            active_row_lo=(row_lo if active_rows else None),
         )
         manifests.append(manifest)
         stage = out / f"stage{layer}"
@@ -360,7 +384,8 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             prior_start = prior["start"]
         descriptors = remap_descriptor_words(
             raw_desc, manifest, plan_records, layer, prior_start,
-            zero_position["start"], int(template_manifest["descriptor_count"]),
+            zero_position["start"],
+            None if active_rows else int(template_manifest["descriptor_count"]),
         )
         stage_descriptors = []
         for words in descriptors:
@@ -386,7 +411,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
             if target is None:
                 raise ValueError(f"missing runtime checkpoint allocation for {name}")
             checked_pairs = runtime_live_tensor_pairs(
-                name, pairs, raw_tensor_map, target["start"], len(tokens))
+                name, pairs, raw_tensor_map, target["start"], len(tokens), row_lo)
             if not checked_pairs:
                 raise ValueError(f"runtime checkpoint has no live words: {name}")
             runtime_stage_cps.append((desc_index, checked_pairs))
@@ -402,7 +427,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         final_target = target_tensor_map[final_tensor_name]
         final_golden = runtime_live_tensor_pairs(
             final_tensor_name, final_golden_full, raw_tensor_map,
-            final_target["start"], len(tokens))
+            final_target["start"], len(tokens), row_lo)
         write_pairs(stage / "model_golden.memh", final_golden)
         dma_info = remap_dma(raw_dir, manifest, plan_records, layer, stage)
         write_words(stage / "inputs.memh", [0])
@@ -420,7 +445,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         # Q producer retires. A dense row-stride clear would overwrite valid
         # rows once the context crosses the first four-row group.
         valid_query_rows = len(tokens)
-        for head in range(4):
+        for head in (range(0) if active_rows else range(4)):
             tensor_id = f"attn_q_h{head}_i8"
             qkt_name = f"attn_h{head}_qkt_scaled"
             qkt_index = next(i for i, d in enumerate(manifest["descriptor_contract"])
@@ -438,7 +463,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
                     word_index = (((row // 4) * k_groups + k_group) * 4 +
                                   (row % 4))
                     addresses.add(q_target["start"] + word_index * 4)
-        for head in range(4):
+        for head in (range(0) if active_rows else range(4)):
             tensor_id = f"attn_h{head}_prob_q15"
             template_tensor = next(r for r in manifest["tensor_allocation"]["records"]
                                    if r["tensor_id"] == tensor_id)
@@ -476,7 +501,7 @@ def build(out: Path, seed: int = SEED, tokens: list[int] = TOKENS,
         residual_relocated = {
             plan_by_template_layer[(layer, residual_name)]["start"] + offset * 4: value & 0xFFFFFFFF
             for offset, value in enumerate(residual_values)
-            if offset // 64 < len(tokens)
+            if row_lo <= offset // 64 < len(tokens)
         }
         if layer < LAYERS - 1:
             hidden_rows = [residual_values[row * 64:(row + 1) * 64]

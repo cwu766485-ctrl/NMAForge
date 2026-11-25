@@ -28,6 +28,7 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/compute/matrix/ai_tensor_matrix_core.v" \
     "$REPO_ROOT/rtl/compute/matrix/ai_tensor_matrix_array.sv" \
     "$REPO_ROOT/rtl/compute/sfu/ai_tensor_sfu_math.v" \
+    "$REPO_ROOT/rtl/compute/sfu/ai_tensor_sfu_stream.v" \
     "$REPO_ROOT/rtl/compute/sfu/ai_tensor_sfu_core.v" \
     "$REPO_ROOT/rtl/compute/cnn/ai_conv3x3_linebuffer_core.v" \
     "$REPO_ROOT/rtl/compute/kv/ai_kv_cache_engine.v" \

@@ -1,5 +1,16 @@
 # NMAForge execution frontier
 
+## NMAForge V1.3 Round 34 — Transformer SFU and GPT-2 runtime (2026-11-25)
+
+| Gate | Status | Evidence / boundary |
+|---|---|---|
+| TinyNPU Transformer operators | PASS for ≤256-element rows | R34 vs Tiny: GELU 2.03 vs 4.01, Softmax(197) 3.34 vs 7.03, LN(197) 4.03 vs 4.36, Residual 3.02 vs 3.01 cycles/element. Rows >256 fall back to the legacy FSM (open) |
+| GPT-2 decode runtime | PASS, bit-exact | 10.9× over the same-source baseline. Matrix (16-row tiles for one active row) is now 51% of each layer window |
+| SFU Gate 5 | PASS scoped | No ABI/arbiter/port change; differential equivalence, smoke, seeded and cluster UVM pass. PPA/SpyGlass/formal NOT_RUN |
+| Next | — | (1) DC/PPA of the stream unit; (2) GEMV/M=1 Matrix mapping for decode; (3) >256-row SFU (chunked stats) for DeiT FFN-hidden widths; (4) DeiT Layer-0 closure on the faster SFU |
+
+See the [Round 34 report](../../benchmark/NMAFORGE_V1_3_ROUND34_TRANSFORMER_SFU.md).
+
 ## NMAForge V1.3 Round 33 overlapped execution — 2026-11-25
 
 Round 33 is isolated on `research/nmaforge-v1.3-round33-overlapped-execution`,

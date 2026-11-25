@@ -1,0 +1,21 @@
+op,length,nma_legacy_cycles,nma_legacy_cycles_per_elem,nma_cycles,nma_cycles_per_elem,nma_reads,nma_writes,nma_check,tiny_cycles,tiny_cycles_per_elem,tiny_check,tiny_over_nma
+gelu,64,386,6.03,130,2.03,64,64,exact_golden_pass,257,4.02,PASS max_abs_err=4 (TinyNPU own tolerance 5),1.977
+gelu,192,1154,6.01,386,2.01,192,192,exact_golden_pass,769,4.01,PASS max_abs_err=4 (TinyNPU own tolerance 5),1.992
+gelu,197,1184,6.01,399,2.03,197,197,exact_golden_pass,789,4.01,PASS max_abs_err=4 (TinyNPU own tolerance 5),1.977
+gelu,768,4610,6.0,1538,2.0,768,768,exact_golden_pass,3073,4.0,PASS max_abs_err=4 (TinyNPU own tolerance 5),1.998
+layernorm,64,1421,22.2,320,5.0,192,64,exact_golden_pass,327,5.11,"PASS tiny_criterion(completes)=True gamma=hardwired_127 pearson(out-beta,x-mean)=-0.3432 pearson(out[i+1],beta[i])=0.9996 layernorm_numerically_valid=False unknown_x_outputs=1",1.022
+layernorm,192,3853,20.07,774,4.03,576,192,exact_golden_pass,839,4.37,"PASS tiny_criterion(completes)=True gamma=hardwired_127 pearson(out-beta,x-mean)=-0.0474 pearson(out[i+1],beta[i])=0.9996 layernorm_numerically_valid=False",1.084
+layernorm,197,3948,20.04,794,4.03,591,197,exact_golden_pass,859,4.36,"PASS tiny_criterion(completes)=True gamma=hardwired_127 pearson(out-beta,x-mean)=0.0601 pearson(out[i+1],beta[i])=0.9997 layernorm_numerically_valid=False",1.082
+layernorm,768,14797,19.27,14797,19.27,3840,768,exact_golden_pass,3143,4.09,"PASS tiny_criterion(completes)=True gamma=hardwired_127 pearson(out-beta,x-mean)=0.0441 pearson(out[i+1],beta[i])=0.9996 layernorm_numerically_valid=False",0.212
+requant,64,258,4.03,130,2.03,64,64,exact_golden_pass,,,no_tiny_engine,
+requant,192,770,4.01,386,2.01,192,192,exact_golden_pass,,,no_tiny_engine,
+requant,197,790,4.01,399,2.03,197,197,exact_golden_pass,,,no_tiny_engine,
+requant,768,3074,4.0,1538,2.0,768,768,exact_golden_pass,,,no_tiny_engine,
+residual,64,450,7.03,196,3.06,128,64,exact_golden_pass,193,3.02,PASS exact_saturating_add_mismatches=0,0.985
+residual,192,1346,7.01,580,3.02,384,192,exact_golden_pass,577,3.01,PASS exact_saturating_add_mismatches=0,0.995
+residual,197,1381,7.01,595,3.02,394,197,exact_golden_pass,592,3.01,PASS exact_saturating_add_mismatches=0,0.995
+residual,768,5378,7.0,2308,3.01,1536,768,exact_golden_pass,2305,3.0,PASS exact_saturating_add_mismatches=0,0.999
+softmax,64,1494,23.34,258,4.03,64,64,exact_golden_pass,453,7.08,"PASS tiny_criterion(non_negative,has_positive)=True out_sum=99 pearson_vs_float=0.6445",1.756
+softmax,192,4416,23.0,642,3.34,192,192,exact_golden_pass,1349,7.03,"PASS tiny_criterion(non_negative,has_positive)=True out_sum=60 pearson_vs_float=0.5118",2.101
+softmax,197,4925,25.0,657,3.34,197,197,exact_golden_pass,1384,7.03,"PASS tiny_criterion(non_negative,has_positive)=True out_sum=62 pearson_vs_float=0.3775",2.107
+softmax,768,18737,24.4,18737,24.4,2304,768,exact_golden_pass,5381,7.01,"FAIL tiny_criterion(non_negative,has_positive)=False out_sum=0 pearson_vs_float=nan",0.287

@@ -27,6 +27,7 @@
 ../../../rtl/compute/matrix/ai_tensor_matrix_core.v
 ../../../rtl/compute/matrix/ai_tensor_matrix_array.sv
 ../../../rtl/compute/sfu/ai_tensor_sfu_math.v
+../../../rtl/compute/sfu/ai_tensor_sfu_stream.v
 ../../../rtl/compute/sfu/ai_tensor_sfu_core.v
 ../../../rtl/compute/cnn/ai_conv3x3_linebuffer_core.v
 ../../../rtl/compute/kv/ai_kv_cache_engine.v

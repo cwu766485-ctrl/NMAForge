@@ -236,6 +236,7 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | BF16 兼容包装器 | `ai_bf16_dot_fp32_core` | 否（兼容/独立验证） | 固定选择 BF16 格式的旧接口包装器；顶层产品路径使用混合精度核心。 |
 | 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | ABI/SPAD 仍按 4×4 tile-major；top 默认 16×16 INT8 array；Banked Read 默认最多 8 笔有序 outstanding 和 fault drain；next-K ping-pong prefetch/MAC overlap、K≤64 A-tile reuse 和最多四个 16×16 B macro-tile 的 command-local cache；`0x52` GEMV 支持 16 列面板到 N=256；完整 Cluster UVM、FSM/code coverage 和 PPA 仍开放。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
+| SFU 流式快速路径 | `ai_tensor_sfu_stream` | 是，SFU 子模块 | Round 34：在同一 32-bit SFU 端口上用多 outstanding 顺序读执行 Residual/GELU/Requant、≤256 元素的 LayerNorm/Softmax（行缓存 + 精确行倒数）；其余配置回退原 FSM；不改 ABI/仲裁器；`+define+AI_SFU_LEGACY_ONLY` 强制原路径。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |
 | 整数开方 | `ai_integer_sqrt` | 是，SFU 子模块 | 用于 RMSNorm/LayerNorm 的均方根或方差相关计算。 |
 | 卷积核 | `ai_conv3x3_linebuffer_core` | 是 | Conv3x3 与 Depthwise Conv3x3 的 line-buffer 路径。 |
