@@ -1,5 +1,18 @@
 # NMAForge execution frontier
 
+## Round 35 deployment status (2026-11-26)
+
+- **DeiT-Tiny:** all 12 encoder layers are bit-exact on Product Top; integer
+  top-1 is 75.6% (FP32 78.0%).
+- **Next:**
+  1. GPT-2 small compiler. D=768 requires DDR spill/store tiling within
+     512 KiB, with K/V per head streamed.
+  2. DMA descriptors in CMDQ with overlap and coalescing; remove the per-block
+     W1/W2 re-stream.
+  3. Per-16-column weight scales.
+  4. Patch embedding and head on the NPU.
+  5. Innovations: INT4 GEMV, epilogue fusion, bank lanes.
+
 ## Round 35 step 1 status (2026-11-25)
 
 The integration line `integration/nmaforge-v1.3` is validated, and 512 KiB is

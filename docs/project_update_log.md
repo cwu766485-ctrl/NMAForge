@@ -1,5 +1,20 @@
 # Project update log
 
+## NMAForge V1.3 Round 35 — official DeiT-Tiny 12-layer encoder on Product Top (2026-11-26)
+
+- **Result.** The new compiler (`sw/compiler`) and the TB `+AI_COMPILED_PROGRAM`
+  runtime run all 12 DeiT-Tiny encoder layers (official weights, an ImageNet
+  validation image) bit-exact on Product Top at 512 KiB SPAD: 16,128
+  descriptors, 491,712 checkpoint words and 37,824 final words. The
+  classification is correct.
+- **Cost.** The compute window is 37.5M cycles (150 ms at 250 MHz). Fenced DMA
+  is 6.6M cycles on the stress AXI model.
+- **Accuracy.** The integer accuracy model reaches 75.6% top-1 vs FP32 78.0%
+  on 500 images.
+- **Host-side stages.** The embedding and classifier head stay on the host.
+
+See the [report](benchmark/NMAFORGE_V1_3_ROUND35_DEIT_ON_PRODUCT_TOP.md).
+
 ## NMAForge V1.3 Round 35 — official GPT-2/DeiT numerics and SFU flag[7] modes (2026-11-25)
 
 - **Numerics study.** The current contract fails on official models (GPT-2
