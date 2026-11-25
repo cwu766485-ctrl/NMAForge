@@ -8,6 +8,7 @@ package ai_accel_tests_pkg;
     `include "sequences/ai_version_smoke_seq.svh"
     `include "sequences/ai_fp16_ddr_e2e_seq.svh"
     `include "sequences/ai_external_macro_ddr_e2e_seq.svh"
+    `include "sequences/ai_compute_cluster_spad_map.svh"
     `include "sequences/ai_compute_cluster_e2e_seq.svh"
     `include "base/ai_base_test.svh"
     `include "smoke/ai_version_smoke_test.svh"

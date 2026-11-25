@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUT_DIR="${COMPUTE_PERF_OUT:-/tmp/nmaforge_compute_performance_$(date +%Y%m%d_%H%M%S)}"
 SEEDS="${SEEDS:-20261025 20261026 20261027}"
-PYTHON="${PYTHON:-python3}"
+PYTHON="${PYTHON:-python3.12}"
 
 mkdir -p "$OUT_DIR"
 for seed in $SEEDS; do

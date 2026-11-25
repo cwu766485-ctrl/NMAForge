@@ -296,8 +296,84 @@ The latest 0x53 runtime SVA source/test SHA was
 `ed17ab1c257c0f7947cf78e60730da31c4548138`; formal request-hold evidence was
 at `b719ac6066616b17dfab4eed2429f8bdfdc49457`. The historical frontier was a
 short handoff for the next engineering task; it
+
+Updated: 2026-11-24. This is a short handoff for the next engineering task; it
 does not duplicate per-run evidence. The current Compute Cluster sign-off and
-benchmark work is tracked in the execution RTM and open-issue report.
+benchmark work is tracked in the execution RTM and open-issue report. The
+evidence below is historical and tied to its named source SHA; it is not a fresh
+pass claim for the current checkout.
+
+## Next-step decision (2026-11-24)
+
+### Classification and goal
+
+The next step is **software/runtime and verification first, followed by
+evidence-driven hardware/software co-design**. It is not an immediate hardware
+upgrade. The goal is to make the GEMM/GEMV and model measurements reproducible,
+explain the observed cycle differences, and prove a real continuous model path
+on one Product Top. Only then decide whether a measured bottleneck requires an
+RTL/ABI change.
+
+The active research baseline is branch `feat/shape-adaptive-gemv-v2`, with the
+P0 fixture-map change committed at source SHA
+`c668479570e182e833146fd4a5f1d15bd06daf6c`. Its source-tree SHA is
+`b883b40a1ae5a630934160820f17041a9237e7b4`, Product RTL tree SHA is
+`b969dd80ceceb23e086df423515993353092b5ca`, and the full run manifest is
+[`NMAFORGE_V1_2_P0_RUN_REPORT.md`](../../verification/NMAFORGE_V1_2_P0_RUN_REPORT.md).
+The older candidate replays below remain tied to their own source SHAs.
+
+| Gate | Work type | Next work | Goal / exit evidence |
+|---|---|---|---|
+| 1. Reproducible compute baseline | Software and testbench | **Historical shape replay complete** at `49441dfa`; paired GEMM memory profiles and GEMV prefetch A/B are in the P0 report. Re-run the exact shapes on the current Product path, then split compute, controller/SPAD, transfer, and host intervals. | Historical cycle differences are explained by the selected memory-service profiles. Current-branch GEMV 0x52 and end-to-end host/transfer timing remain open; do not call the historical matrix-core replay a current Product Top benchmark. |
+| 2. Regression fixture recovery | Verification/software | **Recovered** at `c668479`. The old 128 KiB fixture failure was reproduced at `f919bb7`; a capacity-aware 46-region map now reads `SPAD_INFO`, checks bounds and overlap, and passes at 128/256/512 KiB. | Cluster UVM: 3 seeds × 3 capacities; Product Top smoke and 20-case seeded regression pass. No protection check was relaxed. Raw logs, exit codes, and hashes are in the run manifest. |
+| 3. Continuous model path | Runtime/mapper software, with co-design if needed | Freeze the H64 model/runtime source and verify genuine Persistent-KV Decode separately from prefix replay. Continue the DeiT real-token path from the last proven stage; keep staged operator runs distinct from a single-session Product Top run. No host readback/repacking/writeback of intermediate activations. | Demonstrate producer-to-consumer dependencies, retained KV/SPAD state, completion retirement, and per-step Golden on one unreset Product Top. Report host, DMA, command, and compute costs separately. |
+| 4. Dataflow A/B | Software-first co-design | Compare GEMV prefetch/arbitration settings and CNN host layout against existing DMA/repack/fused paths with identical inputs and Golden. Attribute bank, line, prefetch, and layout costs before proposing RTL. | Keep an optimization only when a reproducible A/B lowers measured latency or traffic without changing results or breaking compatibility. Include area/timing impact if RTL changes. |
+| 5. Hardware decision gate | Hardware only when evidence requires it | Consider a minimal RTL/ABI change only if the measured bottleneck cannot be expressed by the current Mapper/Runtime and existing datapaths. First write the contract, minimal reproducer, expected benefit, and verification plan. | Directed Golden and protocol tests pass; legacy Matrix/SFU/CNN/model regressions remain correct; synthesis/timing cost is measured or explicitly NOT_RUN. No MAC-array or SPAD expansion is assumed. |
+
+TinyNPU comparison remains a separate evidence task: pin both source SHAs and
+match the model, arithmetic contract, memory service, and timing boundary before
+calculating speedup. Otherwise publish the raw endpoints as non-comparable. A
+successful benchmark does not by itself close Compute Cluster DV or authorize
+an architecture freeze.
+
+## V1.2 P0 replay status (2026-11-24)
+
+The source-bound results, exact commands, exit codes, tool versions, compressed
+raw logs and SHA-256 digests are indexed in the
+[P0 run report](../../verification/NMAFORGE_V1_2_P0_RUN_REPORT.md) and
+[`run_manifest.json`](../../../benchmark/representative/v1_2/p0/run_manifest.json).
+The current change is UVM fixture/configuration code only; Product RTL, ABI and
+protection policy were not changed. No trained model was loaded, so model hash
+is N/A for this P0 baseline.
+
+- Historical `CLUSTER_MEMORY_EMPTY` was an address-compatibility failure: the
+  128 KiB top returned SLVERR for fixture address `0x7d000` before any engine
+  transaction. The new SPAD_INFO-driven map fits 46 disjoint regions below
+  `0x9740`; allocation fails closed if the capacity is insufficient.
+- The Compute Cluster real-top UVM regression passed seeds
+  `20261025/26/27` at each of 128, 256 and 512 KiB. Per seed it compared 5,368
+  memory words with zero mismatch/unknown/stale/orphan responses and zero UVM
+  warning/error/fatal. Applicable focused functional coverage was 100%; the
+  write-only completion response bin is explicitly N/A.
+- Current-branch `ai_smoke` and 20-case seeded top regression passed. The smoke
+  retains the existing VCS `[LOOP-REROLL-ENABLED]` fixture diagnostic.
+- Historical Matrix replay at SHA `49441dfa` measured GEMM 64×64×64 at 3,413
+  cycles with fixed one-cycle SPAD service and 4,822 cycles with seeded
+  ready/line stalls. GEMV 1×64×64 measured 632 cycles prefetch-off and 584
+  prefetch-on with identical bytes and no recorded bank/line stalls. These are
+  matrix-core endpoint results, not current Product Top or host-inclusive
+  timings. Current branch does not contain the historical folded GEMV 0x52
+  mapping, so a same-source Product GEMV comparison remains open.
+- Scoped dispatch formal passed 3/3 assertions and reached 7/7 engine covers;
+  the matrix array is unresolved/black-boxed, so this does not prove arithmetic
+  or SPAD/DMA behavior. Checker-sensitivity mutation caught 25/25 passive
+  monitor observation mutations; it is not a DUT RTL mutation score.
+
+This closes the fixture recovery and historical cycle-replay portion of P0. It
+does not close the V1.2 objective: trained GPT-2/DeiT model packages, persistent
+KV decode, full DeiT Layer 0, CNN fusion A/B, normalized TinyNPU timing, seven
+independent engine scoreboards, per-engine protection crosses, full requirement
+closure and ASIC sign-off remain open.
 
 Latest per-command Top Matrix profile source/test SHA is
 `839b9af5bcd2ab5f85c52f0d014d8f46e794c1a0` (tree
@@ -797,18 +873,19 @@ SPAD measurement. See the [shape-adaptive report](../../research/SHAPE_ADAPTIVE_
 
 ## Next work
 
-1. Close the remaining Compute Cluster P0/P1 items in the
-   [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md)
-   and [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).
-2. Freeze the reviewed source and test manifest, then replay the remaining
-   required gates on one clean SHA. R35 already replays the focused group from
-   clean test commit `cb9717e` with RTL/SPEC byte-identical to the review candidate.
-3. Continue the FP parity-to-writeback proof from the [FP formal frontier](../../../dv/block/compute/fp/formal/README.md); an inconclusive timeout is not a pass.
-4. Keep LEC, DFT, post-layout PPA, and board results as separate closure gates.
-5. Continue the isolated `feat/shape-adaptive-gemv-v2` branch. Its 256-MAC
-   kernel passes three-seed RTL Golden checks at SHA `8c19eaf`; the
-   bandwidth/prefetch schedule is analytical and still needs an actual
-   double-buffered SPAD path, bank-arbitration tests, and synthesis evidence.
+1. Extend Gate 1 with a same-source current Product Top GEMV workload and
+   separately instrumented host/DMA/command/compute intervals. Preserve the
+   historical results as a distinct profile.
+2. Use the frozen source/test manifest to proceed with Gate 3's continuous H64/DeiT execution
+   evidence; do not treat historical staged results as a current Product Top
+   pass.
+3. Run Gate 4 A/B experiments. Route an RTL change through Gate 5 only when
+   measurements show that software scheduling or existing hardware cannot
+   address the bottleneck.
+4. Keep the [execution RTM](../../verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md),
+   [open-issue report](../../verification/COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md),
+   FP formal frontier, LEC, DFT, PPA, and board evidence as distinct closure
+   records. Do not infer full sign-off from a model Golden or benchmark pass.
 
 ## Canonical commands
 

@@ -399,3 +399,7 @@ hashes, exact command manifest, and compressed raw-log archive are under
 `docs/benchmark/NMAFORGE_V1_3_ROUND33_PERFORMANCE_CLOSURE.md` and
 `benchmark/performance_dominance/round33/`. GPT-2 retraining and 12-layer DeiT
 development were not started.
+
+## NMAForge V1.2 P0 — 2026-11-24
+
+On research branch `feat/shape-adaptive-gemv-v2`, committed capacity-aware Compute Cluster UVM fixture allocation at source SHA `c668479570e182e833146fd4a5f1d15bd06daf6c`. Reproduced the historical 128 KiB `CLUSTER_MEMORY_EMPTY` cause at SHA `f919bb787dab1a4e3bef44b5308ead56d6e77b72` (fixture write `0x7d000` returned SLVERR before an engine transaction). Read `SPAD_INFO`, allocated 46 bounded/disjoint regions and passed three seeds at each 128/256/512 KiB configuration, with 5,368 compared words per seed and zero mismatch/unknown/stale/orphan responses. The exact capacity commands and log hashes are in the P0 manifest. Also ran `make ai_smoke AI_RANDOM_CASES=4 AI_SEED=12345 SEED=20261124` and `make ai_run AI_RANDOM_CASES=20 AI_SEED=12345`; both exited 0. Historical 64×64×64 GEMM and 1×64×64 GEMV cycle-profile replay is SHA-bound to `49441dfafa130731c822c43bf2e500023e58423c`; it is not current Product Top timing. See [P0 run report](verification/NMAFORGE_V1_2_P0_RUN_REPORT.md), [run manifest](../benchmark/representative/v1_2/p0/run_manifest.json), and the addendum in the [Compute Cluster RTM](verification/COMPUTE_CLUSTER_EXECUTION_RTM_2026-10-27.md). Full V1.2 remains open.

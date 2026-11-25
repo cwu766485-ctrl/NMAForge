@@ -517,6 +517,33 @@ SHA-256 evidence:
 - `CLUSTER-S2-TOP-SMOKE-FA2B` retains one `[LOOP-REROLL-ENABLED]` fixture warning; it is not an SVA port warning and is not silently counted as zero-warning.
 - Whole-top URG line/condition/FSM/branch/assertion/group figures include DUT, SVA, testbench and UVM. They are not DUT-only coverage. Do not use them as a cluster closure percentage.
 
+## V1.2 P0 branch addendum — `NMAFORGE-V1.2-P0-C668479-20261124`
+
+This addendum is a separate source-bound run on research branch
+`feat/shape-adaptive-gemv-v2`, source SHA
+`c668479570e182e833146fd4a5f1d15bd06daf6c`; it does not change the inherited
+24 PASS-SCOPED / 14 PARTIAL classification above, which refers to the selected
+candidate source identities recorded in this RTM.
+
+The former 128 KiB `CLUSTER_MEMORY_EMPTY` setup was reproduced at SHA
+`f919bb787dab1a4e3bef44b5308ead56d6e77b72`: fixture address `0x7d000` returned
+SLVERR before an engine transaction. A SPAD_INFO-driven, capacity-checked map
+now allocates 46 disjoint fixture regions through `0x9740`. Compute Cluster
+real-top UVM passed 3 seeds each at 128/256/512 KiB; every seed checked 5,368
+words with no mismatch, unknown, stale or orphan response. Current-branch
+`ai_smoke` and the 20-case seeded top regression also passed. No Product RTL,
+ABI or protection-policy change was made.
+
+The report's [Requirement-to-Testpoint mapping delta](NMAFORGE_V1_2_P0_RUN_REPORT.md#dv-testpoint-mapping-delta-for-this-run)
+maps the new run markers to affected `REQ-CL` and `REQ-PC` rows and records
+coverage limits. Formal (3/3 dispatch/ownership assertions, 7/7 dispatch covers)
+and passive-monitor checker-sensitivity mutation (25/25) remain separate
+evidence classes. Full per-engine protection crosses, independent per-engine
+scoreboard components, full requirement closure, and external-fabric reset
+qualification remain open. Exact commands, exit codes, tool versions, CSV and
+compressed raw-log SHA-256 digests are in the [P0 run report](NMAFORGE_V1_2_P0_RUN_REPORT.md)
+and [`run_manifest.json`](../../benchmark/representative/v1_2/p0/run_manifest.json).
+
 ## Sign-off interpretation
 
 This RTM supports **CL-RC1 review** and a **bounded CL-RC2 evidence review**. It does not meet CL-DV-v1.0 closure: R99 closes `OPEN-CL-003` for the user-selected in-repository `ai_accel_memory_fabric`; broader legal fault/reset crosses and other partial requirements remain open. All 38 requirements retain PASS-SCOPED/PARTIAL dispositions (24/14); no requirement is BLOCKED_SPEC or NOT_RUN. R46/R47 are `BLOCKED_ENV`; R48 was a failed testbench coverage gate, corrected by R49. R55–R58 add exact-clean current-harness seven-engine UVM, checker-sensitivity, Matrix fault/recovery and prefetch-off fallback evidence; R59 replays Top Smoke and the 20-case top regression; R60 extends seeded parity to all seven engines; R64/R65 add all-engine Protection phases; R66 reconfirms 28/28 mutation catches on R65; R69 covers legal CNM local-FSM Abort/Reset phases and dispositions the core-blocked zero-length transition; R70 replays its named regressions at clean SHA `94c11ef`; R71 adds real-top Matrix Line stall stability and Top Smoke/seeded-top replay at `cfcd4db`; R73 fixes busy-time CPLQ consumer progress and passes the real-top full/hold/release/wrap test at `9d4e9ab`; R83 clean-replays accepted-read Abort/drain on every production engine; R84 clean-replays one SFU and R85 clean-replays one Conv and R86 one Matrix scalar-fallback and R88 one aligned-Line Matrix accepted-write-prefix Abort point; R87 clean-runs default-path UVM and 28/28 checker sensitivity at `402c8ce`; R88 clean-replays the aligned-Line prefix, three-seed UVM, checker sensitivity, Top Smoke and 20-case seeded Top at `ce2e36d`; R89 reruns all 8 Matrix configurations × 5 shapes with 40/40 Golden checks at the same code/test SHA. Behavioral AXI reset and selected Matrix/CNM/DMA recovery do not qualify an unidentified external fabric. See [readiness report](COMPUTE_CLUSTER_DV_SIGNOFF_READINESS_2026-10-27.md), [R55–R58 replay](COMPUTE_CLUSTER_CLEAN_REPLAY_R55_R58_2026-10-30.md), [R59 top smoke](COMPUTE_CLUSTER_TOP_SMOKE_REPLAY_R59_2026-10-30.md), [R60 all-engine parity replay](COMPUTE_CLUSTER_ALL_ENGINE_PARITY_R60_2026-10-30.md), [R64 all-engine Protection replay](COMPUTE_CLUSTER_PROTECTION_CROSS_R64_2026-10-30.md), [R65 phase cross](COMPUTE_CLUSTER_PROTECTION_PHASE_CROSS_R65_2026-10-30.md), [R66 mutation replay](COMPUTE_CLUSTER_MUTATION_CLEAN_REPLAY_R66_2026-10-30.md), [R70 final clean replay](COMPUTE_CLUSTER_FINAL_CLEAN_REPLAY_R70_2026-10-30.md), [R83 all-engine Abort replay](COMPUTE_CLUSTER_ALL_ENGINE_ABORT_R83_2026-10-30.md), [R84 SFU accepted-write-prefix replay](COMPUTE_CLUSTER_SFU_ABORT_WRITE_PREFIX_R84_2026-10-30.md), [R85 Conv accepted-write-prefix replay](COMPUTE_CLUSTER_CONV_ABORT_WRITE_PREFIX_R85_2026-10-30.md), [R86 Matrix scalar-fallback accepted-write-prefix replay](COMPUTE_CLUSTER_MATRIX_ABORT_WRITE_PREFIX_R86_2026-10-30.md), and [open issue list](COMPUTE_CLUSTER_OPEN_ISSUES_2026-10-27.md).

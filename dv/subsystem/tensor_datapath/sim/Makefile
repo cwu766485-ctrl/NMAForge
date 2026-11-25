@@ -1,4 +1,5 @@
 VCS ?= vcs -licwait 1
+PYTHON ?= python3.12
 VCS_BIN ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/vcs
 URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 CLUSTER_TAG ?= multi_engine_$(shell date +%Y%m%d_%H%M%S)
@@ -106,7 +107,7 @@ cluster_regress:
 	$(MAKE) -C $(FP_SIM) dot-uvm-regress \
 		DOT_UVM_SEEDS='$(FP_SEEDS)' DOT_UVM_OUT_DIR=$(CLUSTER_OUT)/fp \
 		VCS='$(VCS)' URG=$(URG)
-	python3.11 -m unittest discover -s ../../../block/compute/fp/model \
+	$(PYTHON) -m unittest discover -s ../../../block/compute/fp/model \
 		-p test_fp_reference.py
 	$(MAKE) -C $(TOP_SMOKE) ai_a4_ref \
 		AI_REF_CASES=$(AI_REF_CASES) AI_REF_SEED=$(AI_REF_SEED)

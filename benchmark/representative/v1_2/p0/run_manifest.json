@@ -1,0 +1,586 @@
+{
+  "abi": "Current checkout SPEC ABI v7.4; no ABI or protection policy change",
+  "artifacts": {
+    "formal": {
+      "gzip_bytes": 3843,
+      "gzip_sha256": "1006e0b7b7389ab6f30a16514cf33cdd1152fb04a8122d7bef93ec19ad6bcbae",
+      "path": "logs/formal/vc_formal.log.gz",
+      "raw_bytes": 17752,
+      "raw_sha256": "37fa2635929536998355cc3ff8753dab3194036da0a1b2f8a5358a8afcba7498"
+    },
+    "historical_failure_compile": {
+      "gzip_bytes": 4371,
+      "gzip_sha256": "6428e278b835b6174b4e0164ece2d00a3c00d658799dd15d93650eff1723ef08",
+      "path": "logs/historical_failure/compile.log.gz",
+      "raw_bytes": 43898,
+      "raw_sha256": "44c3522fc7607ce9dd406d90b2e2773e57adf9f10ac530cbd93fb82cdbc76183"
+    },
+    "historical_failure_run": {
+      "gzip_bytes": 1283,
+      "gzip_sha256": "4ada32d2d6e7bd968bab70c8a529ea24c6ba714173f24c4494f53f92852531fc",
+      "path": "logs/historical_failure/run.log.gz",
+      "raw_bytes": 3174,
+      "raw_sha256": "ac764f3e0a10a7974fb38999ff0ddaf19dd96a07bb5cc62d7cf801a9a5cb4b94"
+    },
+    "history_compile.log": {
+      "gzip_bytes": 1570,
+      "gzip_sha256": "d423a07979dffd72b0e616b6d6bdecc60da626b1b3b536655e228639957eb05c",
+      "path": "logs/historical_round27/compile.log.gz",
+      "raw_bytes": 4055,
+      "raw_sha256": "3d74d69912dfca019418538dd7781cb15eb0d9820efc976f4baccc6e7a127724"
+    },
+    "history_gemm_64x64x64.log": {
+      "gzip_bytes": 1314,
+      "gzip_sha256": "67f1f1370b31ce3ba1e28140ea6f8723fec060cb2b57955a12531a5cc9935e4f",
+      "path": "logs/historical_round27/gemm_64x64x64.log.gz",
+      "raw_bytes": 4408,
+      "raw_sha256": "f15f760042c79085db1f26127fc90ef6d563529091454b2c1f6de31818fcc393"
+    },
+    "history_gemm_64x64x64_seeded_memory.log": {
+      "gzip_bytes": 1366,
+      "gzip_sha256": "8ae32aa61ce2130518748e87e81ea4c7eca72e367bd2d0c53eb89c00510588f8",
+      "path": "logs/historical_round27/gemm_64x64x64_seeded_memory.log.gz",
+      "raw_bytes": 4360,
+      "raw_sha256": "ef12523a945b1be8021f016068f1a401a10715bde2e77fed4c0f42dd11524662"
+    },
+    "history_gemv_prefetch_0_compile.log": {
+      "gzip_bytes": 1585,
+      "gzip_sha256": "2b11bc98b2cb6b8dd23453b09fbbc097fff4834df5fbdb39c306b51485b15a0e",
+      "path": "logs/historical_round27/prefetch_0_compile.log.gz",
+      "raw_bytes": 4184,
+      "raw_sha256": "5949fd13ff20218bd1055c9c082ca50a93e233cd19edc8960e6183c6d987104d"
+    },
+    "history_gemv_prefetch_0_run.log": {
+      "gzip_bytes": 821,
+      "gzip_sha256": "f5121899fd8ec629ddd8f158e94a4b5b12297e452dcb5afec71762737e2817d5",
+      "path": "logs/historical_round27/prefetch_0_run.log.gz",
+      "raw_bytes": 2061,
+      "raw_sha256": "005c039ddd8df4c7a0f5396e070d51514faea9c64e921e4cbd26acdc23384eef"
+    },
+    "history_gemv_prefetch_1_compile.log": {
+      "gzip_bytes": 1583,
+      "gzip_sha256": "e32f9f3bc031bea10e2b304d728503569ddf94aaaecb203ab22f0d4a7d20579a",
+      "path": "logs/historical_round27/prefetch_1_compile.log.gz",
+      "raw_bytes": 4184,
+      "raw_sha256": "ba4089ee66ccaeb6777ebca5ae20897efa39c66b0a7f3f8aca90b70028f9865e"
+    },
+    "history_gemv_prefetch_1_run.log": {
+      "gzip_bytes": 823,
+      "gzip_sha256": "0bdb899636de5f8a28c91dcc89504bf8e718a3e075967a0c73b475fbab0ea4d3",
+      "path": "logs/historical_round27/prefetch_1_run.log.gz",
+      "raw_bytes": 2061,
+      "raw_sha256": "86270986848ba8a7dc696573ef6db5e7cf87982051c980671716d6a436faaf69"
+    },
+    "mutation_address": {
+      "gzip_bytes": 4356,
+      "gzip_sha256": "53aebda8378b6defe9713c7cee03be6b4230271fb2b85f5d010613b883b78b07",
+      "path": "logs/mutation/address.log.gz",
+      "raw_bytes": 18759,
+      "raw_sha256": "5a1998a35d69ec4140322f2caa378cd41be8a7acc6035d19382b49086f59852e"
+    },
+    "mutation_data": {
+      "gzip_bytes": 4248,
+      "gzip_sha256": "e61331a3e1e4b796f1b73f29daaa2e55601703fcb30338158593a22ebbf89d7d",
+      "path": "logs/mutation/data.log.gz",
+      "raw_bytes": 17818,
+      "raw_sha256": "c992c3bac7f108a8ef36e9bcfffd0f7019b54b8f8cf939cf91164076ff146212"
+    },
+    "mutation_done_engine_0": {
+      "gzip_bytes": 4256,
+      "gzip_sha256": "eb0dec28d8be124e64c82b43272abb6fe3cfd74c6d9d348a49e779b37e3f38d3",
+      "path": "logs/mutation/done_engine_0.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "8fbe208592d81c897a88d44532ac8b665020044c14dcb101addcc5d6734938bd"
+    },
+    "mutation_done_engine_1": {
+      "gzip_bytes": 4256,
+      "gzip_sha256": "918b465e73f1a30303828d7342435f5419b220abe819f7c4d5c2112e1f36e324",
+      "path": "logs/mutation/done_engine_1.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "9dafc573243c7bd5e56b3b99805dd6eca7c75e23eeeef82594bb01e058df0a59"
+    },
+    "mutation_done_engine_2": {
+      "gzip_bytes": 4257,
+      "gzip_sha256": "42292c5070eae1d9017027d16abf0b54de631fdb6326fd00ce7ea4e66bb77290",
+      "path": "logs/mutation/done_engine_2.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "67b90dc8b05d722258f913badc565b91c0630091776cc2ffab9b397a2e8a0b9b"
+    },
+    "mutation_done_engine_3": {
+      "gzip_bytes": 4259,
+      "gzip_sha256": "8b503faaf7b6cf2b72ceaf70cfa8a7173959402f1083a5a8d408cf47aa9db577",
+      "path": "logs/mutation/done_engine_3.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "245ce8f9efaa95a67445b2793d8a921d6f5aab8e9a218580fa07c123d8c50f50"
+    },
+    "mutation_done_engine_4": {
+      "gzip_bytes": 4257,
+      "gzip_sha256": "135c53a592604c551b9e9c0f0111b682f2cd2385f17f89f9aff9c9eba54f8451",
+      "path": "logs/mutation/done_engine_4.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "bf212c350eed8c03b123b263a62ef66aa0961d4b85409ccdab6238e7be9993b1"
+    },
+    "mutation_done_engine_5": {
+      "gzip_bytes": 4258,
+      "gzip_sha256": "cee2ab9cd1fb25dbcb51f4c8f28a6f82ee12d531cc1833109374c082d93fe462",
+      "path": "logs/mutation/done_engine_5.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "7c2e393a6d29125baff938f29bd87acfd8f23d2f9d4f3f36e7e3fd5021290e43"
+    },
+    "mutation_done_engine_6": {
+      "gzip_bytes": 4255,
+      "gzip_sha256": "228845ed6d8bea20d6db86310fe0f162c12a86784396f9a8c0d399d543b93fe0",
+      "path": "logs/mutation/done_engine_6.log.gz",
+      "raw_bytes": 17672,
+      "raw_sha256": "6d75b7dfe71fff7ab1e16494dd6df446b5b170baf12910afd0cd5013c312b1c8"
+    },
+    "mutation_duplicate_done_engine_0": {
+      "gzip_bytes": 4265,
+      "gzip_sha256": "6571a168064e14f2da17592975705ce732b0c8f1a97ccdbe2d8007ed80a8ad7f",
+      "path": "logs/mutation/duplicate_done_engine_0.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "03509e58e0d4641dafb44229194d1b8947349572c99d649fb8c8c22e81432f8f"
+    },
+    "mutation_duplicate_done_engine_1": {
+      "gzip_bytes": 4269,
+      "gzip_sha256": "b194bda7ff6d89ec0c1b273e624af974c7c39eeb55ae4584d8ca85d25cc291d7",
+      "path": "logs/mutation/duplicate_done_engine_1.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "c0a3edf0abfb424fca3cfa20faf07249e2f01cc6c3eb73a5fb18e56d2c2a049f"
+    },
+    "mutation_duplicate_done_engine_2": {
+      "gzip_bytes": 4266,
+      "gzip_sha256": "135c1c84f7bb8748253ca6c10c435a092e8aedd86fdc7d77f40e3e70aa843cce",
+      "path": "logs/mutation/duplicate_done_engine_2.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "9b7e6c8a5b8e991b6835ed3c3ba86cc23ce1f7ea974e64bcbcb56bbd1b4a767b"
+    },
+    "mutation_duplicate_done_engine_3": {
+      "gzip_bytes": 4267,
+      "gzip_sha256": "f0c90f13fe8d063212d4566c6bbff50cbe759a624c3613ec7033e835ba05a4c4",
+      "path": "logs/mutation/duplicate_done_engine_3.log.gz",
+      "raw_bytes": 17728,
+      "raw_sha256": "4be27370ff8a3da7fbe4198a531166f3e937ddfa42d9a481d6d83730db2f9589"
+    },
+    "mutation_duplicate_done_engine_4": {
+      "gzip_bytes": 4268,
+      "gzip_sha256": "a85e6478ebdd33bbac67197b916e636d257c5328f8191d2bf7945a8b85ed2d03",
+      "path": "logs/mutation/duplicate_done_engine_4.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "084549aa6583509749eb859b67b59caa3b0a0bc234a8b436329b71263e8c395c"
+    },
+    "mutation_duplicate_done_engine_5": {
+      "gzip_bytes": 4267,
+      "gzip_sha256": "e3bbb0520dabd3f918eea0e314c45afe5376efe5825a33b28557fb88472cdce8",
+      "path": "logs/mutation/duplicate_done_engine_5.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "797b36a82ed7560489332eb92fb6b02a0c7a7fc6cd368c32ccbe813fcf4218e0"
+    },
+    "mutation_duplicate_done_engine_6": {
+      "gzip_bytes": 4265,
+      "gzip_sha256": "cafe5e4482459e24925722e593e7cfa9ad9a778b7aef3a334b488d3694654f89",
+      "path": "logs/mutation/duplicate_done_engine_6.log.gz",
+      "raw_bytes": 17731,
+      "raw_sha256": "eda0059d9d3c1a3f2b7c3d2315df0a7f7f18c0d7e3e9c1c5b43aee72ddd592b0"
+    },
+    "mutation_missing_done_engine_0": {
+      "gzip_bytes": 4235,
+      "gzip_sha256": "2a5175035e8467a00d0cc53fd00104990f6bef8d0d078ba9b73d607ab9795bed",
+      "path": "logs/mutation/missing_done_engine_0.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "5ce23feae5058c5da1dc10c60ec2c39791a436f4c6a450793ccda8b307f807bd"
+    },
+    "mutation_missing_done_engine_1": {
+      "gzip_bytes": 4240,
+      "gzip_sha256": "e779438413ba726f4ddcc0b66905d7ac7cd3c58203791eafc43f31fdd17a3f14",
+      "path": "logs/mutation/missing_done_engine_1.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "e1d5ebfbf504e1e1c4fc91d6c08712d5059273afaebd7cf3419804942adc4d09"
+    },
+    "mutation_missing_done_engine_2": {
+      "gzip_bytes": 4241,
+      "gzip_sha256": "cb9a588f7c9660daa2a8f54bbced500d0042f55153963c519f734893885e3c80",
+      "path": "logs/mutation/missing_done_engine_2.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "062a0e158dd2ae136a30425e8dca7c27964260880951abf24665182fa988212e"
+    },
+    "mutation_missing_done_engine_3": {
+      "gzip_bytes": 4241,
+      "gzip_sha256": "d2594d40a1eda749c7e383dce104a96633839415613b43a6866c4b58e88dcdf7",
+      "path": "logs/mutation/missing_done_engine_3.log.gz",
+      "raw_bytes": 17677,
+      "raw_sha256": "fcb1ddc7d156ad19f2d630ba092b597133268c6a84eb06ec82119960b68178ea"
+    },
+    "mutation_missing_done_engine_4": {
+      "gzip_bytes": 4241,
+      "gzip_sha256": "d53317e1ae3290d97a8a8628e4862f8b388dc801e78bcb7aa41316b163206162",
+      "path": "logs/mutation/missing_done_engine_4.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "e854e9a7b3880d1c11e60be22ac919d4bbe1b9da4637309aa5966f33d07bf1ae"
+    },
+    "mutation_missing_done_engine_5": {
+      "gzip_bytes": 4236,
+      "gzip_sha256": "81c363bee3db87e9c7a70cee1de2fb48bb1f8ee1c13dfea86575a333c8a32107",
+      "path": "logs/mutation/missing_done_engine_5.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "abe23baaa8c63b0579f833145b1ca2a57b456deec71504facd1de03bb8a57875"
+    },
+    "mutation_missing_done_engine_6": {
+      "gzip_bytes": 4235,
+      "gzip_sha256": "1befbd8ddfc3591d8f099242728d731496f158c0e58430e8fbf3d98631466c3d",
+      "path": "logs/mutation/missing_done_engine_6.log.gz",
+      "raw_bytes": 17680,
+      "raw_sha256": "e200690f3b2a6c903a61a39474c875989af77fdfae6d74be59825633788296bf"
+    },
+    "mutation_owner": {
+      "gzip_bytes": 46375,
+      "gzip_sha256": "fc92f75106fe32850f19f1e9c4bf665ea90c5a0b38057540a071d72da4ea20e2",
+      "path": "logs/mutation/owner.log.gz",
+      "raw_bytes": 755959,
+      "raw_sha256": "e4dc6a461e51d6401296f09d64639b266fd489a0259783aa4868c0edfbe4d4f3"
+    },
+    "mutation_wstrb": {
+      "gzip_bytes": 4224,
+      "gzip_sha256": "1f9423bee74e37967d665a39e94f0ccb38e5fb197c042e3a24ece059cc4fb78d",
+      "path": "logs/mutation/wstrb.log.gz",
+      "raw_bytes": 17604,
+      "raw_sha256": "c72390de00292fd6ba9bfba3d614ae923dbbc2630fdc067a0b50aa86cb1de460"
+    },
+    "spad128_compile": {
+      "gzip_bytes": 4408,
+      "gzip_sha256": "488ecfc1c46e23727e990b0465882e67e6b93fe67d5948ebe33fb8532f1829f5",
+      "path": "logs/cluster_spad128/compile.log.gz",
+      "raw_bytes": 44018,
+      "raw_sha256": "b5931a94e96d39771aff358c349b89fd5c2b93f52d633563af3d8f79cfa618b5"
+    },
+    "spad128_seed20261025": {
+      "gzip_bytes": 4056,
+      "gzip_sha256": "9d6c13d4d6f5b9b0ac19cecd7a4f865be4db4afe76969f8045e46b2007d79937",
+      "path": "logs/cluster_spad128/seed_20261025.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "f817bf9136b6cb7bc5603b9c985587cf4b8d7ea20a9c917203781c25d1f76a3d"
+    },
+    "spad128_seed20261026": {
+      "gzip_bytes": 4058,
+      "gzip_sha256": "08c446847a2b06c8a4e8d7e9d27f833dfe22ac7ad4bcfbc96a34958e4630950b",
+      "path": "logs/cluster_spad128/seed_20261026.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "7e35544bd36a8a1b0e47b631205ece2743387839afba0394c13ecd78a43352e1"
+    },
+    "spad128_seed20261027": {
+      "gzip_bytes": 4059,
+      "gzip_sha256": "03a6363fdba37b814ec903be7b41c60f3f863bb667bf6b71796b155fa85c110d",
+      "path": "logs/cluster_spad128/seed_20261027.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "686af0f0cb5306be6458fa91eec5c80b7c049b94013ea35ba62d761bdae903df"
+    },
+    "spad128_urg": {
+      "gzip_bytes": 278,
+      "gzip_sha256": "c39745e5f0b041a87898b31d3ef8be905ef997046d2fe507eb3943ba69704e05",
+      "path": "logs/cluster_spad128/urg_merged.log.gz",
+      "raw_bytes": 600,
+      "raw_sha256": "fe9a91d62440cbe54cbc60eab67a3a53f55ab59bd565123ee0a5c80efda10ca5"
+    },
+    "spad256_compile": {
+      "gzip_bytes": 4412,
+      "gzip_sha256": "26462f8cf156f0f657d110726d183645817ec7bff6cd5942fcb3d07e6b898ff5",
+      "path": "logs/cluster_spad256/compile.log.gz",
+      "raw_bytes": 44017,
+      "raw_sha256": "0f7be554dd53b2a1526e9a1b966f6225d2c08c28da79e8379727e7a263d593d3"
+    },
+    "spad256_seed20261025": {
+      "gzip_bytes": 4059,
+      "gzip_sha256": "03373a3a89801f43111fdfa3ba69cc5085da71d896ba5650ad6d15ffebc1be78",
+      "path": "logs/cluster_spad256/seed_20261025.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "7abaeb87695050b326cc413a3901916f8a45f3e074fdedb1baaae61d62b2e302"
+    },
+    "spad256_seed20261026": {
+      "gzip_bytes": 4059,
+      "gzip_sha256": "d70c590ded1cc98c0f739aeb03a5c950d06dc9001b6ddb1a374f834ee7319282",
+      "path": "logs/cluster_spad256/seed_20261026.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "6929c96eabd5a20919fd722b67ea1cba90a39fe5096dc433ec47ed3fec5d2b85"
+    },
+    "spad256_seed20261027": {
+      "gzip_bytes": 4060,
+      "gzip_sha256": "9b7bfa5bad87d1184cb43b8d8ecae0e61f7941366c5f2ce28eaf0636f758a262",
+      "path": "logs/cluster_spad256/seed_20261027.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "ef6a0865da5d0e4e07b03ba9fd1e8b03b9d75739e923458b4779cc3a4843e173"
+    },
+    "spad256_urg": {
+      "gzip_bytes": 278,
+      "gzip_sha256": "4323bb586f508efed32f1759d819bc4c57e9433ea68255444837cbb757680851",
+      "path": "logs/cluster_spad256/urg_merged.log.gz",
+      "raw_bytes": 600,
+      "raw_sha256": "ee9190d8369fa3efd86a97cc5494f1b489adfe08d12496810d52ca9cf0d30a5a"
+    },
+    "spad512_compile": {
+      "gzip_bytes": 4029,
+      "gzip_sha256": "561409e1345cd82b2773478e392953f8255de6fcbfe36c5fa1422f96434a9ff9",
+      "path": "logs/cluster_spad512/compile.log.gz",
+      "raw_bytes": 41412,
+      "raw_sha256": "7b2d1764bd111eaad49f19fd4161f0d685f317485dc9e286fb5da8945e60e33c"
+    },
+    "spad512_seed20261025": {
+      "gzip_bytes": 4054,
+      "gzip_sha256": "10f769061cad1e3b7d0e98bc0bdc4785431c0104f0071be6a3d5fc37e5289137",
+      "path": "logs/cluster_spad512/seed_20261025.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "9ccd5c2e024c4c0e315b29174249cbcbf9426571aff17f2d5794780a745739d1"
+    },
+    "spad512_seed20261026": {
+      "gzip_bytes": 4059,
+      "gzip_sha256": "b59a6b94d7e63b4bfd57e1a379109d16fe053e52c0d9be7ed36452143c99fcf6",
+      "path": "logs/cluster_spad512/seed_20261026.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "9cb6b354b6f703e49d1ae6cecd1bb13cf8fac851d989ec810566e532430a0bf9"
+    },
+    "spad512_seed20261027": {
+      "gzip_bytes": 4058,
+      "gzip_sha256": "71e93834b87fd873b53e922bd1000e4d58ec6510dc58ac7736539c14ef0062dd",
+      "path": "logs/cluster_spad512/seed_20261027.run.log.gz",
+      "raw_bytes": 16939,
+      "raw_sha256": "c8405a024bc656fd09176b8cc9a4570c27891722f72f5afa73254cf3ba7c0f7b"
+    },
+    "spad512_urg": {
+      "gzip_bytes": 277,
+      "gzip_sha256": "d66039937a452ace295ad28cea1b46011d8fbafb22748815ae554ab68f852f10",
+      "path": "logs/cluster_spad512/urg_merged.log.gz",
+      "raw_bytes": 600,
+      "raw_sha256": "a64f2b0e37d400cf76dae9e0d2ab153c17984cfaaa82bb8df1bb01d92f631a9b"
+    },
+    "top_ai_smoke": {
+      "gzip_bytes": 8426,
+      "gzip_sha256": "233f5cf5685e23395853a571a314a661b0f6f453390bfd86ba6acca532236e04",
+      "path": "logs/top_smoke/ai_smoke_4cases.log.gz",
+      "raw_bytes": 46886,
+      "raw_sha256": "5c7d8e23a979e8af16cb237354c5f814b924778ce5f31cbe972220ee56974135"
+    },
+    "top_compile": {
+      "gzip_bytes": 2307,
+      "gzip_sha256": "3e2436ec3d7b1acf3f134334a1a298bd3f6a1b19f68f09f9160605b80362bb3a",
+      "path": "logs/top_smoke/compile.log.gz",
+      "raw_bytes": 7939,
+      "raw_sha256": "50e8e9fb4103310db53ae689b53209247cca5b17567d78cdd615385cc9a1c63c"
+    },
+    "top_seeded": {
+      "gzip_bytes": 9767,
+      "gzip_sha256": "1c6c5e3f63844210894655ad3a3f0da9275abf0ecfb65e1b74fc0c1538041456",
+      "path": "logs/top_smoke/seeded_top_20cases.log.gz",
+      "raw_bytes": 56309,
+      "raw_sha256": "d4d72bc961be5e243398a165ebd63faa2c344e0f37a2816b916fab79c33bd6d9"
+    }
+  },
+  "assertion_and_coverage_status": "UVM runlogs retain SVA summaries and focused functional coverage. This does not represent full Compute Cluster closure.",
+  "branch": "feat/shape-adaptive-gemv-v2",
+  "formal_status": "PASS_SCOPED",
+  "historical_failure_sha": "f919bb787dab1a4e3bef44b5308ead56d6e77b72",
+  "historical_replay_sha": "49441dfafa130731c822c43bf2e500023e58423c",
+  "model_hash": null,
+  "model_hash_disposition": "P0 regression uses synthetic directed/random Golden fixtures; no trained model package loaded",
+  "performance_csv": "historical_compute_profile.csv",
+  "rtl_changed_in_this_p0_fix": false,
+  "run_id": "NMAFORGE-V1.2-P0-C668479-20261124",
+  "runs": [
+    {
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=128 COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_spad128_c668479",
+      "config": {
+        "coverage": "focused_compute_cg_applicable=100.0%; completion read N/A",
+        "map_end": "0x00009740",
+        "map_regions": 46,
+        "spad_kib": 128,
+        "words_per_bank": 8192
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/cluster_spad128/compile.log.gz",
+        "logs/cluster_spad128/urg_merged.log.gz",
+        "logs/cluster_spad128/seed_20261025.run.log.gz",
+        "logs/cluster_spad128/seed_20261026.run.log.gz",
+        "logs/cluster_spad128/seed_20261027.run.log.gz"
+      ],
+      "name": "cluster_spad128_3_seed",
+      "result": "PASS 3/3; UVM WARNING/ERROR/FATAL=0/0/0; 46 disjoint regions; 5368 checked words per seed; 0 mismatch/unknown/stale/orphan"
+    },
+    {
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=256 COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_spad256_c668479",
+      "config": {
+        "coverage": "focused_compute_cg_applicable=100.0%; completion read N/A",
+        "map_end": "0x00009740",
+        "map_regions": 46,
+        "spad_kib": 256,
+        "words_per_bank": 16384
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/cluster_spad256/compile.log.gz",
+        "logs/cluster_spad256/urg_merged.log.gz",
+        "logs/cluster_spad256/seed_20261025.run.log.gz",
+        "logs/cluster_spad256/seed_20261026.run.log.gz",
+        "logs/cluster_spad256/seed_20261027.run.log.gz"
+      ],
+      "name": "cluster_spad256_3_seed",
+      "result": "PASS 3/3; UVM WARNING/ERROR/FATAL=0/0/0; 46 disjoint regions; 5368 checked words per seed; 0 mismatch/unknown/stale/orphan"
+    },
+    {
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=512 COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027' COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_spad512_c668479",
+      "config": {
+        "coverage": "focused_compute_cg_applicable=100.0%; completion read N/A",
+        "map_end": "0x00009740",
+        "map_regions": 46,
+        "spad_kib": 512,
+        "words_per_bank": 32768
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/cluster_spad512/compile.log.gz",
+        "logs/cluster_spad512/urg_merged.log.gz",
+        "logs/cluster_spad512/seed_20261025.run.log.gz",
+        "logs/cluster_spad512/seed_20261026.run.log.gz",
+        "logs/cluster_spad512/seed_20261027.run.log.gz"
+      ],
+      "name": "cluster_spad512_3_seed",
+      "result": "PASS 3/3; UVM WARNING/ERROR/FATAL=0/0/0; 46 disjoint regions; 5368 checked words per seed; 0 mismatch/unknown/stale/orphan"
+    },
+    {
+      "command": "make ai_smoke AI_RANDOM_CASES=4 AI_SEED=12345 SEED=20261124",
+      "config": {
+        "ai_seed": 12345,
+        "random_cases": 4,
+        "spad_kib": 512
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/top_smoke/compile.log.gz",
+        "logs/top_smoke/ai_smoke_4cases.log.gz"
+      ],
+      "name": "product_top_ai_smoke",
+      "result": "TEST PASS; VCS loop-reroll informational warning retained"
+    },
+    {
+      "command": "make ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+      "config": {
+        "ai_seed": 12345,
+        "random_cases": 20,
+        "spad_kib": 512
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/top_smoke/seeded_top_20cases.log.gz"
+      ],
+      "name": "product_top_seeded_regression",
+      "result": "TEST PASS; 20 seeded random cases"
+    },
+    {
+      "command": "make uvm_compute_cluster_mutation SPAD_KIB=512 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_spad512_c668479 COMPUTE_CLUSTER_MUTATION_OUT=/tmp/nmaforge_v1_2_cluster_mutation_c668479",
+      "exit_code": 0,
+      "logs": [
+        "logs/mutation/address.log.gz",
+        "logs/mutation/data.log.gz",
+        "logs/mutation/done_engine_0.log.gz",
+        "logs/mutation/done_engine_1.log.gz",
+        "logs/mutation/done_engine_2.log.gz",
+        "logs/mutation/done_engine_3.log.gz",
+        "logs/mutation/done_engine_4.log.gz",
+        "logs/mutation/done_engine_5.log.gz",
+        "logs/mutation/done_engine_6.log.gz",
+        "logs/mutation/duplicate_done_engine_0.log.gz",
+        "logs/mutation/duplicate_done_engine_1.log.gz",
+        "logs/mutation/duplicate_done_engine_2.log.gz",
+        "logs/mutation/duplicate_done_engine_3.log.gz",
+        "logs/mutation/duplicate_done_engine_4.log.gz",
+        "logs/mutation/duplicate_done_engine_5.log.gz",
+        "logs/mutation/duplicate_done_engine_6.log.gz",
+        "logs/mutation/missing_done_engine_0.log.gz",
+        "logs/mutation/missing_done_engine_1.log.gz",
+        "logs/mutation/missing_done_engine_2.log.gz",
+        "logs/mutation/missing_done_engine_3.log.gz",
+        "logs/mutation/missing_done_engine_4.log.gz",
+        "logs/mutation/missing_done_engine_5.log.gz",
+        "logs/mutation/missing_done_engine_6.log.gz",
+        "logs/mutation/owner.log.gz",
+        "logs/mutation/wstrb.log.gz"
+      ],
+      "name": "cluster_mutation_sensitivity",
+      "result": "PASS 25/25 expected checker catches; expected UVM errors are mutation outcomes"
+    },
+    {
+      "command": "make -C dv/subsystem/tensor_datapath/formal run OUT=/tmp/nmaforge_v1_2_cluster_formal_c668479 TIMEOUT=300",
+      "exit_code": 0,
+      "logs": [
+        "logs/formal/vc_formal.log.gz"
+      ],
+      "name": "cluster_formal_serial_dispatch",
+      "result": "PASS scoped: 3/3 assertions proven, 7/7 engine dispatch covers hit; setup clean; matrix array unresolved/blackboxed warning limits proof scope",
+      "scope": "dispatch ownership only; not arithmetic, memory arbitration, DMA or full-top proof"
+    },
+    {
+      "command": "/tmp/nmaforge_v12_p0_round27_49441df_core/simv +SEED=20261122 +TINY_NPU_MATCH_MULTI",
+      "config": {
+        "array": "16x16",
+        "spad": "registered behavioral with seeded ready/line backpressure"
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/historical_round27/gemm_64x64x64_seeded_memory.log.gz"
+      ],
+      "name": "historical_gemm64_seeded_memory_replay",
+      "result": "PASS; 64x64x64, 4822 cycles; 4096 output Golden",
+      "source_commit_sha": "49441dfafa130731c822c43bf2e500023e58423c"
+    },
+    {
+      "command": "/tmp/nmaforge_v12_p0_round27_49441df_core/simv +SEED=20261122 +MATRIX_FIXED_MEMORY +TINY_NPU_MATCH_MULTI",
+      "config": {
+        "array": "16x16",
+        "spad": "one-cycle behavioral, always ready"
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/historical_round27/gemm_64x64x64.log.gz"
+      ],
+      "name": "historical_gemm64_fixed_spad_replay",
+      "result": "PASS; 64x64x64, 3413 cycles; same operands and Golden",
+      "source_commit_sha": "49441dfafa130731c822c43bf2e500023e58423c"
+    },
+    {
+      "command": "make -C dv/block/compute/matrix/sim round27-gemv-prefetch-ablation SEED=20261122 PHYSICAL_ARRAY_SIZE=16 ROUND27_GEMV_OUT=/tmp/nmaforge_v12_p0_round27_49441df_gemv",
+      "config": {
+        "array": "16x16",
+        "b_cache": 0,
+        "descriptors": 4,
+        "spad": "one-cycle behavioral, always ready"
+      },
+      "exit_code": 0,
+      "logs": [
+        "logs/historical_round27/prefetch_0_run.log.gz",
+        "logs/historical_round27/prefetch_1_run.log.gz"
+      ],
+      "name": "historical_gemv1x64_prefetch_ab",
+      "result": "PASS 64/64 Golden; 632 cycles prefetch off, 584 on; 4352 read bytes and 256 output bytes each",
+      "source_commit_sha": "49441dfafa130731c822c43bf2e500023e58423c"
+    },
+    {
+      "command": "make -C dv/uvm/sim uvm_compute_cluster_regress COMPUTE_CLUSTER_UVM_SEEDS=20261025 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v1_2_repro_f919_captured",
+      "exit_code": 2,
+      "logs": [
+        "logs/historical_failure/compile.log.gz",
+        "logs/historical_failure/run.log.gz"
+      ],
+      "name": "historical_128kiB_fixture_failure_reproduction",
+      "result": "FAIL reproduced before engine transaction: AXI-Lite SPAD write 0x7d000 returned SLVERR with top default SPAD 128 KiB",
+      "source_commit_sha": "f919bb787dab1a4e3bef44b5308ead56d6e77b72"
+    }
+  ],
+  "status": "P0_BASELINE_AND_FIXTURE_RECOVERY_PASS; FULL_V1_2_OPEN",
+  "tested_product_rtl_tree_sha": "b969dd80ceceb23e086df423515993353092b5ca",
+  "tested_source_commit_sha": "c668479570e182e833146fd4a5f1d15bd06daf6c",
+  "tested_source_tree_sha": "b883b40a1ae5a630934160820f17041a9237e7b4",
+  "tools": {
+    "python": "3.12.13",
+    "urg": "V-2023.12-SP1",
+    "vc_formal": "V-2023.12-SP2",
+    "vcs": "V-2023.12-SP1_Full64"
+  }
+}

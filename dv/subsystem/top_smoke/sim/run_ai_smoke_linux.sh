@@ -15,9 +15,9 @@ find_python() {
         return 0
     fi
     local candidate
-    for candidate in python3.12 python3.11 python3.10 python3.9 python3.8 python3; do
+    for candidate in python3.12 python3.11 python3.10 python3.9 python3.8; do
         if command -v "${candidate}" >/dev/null 2>&1 &&
-           "${candidate}" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 7) else 1)'; then
+           "${candidate}" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 8) else 1)'; then
             printf '%s\n' "${candidate}"
             return 0
         fi
@@ -30,7 +30,7 @@ if ! command -v vcs >/dev/null 2>&1; then
     exit 127
 fi
 if ! python_bin="$(find_python)"; then
-    echo "ERROR: Python 3.7 or newer is required for the fixed-point reference gate." >&2
+    echo "ERROR: Python 3.8 or newer is required; install Python 3.12 or set PYTHON_BIN." >&2
     exit 127
 fi
 

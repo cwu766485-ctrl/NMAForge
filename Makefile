@@ -2,7 +2,7 @@
 .PHONY: help benchmark-tinynpu inference-digits inference-transformer compute-performance-report shape-adaptive-regress shape-adaptive-spad-regress
 
 AI_DIGITS_RUN ?= /tmp/nmaforge_digits_$(shell date +%Y%m%d_%H%M%S)
-PYTHON ?= $(shell for p in python3.12 python3.11 python3.10 python3.9; do command -v $$p >/dev/null 2>&1 && { echo $$p; exit 0; }; done; command -v python3)
+PYTHON ?= python3.12
 AI_DIGITS_PYTHON ?= $(PYTHON)
 TRANSFORMER_SEED ?= 20261029
 COMPUTE_PERF_OUT ?= /tmp/nmaforge_compute_performance_$(shell date +%Y%m%d_%H%M%S)

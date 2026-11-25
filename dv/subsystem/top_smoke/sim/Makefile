@@ -14,10 +14,7 @@ AI_TRANSFORMER_MANIFEST ?= /tmp/nmaforge_transformer_manifest.json
 AI_TRANSFORMER_MAPPING_POLICY ?= gemm
 AI_TRANSFORMER_SEED ?= 20261106
 AI_TRANSFORMER_STEPS ?= 20000
-# The WSL image keeps an old python3 (3.6) alongside newer interpreters.
-# Pick the first installed Python that can parse the A3/A4 reference model;
-# callers may still override PYTHON for a managed VNC/CI environment.
-PYTHON ?= $(shell for p in python3.12 python3.11 python3.10 python3.9 python3.8 python3; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 7) else 1)' >/dev/null 2>&1 && { echo $$p; exit; }; done; echo python3)
+PYTHON ?= python3.12
 
 all: ai_smoke
 
@@ -119,7 +116,7 @@ ai_matrix_dma_overlap_probe: ai_comp
 # production CMDQ/CPLQ/SPAD path. All generated model, simulator, and result
 # files are isolated under /tmp.
 AI_DIGITS_RUN ?= /tmp/nmaforge_digits_rtl_$(shell date +%Y%m%d_%H%M%S)
-AI_DIGITS_PYTHON ?= python3
+AI_DIGITS_PYTHON ?= $(PYTHON)
 AI_DIGITS_MODEL ?=
 .PHONY: ai_digits_inference
 ai_digits_inference:
@@ -160,7 +157,7 @@ ai_digits_inference:
 # Paired TinyNPU conv1x_mini graph through production top, Matrix/SFU/int8
 # engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
 AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
-AI_TINYNPU_CNN_PYTHON ?= python3
+AI_TINYNPU_CNN_PYTHON ?= $(PYTHON)
 AI_TINYNPU_CNN_CLASSES ?= 4
 .PHONY: ai_tinynpu_cnn_match
 ai_tinynpu_cnn_match:

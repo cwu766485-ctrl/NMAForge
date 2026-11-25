@@ -1,7 +1,7 @@
 # Run from dv/uvm/sim on the Linux/VCS environment.
 UVM_TEST ?= ai_version_smoke_test
 VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
-SPAD_KIB ?= 128
+SPAD_KIB ?= 512
 ifeq ($(filter $(SPAD_KIB),128 256 512),)
 $(error SPAD_KIB must be one of 128, 256, or 512)
 endif

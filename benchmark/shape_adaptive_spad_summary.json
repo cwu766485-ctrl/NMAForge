@@ -1,15 +1,26 @@
 {
-  "run_id": "SHAPE-SPAD-30e3ba81c675fe1612db1a393a8d3879aa80ba89-20261104",
-  "source_sha": "30e3ba81c675fe1612db1a393a8d3879aa80ba89",
+  "run_id": "SHAPE-SPAD-773a747a841afaff8c68ce194a9b1c0558a82d27-20261113",
+  "source_sha": "773a747a841afaff8c68ce194a9b1c0558a82d27",
   "vcs_version": "V-2023.12-SP1_Full64",
   "regression_seeds": [
-    20261101,
-    20261102,
-    20261103
+    20261113,
+    20261114,
+    20261115
   ],
-  "pass_count": 12,
-  "workloads_per_seed": 4,
-  "dimensions": "M=1/4/8/16, N=8, K=64; signed INT8 \u00d7 INT8 -> signed INT64 accumulation",
+  "pass_count": 27,
+  "workloads_per_seed": 9,
+  "dimensions": [
+    "16x16x64",
+    "16x8x64",
+    "1x13x17",
+    "1x13x64",
+    "1x8x64",
+    "4x13x64",
+    "4x8x64",
+    "8x16x64",
+    "8x8x64"
+  ],
+  "numeric_contract": "signed INT8 \u00d7 INT8 -> signed INT64 accumulation; complete 32-bit SPAD output image checked against independent INT32 GEMM",
   "memory": {
     "implementation": "ai_spad_arbiter + ai_scratchpad four-bank VCS behavioral RAM",
     "read_latency": "two registered scratchpad stages plus arbiter response tagging",
@@ -23,5 +34,5 @@
     "checker": "independent INT32 GEMM plus complete SPAD result-image and uncommitted sentinel checks"
   },
   "timing_limit": "research wrapper measures real arbiter/SPAD and kernel RTL; it is not connected to the production Matrix command path and is not an ASIC PPA result",
-  "csv": "benchmark/shape_adaptive_spad_ablation.csv"
+  "csv": "/home/ray/workspace/NMAForge/benchmark/shape_adaptive_spad_ablation.csv"
 }
