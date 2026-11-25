@@ -1,5 +1,23 @@
 # Project update log
 
+## NMAForge V1.3 Round 35 step 1 — integration, 512 KiB SPAD, DMA bandwidth (2026-11-25)
+
+- **Integration line.** `integration/nmaforge-v1.3` merges Round 34 and the
+  active working branch, and is a superset of `main` and
+  `candidate/frontend-closeout`. Smoke, seeded, SFU equivalence, GPT-2 and
+  cluster UVM at 128/256/512 KiB all pass.
+- **SPAD default.** It is now 512 KiB in both RTL and SPEC.
+- **DMA beat counters.** They are now parameterized, so 32- and 64-beat bursts
+  work.
+- **DMA bandwidth.** A new performance memory model shows the 16-beat product
+  reaching 76% of peak at 50-cycle latency and 48% at 100 cycles. 32/64-beat
+  bursts reach 98%/96%.
+- **Burst default.** It stays at 16 per SPEC pending approval.
+- **Next step.** System gains are dominated by small host-fenced DMAs; the
+  next step is DMA-in-CMDQ overlap.
+
+See the [Round 35 report](benchmark/NMAFORGE_V1_3_ROUND35_INTEGRATION_AND_BANDWIDTH.md).
+
 ## NMAForge V1.3 Round 34 — Transformer operators, GPT-2 runtime and SFU fast path (2026-11-25)
 
 Isolated branch `research/nmaforge-v1.3-round34-transformer-sfu` (base Round 33

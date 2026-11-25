@@ -1,5 +1,23 @@
 # NMAForge execution frontier
 
+## Round 35 step 1 status (2026-11-25)
+
+The integration line `integration/nmaforge-v1.3` is validated, and 512 KiB is
+the standard SPAD. DMA bandwidth is characterized
+([report](../../benchmark/NMAFORGE_V1_3_ROUND35_INTEGRATION_AND_BANDWIDTH.md)).
+
+Next, in order:
+
+1. Branch cleanup (owner approval) and the `port-missing-fixes` arbiter
+   fairness merge.
+2. DMA descriptors in the CMDQ event chain with compute overlap and coalesced
+   weight transfers, plus the SPEC decision on 32-beat bursts.
+3. A GPT-2 small / distilgpt2 software PTQ quality gate, then a weight-streamed
+   H768 mapper.
+4. DeiT Layer-0 closure and a bit-exact software accuracy model.
+5. Round-35 innovation items (GEMM epilogue fusion, INT4 weight-stream GEMV,
+   bank-level near-memory lanes), each through Gate 5.
+
 ## NMAForge V1.3 Round 34 — Transformer SFU and GPT-2 runtime (2026-11-25)
 
 | Gate | Status | Evidence / boundary |

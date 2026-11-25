@@ -23,9 +23,15 @@
 // ============================================================================
 module ai_accel_top #(
     // Four fixed banks are retained for the bank-local INT8 datapath.  Depth
-    // defaults to 8192 words/bank (128 KiB); 32768 selects optional 512 KiB.
-    parameter integer SPAD_WORDS_PER_BANK = 8192,
-    parameter integer M_AXI_ADDR_WIDTH = 64
+    // defaults to 32768 words/bank (512 KiB, the Round 35 standard product
+    // configuration); 8192/16384 select the 128/256 KiB variants.
+    parameter integer SPAD_WORDS_PER_BANK = 32768,
+    parameter integer M_AXI_ADDR_WIDTH = 64,
+    // AXI4 read/write burst length in 128-bit beats.  SPEC v7.4 fixes the
+    // product contract at 16; the DMA beat counters are sized from this
+    // parameter so 32/64 can be evaluated (Round 35 bandwidth sweep: 32 beats
+    // with four outstanding reads reach ~98% of peak at 50-cycle latency).
+    parameter integer DMA_MAX_BURST_BEATS = 16
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ACLK CLK" *)
     (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME ACLK, ASSOCIATED_BUSIF S_AXI:M_AXI, ASSOCIATED_RESET aresetn" *)
@@ -1263,7 +1269,7 @@ module ai_accel_top #(
     //   store=0: DDR -> scratchpad for inputs and weights;
     //   store=1: scratchpad -> DDR for results.
     // Direct, 2D, gather, and tile requests share this 128-bit tagged backend.
-    ai_axi128_dma #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH)) dma_u(
+    ai_axi128_dma #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH), .MAX_BURST_BEATS(DMA_MAX_BURST_BEATS)) dma_u(
         .clk(aclk), .resetn(aresetn), .start(dma_start_mux),
         .abort(core_abort), .store(dma_store_mux), .ext_addr(dma_ext_addr_mux),
         .spad_addr(dma_spad_addr_mux), .length_words(dma_length_words_mux),

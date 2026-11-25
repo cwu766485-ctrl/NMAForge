@@ -5,14 +5,15 @@ module ai_dma_burst_planner #(
     input  wire [AXI_ADDR_WIDTH-1:0] ext_addr,
     input  wire [15:0]               remaining_words,
     output wire                      plan_wide,
-    output wire [4:0]                plan_beats,
+    output wire [$clog2(MAX_BURST_BEATS+1)-1:0] plan_beats,
     output wire [15:0]               plan_words,
     output wire [31:0]               plan_bytes
 );
 
     reg [8:0]  boundary_beats_comb;
     reg [15:0] remaining_beats_comb;
-    reg [4:0]  plan_beats_comb;
+    localparam integer BEAT_W = $clog2(MAX_BURST_BEATS+1);
+    reg [BEAT_W-1:0] plan_beats_comb;
     reg [15:0] plan_words_comb;
     reg [31:0] plan_bytes_comb;
     reg        plan_wide_comb;
@@ -28,11 +29,11 @@ module ai_dma_burst_planner #(
         end else begin
             if (boundary_beats_comb < MAX_BURST_BEATS &&
                 {7'd0, boundary_beats_comb} < remaining_beats_comb)
-                plan_beats_comb = boundary_beats_comb[4:0];
+                plan_beats_comb = boundary_beats_comb[BEAT_W-1:0];
             else if (remaining_beats_comb > MAX_BURST_BEATS)
                 plan_beats_comb = MAX_BURST_BEATS;
             else
-                plan_beats_comb = remaining_beats_comb[4:0];
+                plan_beats_comb = remaining_beats_comb[BEAT_W-1:0];
             if (remaining_words < ({11'd0, plan_beats_comb} << 2))
                 plan_words_comb = remaining_words;
             else
