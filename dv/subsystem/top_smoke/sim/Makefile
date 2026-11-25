@@ -7,10 +7,7 @@ AI_RANDOM_CASES ?= 4
 AI_SEED ?= 12345
 AI_REF_CASES ?= 1000
 AI_REF_SEED ?= 20260722
-# The WSL image keeps an old python3 (3.6) alongside newer interpreters.
-# Pick the first installed Python that can parse the A3/A4 reference model;
-# callers may still override PYTHON for a managed VNC/CI environment.
-PYTHON ?= $(shell for p in python3.12 python3.11 python3.10 python3.9 python3.8 python3; do command -v $$p >/dev/null 2>&1 && $$p -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 7) else 1)' >/dev/null 2>&1 && { echo $$p; exit; }; done; echo python3)
+PYTHON ?= python3.12
 
 all: ai_smoke
 
@@ -93,7 +90,7 @@ ai_fp_dot_dma_benchmark: ai_comp
 # production CMDQ/CPLQ/SPAD path. All generated model, simulator, and result
 # files are isolated under /tmp.
 AI_DIGITS_RUN ?= /tmp/nmaforge_digits_rtl_$(shell date +%Y%m%d_%H%M%S)
-AI_DIGITS_PYTHON ?= python3
+AI_DIGITS_PYTHON ?= $(PYTHON)
 .PHONY: ai_digits_inference
 ai_digits_inference:
 	test ! -e "$(AI_DIGITS_RUN)"
@@ -126,7 +123,7 @@ ai_digits_inference:
 # Paired TinyNPU conv1x_mini graph through production top, Matrix/SFU/int8
 # engines, ABI-v7 command/completion queues, and an independent per-layer Golden.
 AI_TINYNPU_CNN_RUN ?= /tmp/nmaforge_tinynpu_cnn_rtl_$(shell date +%Y%m%d_%H%M%S)
-AI_TINYNPU_CNN_PYTHON ?= python3
+AI_TINYNPU_CNN_PYTHON ?= $(PYTHON)
 .PHONY: ai_tinynpu_cnn_match
 ai_tinynpu_cnn_match:
 	test ! -e "$(AI_TINYNPU_CNN_RUN)"

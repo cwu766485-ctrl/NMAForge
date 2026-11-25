@@ -11,7 +11,7 @@ OUT_DIR="${TINYNPU_BENCH_OUT:-/tmp/nmaforge_tinynpu_bench_${RUN_DATE}_${SEED}}"
 WORK_ROOT="${TINYNPU_WORK_ROOT:-$OUT_DIR/reference}"
 TINY_NPU_ROOT="${TINY_NPU_ROOT:-$WORK_ROOT/source}"
 VERILATOR="${VERILATOR:-verilator}"
-PYTHON="${PYTHON:-python3}"
+PYTHON="${PYTHON:-python3.12}"
 VCS_VERSION="${VCS_VERSION:-}"
 
 if [[ ! -d "$TINY_NPU_ROOT/.git" ]]; then

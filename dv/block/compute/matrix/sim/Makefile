@@ -1,4 +1,5 @@
 VCS ?= vcs -licwait 1
+PYTHON ?= python3.12
 URG ?= /opt/Synopsys/vcs/V-2023.12-SP1/bin/urg
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_matrix_datapath_$(SEED)
@@ -187,7 +188,7 @@ matrix-config-comparison:
 			done; \
 		done; \
 	done; \
-	python3 ../../../../../tools/summarize_matrix_config_bench.py --root $(MATRIX_CONFIG_OUT) --seed $(SEED)
+	$(PYTHON) ../../../../../tools/summarize_matrix_config_bench.py --root $(MATRIX_CONFIG_OUT) --seed $(SEED)
 
 # Matched signed-INT8 16x16x16 GEMM using the pinned TinyNPU testbench's
 # deterministic A/B values. Keep this on an 8x8 physical array and the same

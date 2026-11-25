@@ -12,7 +12,7 @@ SPAD_JSON := $(REPO_ROOT)/benchmark/shape_adaptive_spad_summary.json
 RUN_DIR ?= /tmp/nmaforge_shape_adaptive_$(shell date +%Y%m%d_%H%M%S)
 SEEDS ?= 20261025 20261026 20261027
 VCS ?= vcs
-PYTHON ?= python3
+PYTHON ?= python3.12
 SOURCE_SHA ?= $(shell git -C "$(REPO_ROOT)" rev-parse HEAD)
 
 .PHONY: shape-adaptive-regress shape-adaptive-spad-regress

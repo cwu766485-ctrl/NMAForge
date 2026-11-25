@@ -7,7 +7,7 @@ WORK_ROOT="${TINYNPU_WORK_ROOT:-${TMPDIR:-/tmp}/nmaforge_tinynpu_${PINNED_SHA:0:
 TINY_NPU_ROOT="${TINY_NPU_ROOT:-$WORK_ROOT/source}"
 OUT_DIR="${TINYNPU_CNN_OUT:-$WORK_ROOT/cnn}"
 VERILATOR="${VERILATOR:-verilator}"
-PYTHON="${PYTHON:-python3}"
+PYTHON="${PYTHON:-python3.12}"
 
 ACTUAL_SHA="$(git -C "$TINY_NPU_ROOT" rev-parse HEAD)"
 if [[ "$ACTUAL_SHA" != "$PINNED_SHA" ]]; then

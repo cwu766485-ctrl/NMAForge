@@ -1,4 +1,4 @@
-PYTHON ?= python3.11
+PYTHON ?= python3.12
 VCS ?= vcs -licwait 1
 SEED ?= 20261021
 OUT_DIR ?= /tmp/nmaforge_sfu_random_latency_$(SEED)
