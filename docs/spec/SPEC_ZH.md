@@ -88,7 +88,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 | 1~4 | src0/src1/bias/dst | 地址或宏子描述符参数 |
 | 5 | shape | M[15:0]、N[31:16] |
 | 6 | extent | K、向量长度或子描述符数 |
-| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8；bit5 `PACK_I8_TILE_A` |
+| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8；bit5 `PACK_I8_TILE_A`；bit7 SFU 激活/舍入模式（见下） |
 | 8 | aux0 | 操作专用字段，例如 KV head/token |
 | 9 | postprocess | shift[4:0]、activation[6:5] |
 | 10~12 | strides | src0、src1、dst 实例/批次步长 |
@@ -103,6 +103,8 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 KV-cache opcode `0x43/0x44` 保持 ABI v7 descriptor 大小和旧 `flags=0` 行为不变。`aux0={head_index[15:0],token_index[15:0]}`；legacy 模式下 `src0_stride` 是 token stride、`src1_stride` 是 head stride，`0x43` 顺序复制 `length` 个 32-bit word，`0x44` 执行反向读取。`0x43 flags=8'h01` 可选地启用受限 Matrix-B Token Append：`length` 必须是 4 的倍数且为 4..16 个 INT8 feature，`src0_stride=16` 表示 Matrix-A tile 相邻 K-group 的字节步长，`src1_stride` 是每个 head 的 cache byte span，且必须能被 `length` 整除；推导出的 token capacity 必须为 4..16 且为 4 的倍数，`token_index` 必须小于 capacity。`src0` 指向一个 Matrix-A 打包 token row；引擎将每个 feature 写入 `[token,feature]` Matrix-B 物理布局对应的 byte lane，通过 SPAD 读改写保留其他 token。该模式仅允许 `flags=8'h01`，使用 `aux0` 的 head/token 选择，不改变旧模式或 `0x44`。发生非法尺寸、stride、token 或地址溢出时必须以配置错误完成，不得部分写入。
 
 SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果按输入连续顺序打包为 INT8。可选 `flags[5]=PACK_I8_TILE_A` 必须同时设置 `flags[4]`，并要求 `M,N` 为非零 4 的倍数且 `length=M×N`。输入仍按 row-major 读取；输出按 Matrix A 的 `[row_group][k_group][row_lane]` 顺序写入，每 word 的四个低字节对应连续四列 K。其 word index 为 `(((row/4)×(N/4)+k/4)×4)+(row mod 4)`，地址为 `dst+4×word_index`。该模式没有 partial word；legacy bit4-only 的线性 packing 语义不变。
+
+Round 35（ABI v7.4 兼容扩展）：SFU 描述符 `flags[7]`。`REQUANT_I8`（`0x36`）置位时在算术右移前加 `2^(shift-1)`（shift=0 时不加），即 round-to-nearest（ties toward +∞），再做 INT8 饱和，其余 layout 规则不变。`GELU_Q8_8`（`0x35`）置位时变为**可编程 LUT 激活**：先从 `src1` 读取 64 个 word 作为 256 项 signed INT8 表（第 i 项位于字节地址 `src1+i`，小端），对每个 INT32 输入计算 `code = sat8((x + 2^(shift-1)) >> shift)`，输出 `LUT[code+128]`；输出 layout 与 `REQUANT_I8` 相同（sign-extend word、`flags[4]` 线性打包、`flags[5]` Matrix-A tile 打包，约束相同）。未置 `flags[7]` 的 `0x35` 设置 `flags[4]/[5]` 为配置错误。两种模式由 SFU 流式快速路径执行：dst 与 src0 部分重叠（打包模式要求不重叠）或 LUT 区与 dst 重叠时，以及仅 legacy SFU 的构建，均返回 `ERR_CONFIG`，不会静默忽略该位。
 
 研究候选 `0x3a` 仅在隔离研究分支实现：它读取两路 signed INT32，先按 `RESIDUAL_I32` 的无移位加法合同求和，再按 `REQUANT_I8` 的 arithmetic shift、INT8 saturation 和 `flags[4]` packed layout 写回。`length` 必须为非零 4 的倍数，`flags[4]` 必须为 1，其他 reserved flags 必须为 0；其结果不得被视为当前产品 ABI 或产品 DV 闭合证据。
 

@@ -48,7 +48,7 @@ module tb_ai_tensor_sfu_random;
     .clk(clk),.resetn(resetn),.start(start),.abort(abort),.op_mode(op_mode),
     .src0_base(src0_base),.src1_base(src1_base),.beta_base(beta_base),
     .beta_enable(beta_enable),.pack_enable(pack_enable),
-    .pack_tile_a(pack_tile_a),.input_tile_a(1'b0),.src0_stride(32'd0),
+    .pack_tile_a(pack_tile_a),.act_flag(1'b0),.input_tile_a(1'b0),.src0_stride(32'd0),
     .dst_base(dst_base),
     .length(length),.m_size(m_size),.n_size(n_size),
     .scale_shift(scale_shift),.epsilon(epsilon),

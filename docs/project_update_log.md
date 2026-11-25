@@ -1,5 +1,25 @@
 # Project update log
 
+## NMAForge V1.3 Round 35 — official GPT-2/DeiT numerics and SFU flag[7] modes (2026-11-25)
+
+- **Numerics study.** The current contract fails on official models (GPT-2
+  small PPL 212, DeiT-Tiny 32.4%). Root causes are floor rounding,
+  truncated Q7 probabilities and the PWL GELU. With an LN rounding offset,
+  SmoothQuant folded into LN, rounded probabilities and a GELU LUT, the models
+  reach GPT-2 PPL 56.4 (FP32 50.6) and DeiT 77.2% (FP32 78.0%). See the
+  [report](benchmark/NMAFORGE_V1_3_ROUND35_DEPLOYMENT_NUMERICS.md).
+- **RTL.** SFU `flags[7]` adds a programmable 256-entry LUT activation on
+  0x35 (rounded INT32→INT8 code, LUT at src1, REQUANT layouts including
+  Matrix-A tile packing) and round-to-nearest on 0x36. Unsupported placements
+  return ERR_CONFIG. The validator rejects packing on plain GELU.
+- **Verification.**
+  - `act-modes-regress`: 3 seeds × 108 Golden cases, legacy-reject and
+    packed-GELU-reject checks, and 2/2 mutations detected.
+  - SFU stream equivalence, legacy SFU random, `ai_smoke` and the 20-case
+    seeded regression pass.
+  - Cluster UVM 128/512 KiB × 3 seeds: ERROR/FATAL=0.
+  - GPT-2 H64: bit-exact, 384,617 cycles.
+
 ## NMAForge V1.3 Round 35 step 1 — integration, 512 KiB SPAD, DMA bandwidth (2026-11-25)
 
 - **Integration line.** `integration/nmaforge-v1.3` merges Round 34 and the

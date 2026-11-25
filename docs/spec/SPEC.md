@@ -7,6 +7,12 @@ This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
 128-bit AXI4 DMA, 512 KiB default four-bank scratchpad (128/256 KiB variants; capacity reported by `SPAD_INFO`), CMDQ/CPLQ, ABI v7.4 descriptors,
+
+Round 35 compatible extension (ABI v7.4): SFU descriptor `flags[7]` selects
+round-to-nearest for `REQUANT_I8` (0x36) and a programmable 256-entry INT8 LUT
+activation for `GELU_Q8_8` (0x35; LUT at `src1`, `code = sat8((x + 2^(s-1)) >>
+s)`, output `LUT[code+128]`, REQUANT output layouts). Configurations the
+streaming SFU cannot execute return `ERR_CONFIG`; see SPEC_ZH for details.
 INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.

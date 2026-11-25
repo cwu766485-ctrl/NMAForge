@@ -33,6 +33,10 @@ module ai_tensor_sfu_core #(
     input  wire        pack_enable,
     // Descriptor flag[5] writes packed words in the Matrix A 4x4 tile order.
     input  wire        pack_tile_a,
+    // Descriptor flag[7] (Round 35): GELU -> programmable LUT activation,
+    // REQUANT -> round-to-nearest.  Executed by the streaming path only; the
+    // legacy FSM rejects these modes with ERR_CONFIG instead of ignoring them.
+    input  wire        act_flag,
     // Research ABI-v7.4 extension: flag[6] selects a signed INT8 Matrix-A
     // tile-major source row for LayerNorm (bounded 208x192 DeiT embedding).
     input  wire        input_tile_a,
@@ -293,11 +297,13 @@ module ai_tensor_sfu_core #(
         rp_words[2][rp_write_lane_r*8 +: 8],
         rp_words[1][rp_write_lane_r*8 +: 8],
         rp_words[0][rp_write_lane_r*8 +: 8]};
-    wire pack_tile_config_error = pack_tile_a &&
-        ((op_mode != OP_REQUANT_I8) || !pack_enable ||
+    wire lut_act_mode = (op_mode == OP_GELU_Q8_8) && act_flag;
+    wire pack_tile_config_error = (pack_tile_a &&
+        ((op_mode != OP_REQUANT_I8 && !lut_act_mode) || !pack_enable ||
          (m_size == 0) || (n_size == 0) ||
          (m_size[1:0] != 0) || (n_size[1:0] != 0) ||
-         (pack_tile_expected_length != {16'd0,length}));
+         (pack_tile_expected_length != {16'd0,length}))) ||
+        (pack_enable && !pack_tile_a && (op_mode == OP_GELU_Q8_8) && !act_flag);
     wire repack_config_error = (op_mode == OP_TENSOR_REPACK) &&
         ((epsilon[31:5] != 0) || (epsilon[1:0] == 2'd3) ||
          (epsilon[3:2] > 2'd2) || (length == 0) || (m_size < 16) ||
@@ -327,7 +333,8 @@ module ai_tensor_sfu_core #(
     reg         last_stream_r;
 
     wire [33:0] fp_len_bytes = {16'd0, length, 2'b00};
-    wire [33:0] fp_dst_bytes = (op_mode == OP_REQUANT_I8 && pack_enable) ?
+    wire fp_packed = pack_enable && ((op_mode == OP_REQUANT_I8) || lut_act_mode);
+    wire [33:0] fp_dst_bytes = fp_packed ?
                                {18'd0, (length + 16'd3) & 16'hfffc} : fp_len_bytes;
     function fp_disjoint;
         input [31:0] a_base; input [33:0] a_bytes;
@@ -337,7 +344,7 @@ module ai_tensor_sfu_core #(
                           ({2'd0, b_base} + b_bytes <= {2'd0, a_base});
         end
     endfunction
-    wire fp_dst_src0_ok = (dst_base == src0_base && !(op_mode == OP_REQUANT_I8 && pack_enable)) ||
+    wire fp_dst_src0_ok = (dst_base == src0_base && !fp_packed) ||
                           fp_disjoint(dst_base, fp_dst_bytes, src0_base, fp_len_bytes);
     wire fp_dst_src1_ok = (dst_base == src1_base) ||
                           fp_disjoint(dst_base, fp_dst_bytes, src1_base, fp_len_bytes);
@@ -347,7 +354,9 @@ module ai_tensor_sfu_core #(
                         !repack_config_error && !input_tile_a;
     wire stream_eligible = fp_common_ok && (
         ((op_mode == OP_RESIDUAL_I32) && fp_dst_src0_ok && fp_dst_src1_ok) ||
-        ((op_mode == OP_GELU_Q8_8) && fp_dst_src0_ok) ||
+        ((op_mode == OP_GELU_Q8_8) && fp_dst_src0_ok &&
+         (!act_flag || ((src1_base[1:0] == 2'b00) &&
+                        fp_disjoint(dst_base, fp_dst_bytes, src1_base, 34'd256)))) ||
         ((op_mode == OP_REQUANT_I8) && fp_dst_src0_ok) ||
         ((op_mode == OP_LAYERNORM_Q15) && fp_row_fits && fp_dst_src0_ok &&
          ((src1_base == 0) || fp_disjoint(dst_base, fp_len_bytes, src1_base, fp_len_bytes)) &&
@@ -360,7 +369,8 @@ module ai_tensor_sfu_core #(
         .clk(clk), .resetn(resetn), .start(stream_start), .abort(abort),
         .op_mode(op_mode), .src0_base(src0_base), .src1_base(src1_base),
         .beta_base(beta_base), .beta_enable(beta_enable), .pack_enable(pack_enable),
-        .pack_tile_a(pack_tile_a), .dst_base(dst_base), .length(length),
+        .pack_tile_a(pack_tile_a), .act_flag(act_flag),
+        .dst_base(dst_base), .length(length),
         .n_size(n_size), .scale_shift(scale_shift), .epsilon(epsilon),
         .watchdog_limit(watchdog_limit),
         .spad_valid(s_spad_valid), .spad_write(s_spad_write), .spad_addr(s_spad_addr),
@@ -535,6 +545,8 @@ module ai_tensor_sfu_core #(
                         mean_r<=0; beta_r<=0; pack_word_r<=0;
                         rms_normalize_phase_r<=0;
                         if (length==0 || input_alignment_error ||
+                            (act_flag && ((op_mode == OP_GELU_Q8_8) ||
+                                          (op_mode == OP_REQUANT_I8))) ||
                             (op_mode == OP_RESIDUAL_REQUANT_I8 &&
                              (!pack_enable || length[1:0] != 0)) ||
                             pack_tile_config_error || repack_config_error) begin

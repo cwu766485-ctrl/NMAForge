@@ -266,6 +266,7 @@ module ai_accel_compute_cluster (
         .src0_base(launch_src0), .src1_base(launch_src1),
         .beta_base(launch_bias_base), .beta_enable(launch_bias_enable),
         .pack_enable(launch_flags[4]), .pack_tile_a(launch_flags[5]),
+        .act_flag(launch_flags[7]),
         .input_tile_a(launch_flags[6]), .src0_stride(launch_src0_stride),
         .dst_base(launch_dst), .length(launch_length),
         .m_size(launch_m), .n_size(launch_n), .scale_shift(launch_shift),

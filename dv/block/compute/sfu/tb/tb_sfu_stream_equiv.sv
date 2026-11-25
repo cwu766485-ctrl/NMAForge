@@ -89,7 +89,7 @@ module tb_sfu_stream_equiv;
         ai_tensor_sfu_core #(.FAST_PATH_ENABLE_P(g)) core (
             .clk(clk), .resetn(resetn), .start(start), .abort(abort), .op_mode(op),
             .src0_base(src0), .src1_base(src1), .beta_base(beta), .beta_enable(beta_en),
-            .pack_enable(pack), .pack_tile_a(tile_a), .input_tile_a(1'b0),
+            .pack_enable(pack), .pack_tile_a(tile_a), .act_flag(1'b0), .input_tile_a(1'b0),
             .src0_stride(32'd0), .dst_base(dst), .length(len), .m_size(m_size),
             .n_size(n_size), .scale_shift(shift), .epsilon(eps), .watchdog_limit(32'd0),
             .spad_valid(sv[g]), .spad_write(sw[g]), .spad_addr(sa[g]), .spad_wdata(sd[g]),

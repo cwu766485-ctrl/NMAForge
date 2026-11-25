@@ -19,6 +19,11 @@
 //                       while mean/variance/sqrt/reciprocal run; one write
 //   0x32/0x39 SOFTMAX   x read once into the row cache; one exact row
 //                       reciprocal replaces the per-element iterative divide
+//   0x35 + flag[7]      LUT activation: 64 LUT words are read first (prefix
+//                       of the read program), then each INT32 input becomes
+//                       code = sat8((x + 2^(s-1)) >>> s), out = LUT[code+128];
+//                       optional linear / Matrix-A packing as for REQUANT
+//   0x36 + flag[7]      REQUANT with round-to-nearest
 //
 // Softmax quotient: q = floor(a / s) with a = exp << 15 <= 2^30 and
 // 0 < s <= 256 * 32768 = 2^23.  With r = floor(2^56 / s), the estimate
@@ -39,6 +44,10 @@ module ai_tensor_sfu_stream #(
     input  wire        beta_enable,
     input  wire        pack_enable,
     input  wire        pack_tile_a,
+    // Descriptor flag[7]: GELU 0x35 -> programmable LUT activation (INT32 ->
+    // rounded shift -> INT8 code -> 256-entry LUT at src1); REQUANT 0x36 ->
+    // round-to-nearest before the arithmetic shift.
+    input  wire        act_flag,
     input  wire [31:0] dst_base,
     input  wire [15:0] length,
     input  wire [15:0] n_size,
@@ -112,7 +121,8 @@ module ai_tensor_sfu_stream #(
     reg [31:0] src0_r, src1_r, beta_base_r, dst_r, epsilon_r, watchdog_r;
     reg [15:0] length_r, n_size_r;
     reg [4:0]  shift_r;
-    reg        beta_en_r, pack_r, tile_a_r, use_gamma_r;
+    reg        beta_en_r, pack_r, tile_a_r, use_gamma_r, lut_mode_r, round_r;
+    reg [7:0]  lut_r [0:255];
     reg [3:0]  pending_error_r;
     reg        error_pending_r;
     reg [4:0]  drain_timer_r;
@@ -140,7 +150,10 @@ module ai_tensor_sfu_stream #(
 
     // Read address for read number rd_issued_r.
     wire [17:0] len18 = {2'd0, length_r};
-    wire [17:0] rd_elem_ew = is_residual ? {1'b0, rd_issued_r[17:1]} : rd_issued_r;
+    wire [17:0] lut_pre    = lut_mode_r ? 18'd64 : 18'd0;   // LUT words read first
+    wire        rd_is_lut  = lut_mode_r && (rd_issued_r < 18'd64);
+    wire        rsp_is_lut = lut_mode_r && (rsp_count_r < 18'd64);
+    wire [17:0] rd_elem_ew = is_residual ? {1'b0, rd_issued_r[17:1]} : (rd_issued_r - lut_pre);
     wire        rd_is_y   = is_residual && rd_issued_r[0];
     wire [17:0] rd_seg1   = len18;                                  // gamma start
     wire [17:0] rd_seg2   = use_gamma_r ? (len18 << 1) : len18;     // beta start
@@ -151,7 +164,8 @@ module ai_tensor_sfu_stream #(
                               (rd_seg == 2'd1) ? (rd_issued_r - rd_seg1) :
                                                  (rd_issued_r - rd_seg2);
     wire [31:0] rd_addr = !is_rowop ?
-        ((rd_is_y ? src1_r : src0_r) + {12'd0, rd_elem_ew, 2'b00}) :
+        (rd_is_lut ? (src1_r + {12'd0, rd_issued_r, 2'b00}) :
+         ((rd_is_y ? src1_r : src0_r) + {12'd0, rd_elem_ew, 2'b00})) :
         ((rd_seg == 2'd0) ? src0_r : (rd_seg == 2'd1) ? src1_r : beta_base_r) +
         {12'd0, rd_row_elem, 2'b00};
     // Responses arrive in request order; for row ops their segment follows
@@ -177,6 +191,14 @@ module ai_tensor_sfu_stream #(
     reg [31:0] pack_group_base_r;
 
     wire signed [31:0] fifo_x = fifo_r[fifo_head_r];
+    wire rsp_to_fifo = spad_rsp_valid && (outstanding_r != 0) && !is_rowop && !rsp_is_lut;
+    // Round-to-nearest shift + INT8 saturation (LUT code / rounded REQUANT).
+    wire signed [32:0] rs_in = {fifo_x[31], fifo_x} +
+        ((shift_r == 5'd0) ? 33'sd0 : (33'sd1 <<< (shift_r - 5'd1)));
+    wire signed [32:0] rs_sh = rs_in >>> shift_r;
+    wire [7:0] rs_sat = (rs_sh > 33'sd127) ? 8'h7f :
+                        (rs_sh < -33'sd128) ? 8'h80 : rs_sh[7:0];
+    wire [7:0] lut_out = lut_r[{~rs_sat[7], rs_sat[6:0]}];
     wire signed [31:0] fifo_y = fifo_r[fifo_head_r + 3'd1];
 
     // --------------------------------------------------- row-op registers
@@ -276,16 +298,18 @@ module ai_tensor_sfu_stream #(
 
     // Elementwise output for the FIFO head.
     wire ew_operands_ready = fifo_count_r >= {2'd0, operands};
+    wire [7:0]  ew_byte  = lut_mode_r ? lut_out : (round_r ? rs_sat : m_requant[7:0]);
     wire [31:0] ew_value = is_residual ? m_residual :
-                           is_gelu ? gelu_piecewise : m_requant;
+                           (is_gelu && !lut_mode_r) ? gelu_piecewise :
+                           (lut_mode_r || round_r) ? {{24{ew_byte[7]}}, ew_byte} : m_requant;
     wire ew_last = (ew_elem_r == len18 - 18'd1);
     wire [31:0] pack_tile_word = pack_group_base_r + ({16'd0, pack_k_group_r} << 2) +
                                  {30'd0, pack_row_r[1:0]};
     wire [31:0] pack_word_index = tile_a_r ? pack_tile_word : {14'd0, ew_elem_r[17:2]};
-    wire [31:0] pack_word_next = (ew_elem_r[1:0] == 2'd0) ? {24'd0, m_requant[7:0]} :
-        (ew_elem_r[1:0] == 2'd1) ? {16'd0, m_requant[7:0], pack_word_r[7:0]} :
-        (ew_elem_r[1:0] == 2'd2) ? {8'd0, m_requant[7:0], pack_word_r[15:0]} :
-                                   {m_requant[7:0], pack_word_r[23:0]};
+    wire [31:0] pack_word_next = (ew_elem_r[1:0] == 2'd0) ? {24'd0, ew_byte} :
+        (ew_elem_r[1:0] == 2'd1) ? {16'd0, ew_byte, pack_word_r[7:0]} :
+        (ew_elem_r[1:0] == 2'd2) ? {8'd0, ew_byte, pack_word_r[15:0]} :
+                                   {ew_byte, pack_word_r[23:0]};
     wire watchdog_expired = busy && (watchdog_r != 0) && (cycle_count >= watchdog_r);
 
     integer i;
@@ -297,6 +321,7 @@ module ai_tensor_sfu_stream #(
             beta_base_r <= 32'd0; dst_r <= 32'd0; epsilon_r <= 32'd1; watchdog_r <= 32'd0;
             length_r <= 16'd0; n_size_r <= 16'd0; shift_r <= 5'd0; beta_en_r <= 1'b0;
             pack_r <= 1'b0; tile_a_r <= 1'b0; use_gamma_r <= 1'b0;
+            lut_mode_r <= 1'b0; round_r <= 1'b0;
             pending_error_r <= 4'd0; error_pending_r <= 1'b0; drain_timer_r <= 5'd0;
             rd_issued_r <= 18'd0; rd_total_r <= 18'd0; rsp_count_r <= 18'd0;
             outstanding_r <= 5'd0; fifo_head_r <= 3'd0; fifo_tail_r <= 3'd0;
@@ -329,7 +354,10 @@ module ai_tensor_sfu_stream #(
                                  (epsilon == 32'd0 ? 32'd1 : epsilon);
                     watchdog_r <= watchdog_limit; length_r <= length; n_size_r <= n_size;
                     shift_r <= scale_shift; beta_en_r <= beta_enable;
-                    pack_r <= pack_enable && (op_mode == OP_REQUANT_I8);
+                    pack_r <= pack_enable && ((op_mode == OP_REQUANT_I8) ||
+                                              ((op_mode == OP_GELU_Q8_8) && act_flag));
+                    lut_mode_r <= (op_mode == OP_GELU_Q8_8) && act_flag;
+                    round_r <= (op_mode == OP_REQUANT_I8) && act_flag;
                     tile_a_r <= pack_tile_a; error_code <= 4'd0; element_count <= 32'd0;
                     use_gamma_r <= (op_mode == OP_LAYERNORM_Q15) && (src1_base != 32'd0);
                     pending_error_r <= 4'd0; error_pending_r <= 1'b0;
@@ -348,7 +376,8 @@ module ai_tensor_sfu_stream #(
                             ((src1_base != 32'd0) ? {2'd0, length} : 18'd0) +
                             (beta_enable ? {2'd0, length} : 18'd0);
                     else
-                        rd_total_r <= {2'd0, length};
+                        rd_total_r <= {2'd0, length} +
+                            (((op_mode == OP_GELU_Q8_8) && act_flag) ? 18'd64 : 18'd0);
                     phase_r <= ((op_mode == OP_LAYERNORM_Q15) ||
                                 (op_mode == OP_SOFTMAX_Q15) ||
                                 (op_mode == OP_CAUSAL_SOFTMAX_Q15)) ? P_XREAD : P_STREAM;
@@ -371,7 +400,12 @@ module ai_tensor_sfu_stream #(
                     if (spad_parity_error && !error_pending_r) begin
                         error_pending_r <= 1'b1; pending_error_r <= ERR_PARITY;
                     end
-                    if (!is_rowop) begin
+                    if (rsp_is_lut) begin
+                        lut_r[{rsp_count_r[5:0], 2'd0}] <= spad_rdata[7:0];
+                        lut_r[{rsp_count_r[5:0], 2'd1}] <= spad_rdata[15:8];
+                        lut_r[{rsp_count_r[5:0], 2'd2}] <= spad_rdata[23:16];
+                        lut_r[{rsp_count_r[5:0], 2'd3}] <= spad_rdata[31:24];
+                    end else if (!is_rowop) begin
                         fifo_r[fifo_tail_r] <= spad_rdata;
                         fifo_tail_r <= fifo_tail_r + 3'd1;
                     end else begin
@@ -415,7 +449,7 @@ module ai_tensor_sfu_stream #(
                             if (wr_free && ew_operands_ready && ew_elem_r < len18) begin
                                 fifo_head_r <= fifo_head_r + {1'b0, operands};
                                 fifo_count_r <= fifo_count_r - {2'd0, operands} +
-                                    ((spad_rsp_valid && outstanding_r != 0) ? 4'd1 : 4'd0);
+                                    (rsp_to_fifo ? 4'd1 : 4'd0);
                                 ew_elem_r <= ew_elem_r + 18'd1;
                                 if (pack_r) begin
                                     pack_word_r <= pack_word_next;
@@ -445,7 +479,7 @@ module ai_tensor_sfu_stream #(
                                 end
                             end else begin
                                 fifo_count_r <= fifo_count_r +
-                                    ((spad_rsp_valid && outstanding_r != 0) ? 4'd1 : 4'd0);
+                                    (rsp_to_fifo ? 4'd1 : 4'd0);
                             end
                         end
                     end

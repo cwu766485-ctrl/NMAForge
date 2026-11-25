@@ -76,3 +76,25 @@ stream-equiv-regress: stream-equiv-compile
 			$(if $(filter 0,$(EQUIV_STALL)),+NO_STALL,) -l $(EQUIV_OUT)/run_$$seed.log; \
 		grep -q '^SFU_STREAM_EQUIV_PASS ' $(EQUIV_OUT)/run_$$seed.log; \
 	done
+
+# Round 35: SFU descriptor flag[7] modes (programmable LUT activation on GELU,
+# round-to-nearest REQUANT) against the independent Python Golden with random
+# back-pressure / multi-outstanding latency; legacy-only core must reject.
+ACT_OUT ?= /tmp/nmaforge_sfu_act_modes
+ACT_SEEDS ?= 20261125 20261126 20261127
+.PHONY: act-modes-regress
+act-modes-regress:
+	mkdir -p $(ACT_OUT)
+	$(VCS) -full64 -sverilog -timescale=1ns/1ps -Mdir=$(ACT_OUT)/csrc -top tb_sfu_act_modes \
+		../../../../../rtl/compute/common/ai_unsigned_divider.v \
+		../../../../../rtl/compute/common/ai_integer_sqrt.v \
+		../../../../../rtl/compute/sfu/ai_tensor_sfu_math.v \
+		../../../../../rtl/compute/sfu/ai_tensor_sfu_stream.v \
+		../../../../../rtl/compute/sfu/ai_tensor_sfu_core.v \
+		../tb/tb_sfu_stream_equiv.sv ../tb/tb_sfu_act_modes.sv \
+		-o $(ACT_OUT)/simv -l $(ACT_OUT)/compile.log
+	@set -e; for seed in $(ACT_SEEDS); do \
+		$(PYTHON) ../model/generate_act_mode_vectors.py --seed $$seed --output $(ACT_OUT)/v_$$seed.txt; \
+		$(ACT_OUT)/simv +VECTORS=$(ACT_OUT)/v_$$seed.txt -l $(ACT_OUT)/run_$$seed.log; \
+		grep -q '^SFU_ACT_MODES_PASS ' $(ACT_OUT)/run_$$seed.log; \
+	done

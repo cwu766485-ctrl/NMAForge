@@ -48,8 +48,10 @@ module ai_descriptor_validator (
     wire is_fp16_dot = (op == 8'h51);
     wire is_fp_dot = is_bf16_dot || is_fp16_dot;
     wire [31:0] pack_tile_a_elements = {16'd0,m_size} * {16'd0,n_size};
+    // Round 35: GELU flag[7] selects the LUT activation, which may pack like
+    // REQUANT; packing on plain GELU is rejected.
     wire pack_tile_a_fields_valid =
-        (op == 8'h36) && flags[4] &&
+        ((op == 8'h36) || ((op == 8'h35) && flags[7])) && flags[4] &&
         (m_size != 0) && (n_size != 0) &&
         (m_size[1:0] == 0) && (n_size[1:0] == 0) &&
         (pack_tile_a_elements == {16'd0,length});
@@ -243,8 +245,9 @@ module ai_descriptor_validator (
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
                                 (flags[6] && !ln_tile_a_fields_valid) ||
-                                ((op == 8'h36) && flags[5] &&
+                                (((op == 8'h36) || (op == 8'h35)) && flags[5] &&
                                  !pack_tile_a_fields_valid) ||
+                                ((op == 8'h35) && flags[4] && !flags[7]) ||
                                 ((op == 8'h3a) &&
                                  (flags[7:5] != 0 || flags[4] != 1'b1)) ||
                                 (macro_child_fetch && is_macro) ||
