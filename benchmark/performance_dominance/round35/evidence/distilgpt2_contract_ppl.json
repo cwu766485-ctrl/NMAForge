@@ -1,0 +1,119 @@
+{
+  "model": "2290a62682d06624634c1f46a6ad5be0f47f38aa",
+  "ctx": 256,
+  "eval_windows": 20,
+  "eval_tokens": 5120,
+  "calib_windows": 4,
+  "res_frac": 8,
+  "hf_fp32_max_logit_diff": 9.918212890625e-05,
+  "configs": {
+    "fp32": {
+      "ppl": 71.34547075072076,
+      "w8": null,
+      "a8": null,
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 37.5
+    },
+    "w8a8_pow2": {
+      "ppl": 91.25193985201193,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 30.9
+    },
+    "ln_rnd": {
+      "ppl": 91.32463544800416,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": null,
+      "gelu": null,
+      "ln_round_bits": 4,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 66.3
+    },
+    "ln_rnd_q7": {
+      "ppl": 123.95249837756867,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q7",
+      "gelu": null,
+      "ln_round_bits": 4,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 35.4
+    },
+    "ln_rnd_q15": {
+      "ppl": 90.5504057550736,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": null,
+      "ln_round_bits": 4,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 54.2
+    },
+    "ln_rnd_q15_pwl": {
+      "ppl": 239.33550153643924,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "pwl",
+      "ln_round_bits": 4,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 26.0
+    },
+    "ln_rnd_q15_lut8": {
+      "ppl": 93.45588080637305,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_round_bits": 4,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 43.8
+    },
+    "ln_rnd_smooth_q15_lut8": {
+      "ppl": 78.56008752123937,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_round_bits": 4,
+      "smooth": 0.5,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 57.4
+    },
+    "ln_rnd_smooth_epi_q15_lut8": {
+      "ppl": 78.95392769440411,
+      "w8": "pc",
+      "a8": "f",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_round_bits": 4,
+      "smooth": 0.5,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 56.8
+    }
+  }
+}

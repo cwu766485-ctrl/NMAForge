@@ -1,0 +1,101 @@
+{
+  "model": "2290a62682d06624634c1f46a6ad5be0f47f38aa",
+  "ctx": 256,
+  "eval_windows": 20,
+  "eval_tokens": 5120,
+  "calib_windows": 4,
+  "res_frac": 8,
+  "hf_fp32_max_logit_diff": 9.918212890625e-05,
+  "configs": {
+    "fp32": {
+      "ppl": 71.34547075072076,
+      "w8": null,
+      "a8": null,
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 182.5
+    },
+    "w8a8_pow2": {
+      "ppl": 91.25193985201193,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 222.9
+    },
+    "+res_only": {
+      "ppl": 90.92142094695144,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": false,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 200.7
+    },
+    "+res_ln_int": {
+      "ppl": 1938.1917814713513,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 315.7
+    },
+    "+ln_normfirst": {
+      "ppl": 1939.7961201704625,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": "normfirst",
+      "sm": null,
+      "gelu": null,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 251.9
+    },
+    "nf_q15_lut8": {
+      "ppl": 2014.2594868419217,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": "normfirst",
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 304.4
+    },
+    "nf_smooth_q15_lut8": {
+      "ppl": 198.20281202911636,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": "normfirst",
+      "sm": "q15",
+      "gelu": "lut8",
+      "smooth": 0.5,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 371.1
+    },
+    "nf_smooth_epilogue_q15_lut8": {
+      "ppl": 102.25773431227022,
+      "w8": "pc",
+      "a8": "f",
+      "res": true,
+      "ln": "normfirst",
+      "sm": "q15",
+      "gelu": "lut8",
+      "smooth": 0.5,
+      "ln_post_gamma_saturation": 0.0,
+      "seconds": 444.2
+    }
+  }
+}

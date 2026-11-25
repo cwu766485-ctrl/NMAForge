@@ -1,0 +1,84 @@
+{
+  "model": "facebook/deit-tiny-patch16-224",
+  "images": 500,
+  "calib_images": 20,
+  "configs": {
+    "fp32": {
+      "top1": 0.7799999713897705,
+      "w8": null,
+      "a8": null,
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null
+    },
+    "w8a8_pow2": {
+      "top1": 0.7699999809265137,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": false,
+      "ln": false,
+      "sm": null,
+      "gelu": null
+    },
+    "full_contract_q7_pwl": {
+      "top1": 0.3240000009536743,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q7",
+      "gelu": "pwl"
+    },
+    "ln_rnd_q7_pwl": {
+      "top1": 0.21199999749660492,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q7",
+      "gelu": "pwl",
+      "ln_round_bits": 4
+    },
+    "ln_rnd_q15_pwl": {
+      "top1": 0.38199999928474426,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "pwl",
+      "ln_round_bits": 4
+    },
+    "ln_rnd_q15_lut8": {
+      "top1": 0.7720000147819519,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_round_bits": 4
+    },
+    "ln_rnd_q7_lut8": {
+      "top1": 0.671999990940094,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q7",
+      "gelu": "lut8",
+      "ln_round_bits": 4
+    },
+    "epi_ln_rnd_q15_lut8": {
+      "top1": 0.7639999985694885,
+      "w8": "pc",
+      "a8": "f",
+      "res": true,
+      "ln": true,
+      "sm": "q15",
+      "gelu": "lut8",
+      "ln_round_bits": 4
+    }
+  }
+}
