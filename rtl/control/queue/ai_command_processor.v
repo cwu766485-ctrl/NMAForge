@@ -157,6 +157,7 @@ module ai_command_processor(
         .src1_stride(desc_src1_stride), .dst_stride(desc_dst_stride),
         .batch_count(desc_batch_count), .head_count(desc_head_count),
         .macro_child_fetch(macro_child_fetch_r),
+        .queued_dma_allowed(1'b0),
         .op_valid(), .is_macro(macro_op), .is_tensor_matrix(),
         .is_tensor_sfu(), .version_valid(), .dimensions_valid(),
         .alignment_error(),

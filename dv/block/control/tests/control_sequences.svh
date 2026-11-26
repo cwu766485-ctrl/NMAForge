@@ -39,7 +39,7 @@ class control_reset_version_seq extends control_base_seq;
         read32(VERSION, data); expect_eq("VERSION", data, 32'h1000_000a);
         read32(CAP, data); expect_eq("CAP", data, 32'h001f_ff17);
         read32(ABI_INFO, data); expect_eq("ABI_INFO", data, 32'h1040_0407);
-        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_00ff);
+        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_01ff);
         read32(OP, data); expect_eq("reset OP", data, 0);
         read32(IRQ_ENABLE, data); expect_eq("reset IRQ_ENABLE", data, 0);
         read32(STATUS, data); expect_eq("reset STATUS", data, 0);
@@ -59,7 +59,8 @@ class control_register_file_seq extends control_base_seq;
                                                            input bit [31:0] value);
         case (addr)
             OP: expected_storage_value = {24'd0, value[7:0]};
-            IRQ_ENABLE, CMD_CTRL: expected_storage_value = {31'd0, value[0]};
+            IRQ_ENABLE: expected_storage_value = {31'd0, value[0]};
+            CMD_CTRL: expected_storage_value = {30'd0, value[1:0]};
             LENGTH, M, N, K, DMA_LEN, DMA_ROW_WORDS, DMA_ROW_COUNT,
             TILE_COUNT, TILE_IN_WORDS, TILE_OUT_WORDS:
                 expected_storage_value = {16'd0, value[15:0]};
@@ -264,7 +265,7 @@ class control_register_file_seq extends control_base_seq;
         read32(PERF_MATRIX_CYCLES, got); expect_eq("PERF_MATRIX_CYCLES", got, 32'h8888_0008);
         read32(PERF_DMA_RD_STATE, got); expect_eq("PERF_DMA_RD_STATE", got, 32'h0000_002b);
         read32(ABI_INFO, got); expect_eq("ABI_INFO", got, 32'h1040_0407);
-        read32(CAP2, got); expect_eq("CAP2", got, 32'h0000_00ff);
+        read32(CAP2, got); expect_eq("CAP2", got, 32'h0000_01ff);
         write32(VERSION, 32'h0, 4'hf, 2'b10);
         write32(PERF_TOTAL, 32'h0, 4'hf, 2'b10);
     endtask
@@ -563,7 +564,10 @@ class control_busy_abort_seq extends control_base_seq;
         write32(OP, 32'h7, 4'hf, 2'b10);
         write32(CPL_SIZE, 32'd8, 4'hf, 2'b10);
         write32(ABORT, 32'h1, 4'hf, 2'b00);
+        // Round 37: software may append to a running CMDQ.
+        write32(CMD_TAIL, 32'h3, 4'hf, 2'b00);
         status_vif.processor_busy = 0;
+        read32(CMD_TAIL, data); expect_eq("busy CMD_TAIL append accepted", data, 3);
         read32(OP, data); expect_eq("locked OP remains reset", data, 0);
         read32(CPL_SIZE, data); expect_eq("busy CPL_SIZE remains configured", data, 4);
     endtask

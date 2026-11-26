@@ -382,11 +382,18 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
     out = ql.forward(x_in, pos0, kv, tr)
     base, mem = f"{tag}.L{li}", f"L{li}"
 
-    def layernorm(dst):
+    def nxt(kind):
+        """Rotate through the kind's SPAD slots (one slot each, except two
+        weight slots, without --overlap; deeper pools with it)."""
+        slots, rot = R[kind + "_slots"], R["_rot"]
+        rot[kind] = (rot.get(kind, -1) + 1) % len(slots)
+        return slots[rot[kind]]
+
+    def layernorm(dst, lnb):
         idx = None
         for r in range(T):
             P.emit(f"{base}.ln.r{r}", OP_LAYERNORM, R["X"] + r * D * 4, R["LNT"] + (r % 4) * D * 4,
-                   src1=R["LN_G"], bias=R["LN_B"], k_or_length=D, flags=FLAG_BIAS, aux0=1)
+                   src1=lnb, bias=lnb + D * 4, k_or_length=D, flags=FLAG_BIAS, aux0=1)
             if r % 4 == 3:
                 idx = P.emit(f"{base}.lnpack.g{r // 4}", OP_REQUANT, R["LNT"], dst + (r // 4) * D * 4,
                              m=4, n=D, k_or_length=4 * D, flags=PACK, shift=LN_RB, aux0=1)
@@ -415,61 +422,71 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
             resid(f"{name}.rescale{j}", R["ACC"], R["ACC"], R["ACC"], s + 1 if s > 0 else 0)
 
     dbg = check == "debug" and li == 0
-    P.dma(f"{mem}.ln1", R["LN_G"])
-    idx = layernorm(R["XP"])
+    lnb = nxt("LN")
+    P.dma(f"{mem}.ln1", lnb)
+    idx = layernorm(R["XP"], lnb)
     if dbg:
         P.checkpoint(idx, R["XP"], I.pack_a(tr["xp"]))
     for h in range(H):
-        P.dma(f"{mem}.wq{h}", R["WA"]); P.dma(f"{mem}.wk{h}", R["WB"]); P.dma(f"{mem}.hb{h}", R["HB"])
+        wq, wk, hb, KC, VC = nxt("W"), nxt("W"), nxt("HB"), nxt("KC"), nxt("VC")
+        BQ, BK = hb, hb + HD * 4
+        BVR = BK + HD * 4
+        BSR = BVR + kmax * 4
+        BAR = BSR + kmax * 4
+        BO = BAR + HD * 4
+        P.dma(f"{mem}.wq{h}", wq); P.dma(f"{mem}.wk{h}", wk); P.dma(f"{mem}.hb{h}", hb)
         if pos0:
-            P.dma(f"{mem}.kc{h}", R["KC"], pos0 * HD // 4)
-        gemm(f"{base}.h{h}.q", R["XP"], R["WA"], R["PROJ"], R["BQ"], T, HD, D, ql.sh_q[h])
+            P.dma(f"{mem}.kc{h}", KC, pos0 * HD // 4)
+        gemm(f"{base}.h{h}.q", R["XP"], wq, R["PROJ"], BQ, T, HD, D, ql.sh_q[h])
         pack(f"{base}.h{h}.qpack", R["PROJ"], R["Q8"], T, HD)
-        gemm(f"{base}.h{h}.k", R["XP"], R["WB"], R["PROJ"], R["BK"], T, HD, D, ql.sh_k[h])
-        ik = pack(f"{base}.h{h}.kpack", R["PROJ"], R["KC"] + pos0 * HD, T, HD)
-        P.dma(f"{mem}.wvt{h}", R["WA"]); P.dma(f"{mem}.wo{h}", R["WB"])
-        gemm(f"{base}.h{h}.vt", R["WA"], R["XP"], R["PROJ"], R["BVR"], HD, T, D, ql.sh_v[h])
+        gemm(f"{base}.h{h}.k", R["XP"], wk, R["PROJ"], BK, T, HD, D, ql.sh_k[h])
+        ik = pack(f"{base}.h{h}.kpack", R["PROJ"], KC + pos0 * HD, T, HD)
+        wv, wo = nxt("W"), nxt("W")
+        P.dma(f"{mem}.wvt{h}", wv); P.dma(f"{mem}.wo{h}", wo)
+        gemm(f"{base}.h{h}.vt", wv, R["XP"], R["PROJ"], BVR, HD, T, D, ql.sh_v[h])
         iv = pack(f"{base}.h{h}.vtpack", R["PROJ"], R["VT8"], HD, T)
         # V^T group columns -> DDR cache rows (2D store), then the whole cache back.
         P.dma(f"{mem}.vc{h}", R["VT8"], T, offset=pos0 * 4, rows=HD // 4,
               ext_stride=kmax * 4, spad_stride=T * 4, store=True)
-        P.dma(f"{mem}.vc{h}", R["VC"])
-        i_s = gemm(f"{base}.h{h}.s", R["Q8"], R["KC"], R["SC"], R["BSR"], T, n, HD, ql.sh_s[h])
+        P.dma(f"{mem}.vc{h}", VC)
+        i_s = gemm(f"{base}.h{h}.s", R["Q8"], KC, R["SC"], BSR, T, n, HD, ql.sh_s[h])
         for r in range(T):
             i_sm = P.emit(f"{base}.h{h}.sm{r}", OP_CAUSAL_SOFTMAX, R["SC"] + r * n * 4,
                           R["PR"] + r * kmax * 4, k_or_length=n, aux0=pos0 + r)
         pack(f"{base}.h{h}.p8", R["PR"], R["P8"], T, kmax, shift=8, flags=PACK | FLAG7)
-        gemm(f"{base}.h{h}.av", R["P8"], R["VC"], R["AVO"], R["BAR"], T, HD, kmax, ql.sh_a[h])
+        gemm(f"{base}.h{h}.av", R["P8"], VC, R["AVO"], BAR, T, HD, kmax, ql.sh_a[h])
         i_av = pack(f"{base}.h{h}.avpack", R["AVO"], R["AV8"], T, HD)
         dst = R["ACC"] if h == 0 else R["PART"]
-        idx = gemm(f"{base}.h{h}.wo", R["AV8"], R["WB"], dst, R["BO"], T, D, HD, ql.sh_o[h])
+        idx = gemm(f"{base}.h{h}.wo", R["AV8"], wo, dst, BO, T, D, HD, ql.sh_o[h])
         if h:
             idx = resid(f"{base}.h{h}.acc", R["ACC"], R["ACC"], R["PART"])
         if dbg and h == 0:
-            P.checkpoint(ik, R["KC"], I.pack_a(tr["kc"][:n]))
+            P.checkpoint(ik, KC, I.pack_a(tr["kc"][:n]))
             P.checkpoint(iv, R["VT8"], I.pack_a(tr["vt8"]))
             P.checkpoint(i_s, R["SC"], I.words_i32(tr["s"]))
             pr = np.zeros((T, kmax), np.int64); pr[:, :n] = tr["pr"]
             P.checkpoint(i_sm, R["PR"], I.words_i32(pr))
             P.checkpoint(i_av, R["AV8"], I.pack_a(tr["av8"]))
-        P.dma(f"{mem}.kc{h}", R["KC"] + pos0 * HD, T * HD // 4, offset=pos0 * HD, store=True)
+        P.dma(f"{mem}.kc{h}", KC + pos0 * HD, T * HD // 4, offset=pos0 * HD, store=True)
     rescale(f"{base}.attn", ql.s_o)
     idx = resid(f"{base}.res1", R["X"], R["X"], R["ACC"])
     if check == "debug" or li == 0:
         P.checkpoint(idx, R["X"], I.words_i32(tr["x1"]))
-    P.dma(f"{mem}.ln2", R["LN_G"])
-    idx = layernorm(R["XP"])
+    lnb = nxt("LN")
+    P.dma(f"{mem}.ln2", lnb)
+    idx = layernorm(R["XP"], lnb)
     if dbg:
         P.checkpoint(idx, R["XP"], I.pack_a(tr["x2p"]))
     for c in range(ql.NC):
-        P.dma(f"{mem}.w1c{c}", R["WA"]); P.dma(f"{mem}.w2c{c}", R["WB"]); P.dma(f"{mem}.cb{c}", R["CB"])
-        gemm(f"{base}.c{c}.fc1", R["XP"], R["WA"], R["H1"], R["B1"], T, CH, D, 0)
-        ig = P.emit(f"{base}.c{c}.gelu", OP_GELU, R["H1"], R["H8"], src1=R["LUT"], m=T, n=CH,
+        w1, w2, cb = nxt("W"), nxt("W"), nxt("CB")
+        P.dma(f"{mem}.w1c{c}", w1); P.dma(f"{mem}.w2c{c}", w2); P.dma(f"{mem}.cb{c}", cb)
+        gemm(f"{base}.c{c}.fc1", R["XP"], w1, R["H1"], cb, T, CH, D, 0)
+        ig = P.emit(f"{base}.c{c}.gelu", OP_GELU, R["H1"], R["H8"], src1=cb + CH * 4, m=T, n=CH,
                     k_or_length=T * CH, flags=PACK | FLAG7, shift=ql.sh_l[c], aux0=1)
         if dbg and c == 0:
             P.checkpoint(ig, R["H8"], I.pack_a(tr["h8"]))
         dst = R["ACC"] if c == 0 else R["PART"]
-        gemm(f"{base}.c{c}.fc2", R["H8"], R["WB"], dst, R["B2"], T, D, CH, ql.sh_2[c])
+        gemm(f"{base}.c{c}.fc2", R["H8"], w2, dst, cb + (CH + 64) * 4, T, D, CH, ql.sh_2[c])
         if c:
             resid(f"{base}.c{c}.acc", R["ACC"], R["ACC"], R["PART"])
     rescale(f"{base}.ffn", ql.s_2)
@@ -478,24 +495,22 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
     return out
 
 
-def allocate(P: Program, T: int, D: int, HD: int, kmax: int) -> dict:
-    R = {}
+def allocate(P: Program, T: int, D: int, HD: int, kmax: int, pools: dict | None = None) -> dict:
+    """SPAD map.  Without pools this is the Round 36 map (two weight slots,
+    one LN/HB/CB/K/V slot).  `pools` gives the slot count per kind for the
+    overlap schedule, where DMA into a free slot runs ahead of compute."""
+    pools = pools or {"W": 2, "LN": 1, "HB": 1, "CB": 1, "KC": 1, "VC": 1}
+    R = {"_rot": {}}
     for nm, sz in (("X", T * D * 4), ("ACC", T * D * 4), ("PART", T * D * 4), ("XP", T * D),
-                   ("LNT", 4 * D * 4), ("WA", D * HD), ("WB", D * HD)):
+                   ("LNT", 4 * D * 4)):
         R[nm] = P.alloc(nm, sz)
-    R["LN_G"] = P.alloc("LN", 2 * D * 4)
-    R["LN_B"] = R["LN_G"] + D * 4
-    R["HB"] = P.alloc("HB", (HD + HD + kmax + kmax + HD + D) * 4)
-    R["BQ"], R["BK"] = R["HB"], R["HB"] + HD * 4
-    R["BVR"] = R["BK"] + HD * 4
-    R["BSR"] = R["BVR"] + kmax * 4
-    R["BAR"] = R["BSR"] + kmax * 4
-    R["BO"] = R["BAR"] + HD * 4
-    R["CB"] = P.alloc("CB", (CH + 64 + D) * 4)
-    R["B1"], R["LUT"], R["B2"] = R["CB"], R["CB"] + CH * 4, R["CB"] + (CH + 64) * 4
+    sizes = {"W": D * HD, "LN": 2 * D * 4, "HB": (HD + HD + kmax + kmax + HD + D) * 4,
+             "CB": (CH + 64 + D) * 4, "KC": kmax * HD, "VC": kmax * HD}
+    for kind in ("W", "LN", "HB", "CB"):
+        R[kind + "_slots"] = [P.alloc(f"{kind}{i}", sizes[kind]) for i in range(pools[kind])]
     R["PR"] = P.alloc("PR", T * kmax * 4)          # columns >= current length stay zero
-    R["KC"] = P.alloc("KC", kmax * HD)
-    R["VC"] = P.alloc("VC", kmax * HD)
+    for kind in ("KC", "VC"):
+        R[kind + "_slots"] = [P.alloc(f"{kind}{i}", sizes[kind]) for i in range(pools[kind])]
     u0 = P.next_addr                               # attention / FFN scratch union
     for nm, sz in (("PROJ", T * HD * 4), ("Q8", T * HD), ("VT8", T * HD), ("SC", T * kmax * 4),
                    ("P8", T * kmax), ("AVO", T * HD * 4), ("AV8", T * HD)):
@@ -504,9 +519,24 @@ def allocate(P: Program, T: int, D: int, HD: int, kmax: int) -> dict:
     for nm, sz in (("H1", T * CH * 4), ("H8", T * CH)):
         R[nm] = P.alloc(nm, sz)
     P.next_addr = max(P.next_addr, attn_end)
-    for k in ("BQ", "BK", "BVR", "BSR", "BAR", "BO", "B1", "LUT", "B2"):
-        assert R[k] % 16 == 0, k
+    for hb in R["HB_slots"]:
+        for off in (0, HD, 2 * HD, 2 * HD + kmax, 2 * HD + 2 * kmax, 3 * HD + 2 * kmax):
+            assert (hb + 4 * off) % 16 == 0
+    for cb in R["CB_slots"]:
+        assert cb % 16 == 0 and (cb + CH * 4) % 16 == 0 and (cb + (CH + 64) * 4) % 16 == 0
     return R
+
+
+def allocate_overlap(P: Program, T: int, D: int, HD: int, kmax: int) -> dict:
+    """Largest weight-slot pool that fits below the queue rings."""
+    for w in (8, 6, 5, 4, 3, 2):
+        saved = (P.next_addr, dict(P.regions))
+        try:
+            return allocate(P, T, D, HD, kmax,
+                            {"W": w, "LN": 2, "HB": 2, "CB": 2, "KC": 2, "VC": 2})
+        except ValueError:
+            P.next_addr, P.regions = saved
+    return allocate(P, T, D, HD, kmax)
 
 
 # ------------------------------------------------------------------ data / metrics
@@ -553,6 +583,10 @@ def main():
     ap.add_argument("--kmax", type=int, default=64, help="KV-cache capacity (tokens)")
     ap.add_argument("--check", default="layer", choices=("layer", "debug"))
     ap.add_argument("--no-program", action="store_true")
+    ap.add_argument("--overlap", action="store_true",
+                    help="program format v3: CMDQ DMA (0x60) overlapped with compute")
+    ap.add_argument("--hoist", type=int, default=48,
+                    help="max descriptors a DMA load may be moved ahead (--overlap)")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     assert a.ppl_ctx % 4 == 0
@@ -612,15 +646,15 @@ def main():
     Lp, S, kmax, L = len(prompt), a.decode_steps, a.kmax, fm.L
     T = (Lp + 3) // 4 * 4                              # prefill rows (padding rows are zero)
     assert Lp + S <= kmax and kmax % 4 == 0
-    P = Program()
-    R = allocate(P, T, fm.D, fm.HD, kmax)
+    P = Program(overlap=a.overlap, hoist=a.hoist)
+    R = (allocate_overlap if a.overlap else allocate)(P, T, fm.D, fm.HD, kmax)
     P.ddr_put("zeros_pr", np.zeros(T * kmax, np.int64))
     P.dma("zeros_pr", R["PR"])
     for li in range(a.layers):
         put_layer(P, qls[li], li, kmax)
     kv = [q.new_cache(kmax) for q in qls]
 
-    def block(xb, pos0, tag):
+    def block(xb, pos0, tag, R):
         """First a.layers blocks on the NPU program, the rest in the host Golden."""
         x = xb
         x_npu = None
@@ -637,7 +671,13 @@ def main():
     xb = np.zeros((T, fm.D), np.int64)
     xb[:Lp] = quant_embed(fm, torch.tensor(seq))
     P.ddr_put("x.P", I.words_i32(xb)); P.dma("x.P", R["X"])
-    x_npu, x = block(xb, 0, "P")
+    x_npu, x = block(xb, 0, "P", R)
+    Rd = R
+    if a.overlap and S and T > 4:
+        # Decode runs four rows: give it its own SPAD map with deeper slot pools.
+        P.alloc_reset("dec.")
+        Rd = allocate_overlap(P, 4, fm.D, fm.HD, kmax)
+        P.dma("zeros_pr", Rd["PR"], 4 * kmax)
     prefill_pred = head_logits(fm, x)[:Lp].argmax(-1)
     seq.append(int(prefill_pred[-1]))
     for st in range(S):
@@ -645,10 +685,10 @@ def main():
         pos0, j = t // 4 * 4, t % 4
         xb = np.zeros((4, fm.D), np.int64)
         xb[:j + 1] = quant_embed(fm, torch.tensor(seq[pos0:t + 1]), pos0)
-        P.ddr_put(f"x.S{st}", I.words_i32(xb)); P.dma(f"x.S{st}", R["X"])
-        x_npu, x = block(xb, pos0, f"S{st}")
+        P.ddr_put(f"x.S{st}", I.words_i32(xb)); P.dma(f"x.S{st}", Rd["X"])
+        x_npu, x = block(xb, pos0, f"S{st}", Rd)
         seq.append(int(head_logits(fm, x)[j].argmax()))
-    P.final_rows(R["X"], I.words_i32(x_npu), fm.D, x_npu.shape[0])
+    P.final_rows(Rd["X"], I.words_i32(x_npu), fm.D, x_npu.shape[0])
 
     ref_seq = list(prompt)
     for _ in range(S + 1):                              # FP32 greedy, full recompute
@@ -661,10 +701,15 @@ def main():
                   fp32_generated_ids=ref_seq[Lp:],
                   greedy_match_tokens=int(next((i for i, (u, v) in enumerate(zip(seq[Lp:], ref_seq[Lp:]))
                                                 if u != v), S + 1)))
+    result.update(overlap=a.overlap, weight_slots=len(R["W_slots"]),
+                  decode_weight_slots=len(Rd["W_slots"]),
+                  hoist=a.hoist if a.overlap else 0)
     man = P.write(a.out, result)
     print("GPT2_PROGRAM_READY " + json.dumps({k: man.get(k) for k in (
         "descriptors", "segments", "dma_loads", "dma_stores", "dma_bytes", "spad_high_water",
-        "checkpoint_words", "final_words", "ddr_bytes", "greedy_match_tokens")}), flush=True)
+        "checkpoint_words", "final_words", "ddr_bytes", "greedy_match_tokens", "weight_slots",
+        "decode_weight_slots",
+        "queued_dma", "hoisted_dma", "event_bits_peak", "dependency_waits")}), flush=True)
     print(f"GPT2_GENERATION int={result['int_generated']!r} fp32={result['fp32_generated']!r}")
 
 

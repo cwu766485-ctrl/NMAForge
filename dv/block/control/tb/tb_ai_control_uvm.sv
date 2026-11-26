@@ -52,7 +52,7 @@ module tb_ai_control_uvm;
         .tile_buffer0_base(), .tile_buffer1_base(), .tile_output_offset(), .tile_input_words(), .tile_output_words(),
         .region0_base(), .region0_limit(), .region0_perm(), .region1_base(), .region1_limit(), .region1_perm(),
         .region2_base(), .region2_limit(), .region2_perm(), .region3_base(), .region3_limit(), .region3_perm(),
-        .cmdq_base(), .cmdq_size(), .cmdq_tail(), .cmdq_external(),
+        .cmdq_base(), .cmdq_size(), .cmdq_tail(), .cmdq_external(), .cmdq_event_on_complete(),
         .cmdq_head_load(status.cmdq_head_load), .cmdq_head_seed(status.cmdq_head_seed),
         .cplq_base(), .cplq_size(), .cplq_head(),
         .cplq_tail_load(status.cplq_tail_load), .cplq_tail_seed(status.cplq_tail_seed),

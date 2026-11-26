@@ -2,12 +2,19 @@
 
 // Multi-engine CMDQ issue and in-order retirement controller.
 //
-// Each of the seven compute engines may own one active command. Completed
-// records are buffered in an eight-entry FIFO and become visible in the same
-// order in which their descriptors were accepted. Macro descriptors are
+// Each of the seven compute engines and the queued DMA engine (engine 7,
+// opcode 0x60) may own one active command. Completed
+// records are buffered in a FIFO_DEPTH-entry FIFO (eight by default) and
+// become visible in the same order in which their descriptors were accepted.
+// With event_on_complete=1 (CMD_CTRL[1], latched when the queue starts) a
+// successful command's signal mask is published when its engine completes
+// instead of when it retires, so later work does not wait behind a long
+// unrelated command (for example a queued DMA prefetch). Macro descriptors are
 // handed to the legacy command processor after earlier parallel work drains;
 // this preserves the existing child-fetch and fail-stop semantics.
-module ai_parallel_compute_dispatcher(
+module ai_parallel_compute_dispatcher #(
+    parameter integer FIFO_DEPTH = 8
+)(
     input wire clk,
     input wire resetn,
     input wire submit,
@@ -17,6 +24,7 @@ module ai_parallel_compute_dispatcher(
     input wire [31:0] cmdq_size,
     input wire [31:0] cmdq_tail,
     input wire desc_external,
+    input wire event_on_complete,
     input wire cmdq_head_load,
     input wire [31:0] cmdq_head_seed,
     input wire cplq_tail_load,
@@ -57,13 +65,13 @@ module ai_parallel_compute_dispatcher(
     input wire [15:0] desc_clear_mask,
     input wire [7:0] desc_version,
 
-    input wire [6:0] engine_busy,
-    input wire [6:0] engine_done,
-    input wire [6:0] engine_error,
-    input wire [27:0] engine_error_code,
-    input wire [223:0] engine_result,
-    input wire [223:0] engine_cycles,
-    input wire [223:0] engine_elements,
+    input wire [7:0] engine_busy,
+    input wire [7:0] engine_done,
+    input wire [7:0] engine_error,
+    input wire [31:0] engine_error_code,
+    input wire [255:0] engine_result,
+    input wire [255:0] engine_cycles,
+    input wire [255:0] engine_elements,
     input wire completion_busy,
     input wire completion_done,
 
@@ -131,19 +139,21 @@ module ai_parallel_compute_dispatcher(
     reg aborting_r;
     reg retire_wait_r;
     reg [15:0] dependency_wait_cycles_r;
-    reg [2:0] fifo_head_r, fifo_tail_r;
-    reg [3:0] fifo_count_r;
-    reg [6:0] engine_active_r;
-    reg [2:0] engine_fifo_slot_r [0:6];
-    reg fifo_done_r [0:7];
-    reg fifo_error_r [0:7];
-    reg [3:0] fifo_error_code_r [0:7];
-    reg [15:0] fifo_task_id_r [0:7];
-    reg [15:0] fifo_signal_mask_r [0:7];
-    reg fifo_completion_required_r [0:7];
-    reg [31:0] fifo_result_r [0:7];
-    reg [31:0] fifo_cycles_r [0:7];
-    reg [31:0] fifo_elements_r [0:7];
+    localparam integer PTR_W = (FIFO_DEPTH <= 2) ? 1 : $clog2(FIFO_DEPTH);
+    reg [PTR_W-1:0] fifo_head_r, fifo_tail_r;
+    reg [PTR_W:0] fifo_count_r;
+    reg event_on_complete_r;
+    reg [7:0] engine_active_r;
+    reg [PTR_W-1:0] engine_fifo_slot_r [0:7];
+    reg fifo_done_r [0:FIFO_DEPTH-1];
+    reg fifo_error_r [0:FIFO_DEPTH-1];
+    reg [3:0] fifo_error_code_r [0:FIFO_DEPTH-1];
+    reg [15:0] fifo_task_id_r [0:FIFO_DEPTH-1];
+    reg [15:0] fifo_signal_mask_r [0:FIFO_DEPTH-1];
+    reg fifo_completion_required_r [0:FIFO_DEPTH-1];
+    reg [31:0] fifo_result_r [0:FIFO_DEPTH-1];
+    reg [31:0] fifo_cycles_r [0:FIFO_DEPTH-1];
+    reg [31:0] fifo_elements_r [0:FIFO_DEPTH-1];
 
     wire [31:0] cmdq_head_index, cmdq_head_next;
     wire [31:0] cmdq_after_next_index;
@@ -182,6 +192,7 @@ module ai_parallel_compute_dispatcher(
         .src0_stride(desc_src0_stride), .src1_stride(desc_src1_stride),
         .dst_stride(desc_dst_stride), .batch_count(desc_batch_count),
         .head_count(desc_head_count), .macro_child_fetch(1'b0),
+        .queued_dma_allowed(1'b1),
         .op_valid(), .is_macro(validator_macro), .is_tensor_matrix(),
         .is_tensor_sfu(), .version_valid(), .dimensions_valid(),
         .alignment_error(), .descriptor_invalid(descriptor_invalid)
@@ -198,13 +209,14 @@ module ai_parallel_compute_dispatcher(
             else if (op >= 8'h32 && op <= 8'h3b) engine_for_op = 3'd4;
             else if (op == 8'h16 || op == 8'h17) engine_for_op = 3'd5;
             else if (op == 8'h43 || op == 8'h44) engine_for_op = 3'd6;
+            else if (op == 8'h60) engine_for_op = 3'd7;
             else engine_for_op = 3'd0;
         end
     endfunction
 
     wire [2:0] desc_engine = engine_for_op(desc_op);
     wire desc_engine_ready = !engine_active_r[desc_engine] && !engine_busy[desc_engine];
-    wire can_enqueue = fifo_count_r < 4'd8;
+    wire can_enqueue = fifo_count_r < FIFO_DEPTH;
     wire enqueue_from_fetch = issue_state_r == ISSUE_FETCH && fetch_done &&
                               can_enqueue && (abort || aborting_r || fetch_error);
     wire enqueue_from_decode = issue_state_r == ISSUE_DECODE && can_enqueue &&
@@ -227,6 +239,21 @@ module ai_parallel_compute_dispatcher(
     wire dispatch_descriptor = enqueue_from_decode && dependencies_ready &&
                                !macro_op && !descriptor_invalid &&
                                !abort && !aborting_r;
+    // Signal masks published this cycle: at retirement (default, in CMDQ
+    // order) or, in event-on-complete mode, when an engine finishes without
+    // error while the queue is not aborting.
+    reg [15:0] early_signal_comb;
+    integer e;
+    always @(*) begin
+        early_signal_comb = 16'd0;
+        for (e = 0; e < 8; e = e + 1)
+            if (engine_active_r[e] && engine_done[e] && !engine_error[e] &&
+                !abort && !aborting_r)
+                early_signal_comb = early_signal_comb |
+                                    fifo_signal_mask_r[engine_fifo_slot_r[e]];
+    end
+    wire [15:0] event_signal_now = event_on_complete_r ? early_signal_comb :
+        (retire_success ? fifo_signal_mask_r[fifo_head_r] : 16'd0);
     assign completion_base = cplq_base;
     assign completion_index = cplq_tail_index;
     assign busy = queue_active_r || (fifo_count_r != 0) || retire_wait_r ||
@@ -250,7 +277,7 @@ module ai_parallel_compute_dispatcher(
             fifo_cycles_r[slot] <= cycle_value;
             fifo_elements_r[slot] <= element_value;
             fifo_done_r[slot] <= 1'b1;
-            fifo_tail_r <= fifo_tail_r + 3'd1;
+            fifo_tail_r <= fifo_tail_r + 1'b1;
             cmdq_head <= cmdq_head_next;
             if (!aborting_r && !abort && cmdq_after_next_index != cmdq_tail) begin
                 issue_state_r <= ISSUE_FETCH;
@@ -291,7 +318,7 @@ module ai_parallel_compute_dispatcher(
              desc_src0_stride, desc_src1_stride, desc_dst_stride,
              desc_batch_count == 16'd0 ? 16'd1 : desc_batch_count,
              desc_head_count == 16'd0 ? 16'd1 : desc_head_count};
-            fifo_tail_r <= fifo_tail_r + 3'd1;
+            fifo_tail_r <= fifo_tail_r + 1'b1;
             cmdq_head <= cmdq_head_next;
             dependency_wait_cycles_r <= 16'd0;
             if (!aborting_r && !abort && cmdq_after_next_index != cmdq_tail) begin
@@ -314,10 +341,11 @@ module ai_parallel_compute_dispatcher(
             aborting_r <= 1'b0;
             retire_wait_r <= 1'b0;
             dependency_wait_cycles_r <= 16'd0;
-            fifo_head_r <= 3'd0;
-            fifo_tail_r <= 3'd0;
-            fifo_count_r <= 4'd0;
-            engine_active_r <= 7'd0;
+            fifo_head_r <= {PTR_W{1'b0}};
+            fifo_tail_r <= {PTR_W{1'b0}};
+            fifo_count_r <= {(PTR_W+1){1'b0}};
+            event_on_complete_r <= 1'b0;
+            engine_active_r <= 8'd0;
             fetch_start <= 1'b0;
             fetch_base <= 64'd0;
             fetch_external <= 1'b0;
@@ -358,7 +386,7 @@ module ai_parallel_compute_dispatcher(
             event_elements <= 32'd0;
             dependency_events <= 16'd0;
             legacy_handoff <= 1'b0;
-            for (i = 0; i < 8; i = i + 1) begin
+            for (i = 0; i < FIFO_DEPTH; i = i + 1) begin
                 fifo_done_r[i] <= 1'b0;
                 fifo_error_r[i] <= 1'b0;
                 fifo_error_code_r[i] <= 4'd0;
@@ -369,8 +397,8 @@ module ai_parallel_compute_dispatcher(
                 fifo_cycles_r[i] <= 32'd0;
                 fifo_elements_r[i] <= 32'd0;
             end
-            for (i = 0; i < 7; i = i + 1)
-                engine_fifo_slot_r[i] <= 3'd0;
+            for (i = 0; i < 8; i = i + 1)
+                engine_fifo_slot_r[i] <= {PTR_W{1'b0}};
         end else begin
             fetch_start <= 1'b0;
             launch_valid <= 1'b0;
@@ -394,7 +422,7 @@ module ai_parallel_compute_dispatcher(
 
             // Latch every engine result before considering FIFO retirement.
             // The slot pointer is unique while that engine is active.
-            for (i = 0; i < 7; i = i + 1) begin
+            for (i = 0; i < 8; i = i + 1) begin
                 if (engine_active_r[i] && engine_done[i]) begin
                     head_slot = engine_fifo_slot_r[i];
                     fifo_done_r[head_slot] <= 1'b1;
@@ -422,7 +450,7 @@ module ai_parallel_compute_dispatcher(
 
             if (dequeue_fire) begin
                 fifo_done_r[fifo_head_r] <= 1'b0;
-                fifo_head_r <= fifo_head_r + 3'd1;
+                fifo_head_r <= fifo_head_r + 1'b1;
                 retire_wait_r <= 1'b0;
                 if (retire_complete_cpl)
                     cplq_tail <= cplq_tail_next;
@@ -439,16 +467,15 @@ module ai_parallel_compute_dispatcher(
 
             if (sync_legacy_state && !busy)
                 dependency_events <= legacy_dependency_events;
-            else if (dispatch_descriptor || retire_success) begin
+            else if (dispatch_descriptor || (|event_signal_now)) begin
                 dependency_events <=
-                    (dependency_events |
-                     (retire_success ? fifo_signal_mask_r[fifo_head_r] : 16'd0)) &
+                    (dependency_events | event_signal_now) &
                     ~(dispatch_descriptor ? desc_clear_mask : 16'd0);
             end
 
             case ({(enqueue_from_fetch || enqueue_from_decode), dequeue_fire})
-                2'b10: fifo_count_r <= fifo_count_r + 4'd1;
-                2'b01: fifo_count_r <= fifo_count_r - 4'd1;
+                2'b10: fifo_count_r <= fifo_count_r + 1'b1;
+                2'b01: fifo_count_r <= fifo_count_r - 1'b1;
                 default: fifo_count_r <= fifo_count_r;
             endcase
 
@@ -468,6 +495,7 @@ module ai_parallel_compute_dispatcher(
                         end else if (cmdq_size != 0) begin
                             queue_active_r <= 1'b1;
                             aborting_r <= 1'b0;
+                            event_on_complete_r <= event_on_complete;
                             issue_state_r <= ISSUE_FETCH;
                             fetch_start <= 1'b1;
                             fetch_base <= cmdq_base + (cmdq_head_index << 6);

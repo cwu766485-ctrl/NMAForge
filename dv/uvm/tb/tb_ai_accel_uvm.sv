@@ -250,6 +250,7 @@ module tb_ai_accel_uvm;
         .m_axi_araddr(axi4.araddr), .m_axi_arlen(axi4.arlen), .m_axi_arsize(axi4.arsize), .m_axi_arburst(axi4.arburst),
         .m_axi_arvalid(axi4.arvalid), .m_axi_arready(axi4.arready), .m_axi_rresp(axi4.rresp),
         .m_axi_rvalid(axi4.rvalid), .m_axi_rlast(axi4.rlast), .m_axi_rready(axi4.rready),
+        .m_axi_arid(axi4.arid), .m_axi_rid(axi4.rid),
         .m_axi_awaddr(axi4.awaddr), .m_axi_awlen(axi4.awlen), .m_axi_awvalid(axi4.awvalid), .m_axi_awready(axi4.awready),
         .m_axi_wdata(axi4.wdata), .m_axi_wstrb(axi4.wstrb), .m_axi_wlast(axi4.wlast),
         .m_axi_wvalid(axi4.wvalid), .m_axi_wready(axi4.wready), .m_axi_bresp(axi4.bresp),

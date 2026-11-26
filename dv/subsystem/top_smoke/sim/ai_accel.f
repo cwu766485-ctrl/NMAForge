@@ -5,6 +5,7 @@
 ../../../../rtl/control/cdc/ai_cdc_event_buffer.v
 ../../../../rtl/control/cdc/ai_accel_dual_clock_command_path.v
 ../../../../rtl/dma/ai_dma_burst_planner.v
+../../../../rtl/dma/ai_dma_queue_engine.v
 ../../../../rtl/dma/ai_dma_read_slot_tracker.v
 ../../../../rtl/dma/ai_dma_write_response_tracker.v
 ../../../../rtl/dma/ai_dma_spad_transfer_adapter.v

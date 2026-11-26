@@ -330,6 +330,10 @@ def main():
     ap.add_argument("--accuracy", type=int, default=0, help="images per class for integer accuracy")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--check", default="layer", choices=("layer", "debug"))
+    ap.add_argument("--overlap", action="store_true",
+                    help="program format v3: CMDQ DMA (0x60) overlapped with compute")
+    ap.add_argument("--hoist", type=int, default=48,
+                    help="max descriptors a DMA load may be moved ahead (--overlap)")
     a = ap.parse_args()
     from deit_contract_study import IMAGENETTE_TO_IMAGENET, load_image
     sd = torch.load(a.checkpoint, map_location="cpu", weights_only=True)
@@ -365,7 +369,7 @@ def main():
         result.update(accuracy_images=n, int_top1=correct_i / n, fp32_top1=correct_f / n)
         print(f"DEIT_INT_ACCURACY images={n} int_top1={100*correct_i/n:.2f}% fp32_top1={100*correct_f/n:.2f}%")
 
-    P = Program()
+    P = Program(overlap=a.overlap, hoist=a.hoist)
     R = allocate(P)
     P.ddr_put("zeros_pr", np.zeros(QB * TP, np.int64))
     w0, idx0 = classes[a.image_index % 10]
@@ -379,10 +383,12 @@ def main():
     if a.layers == 12:
         result["npu_program_top1_label"] = int(np.argmax(head_logits(fm, x)))
         result["label"] = idx0
+    result.update(overlap=a.overlap, hoist=a.hoist if a.overlap else 0)
     man = P.write(a.out, result)
-    print("DEIT_PROGRAM_READY " + json.dumps({k: man[k] for k in (
+    print("DEIT_PROGRAM_READY " + json.dumps({k: man.get(k) for k in (
         "descriptors", "segments", "dma_events", "dma_bytes", "spad_high_water",
-        "checkpoint_words", "final_words", "ddr_bytes")}))
+        "checkpoint_words", "final_words", "ddr_bytes", "queued_dma", "hoisted_dma",
+        "event_bits_peak", "dependency_waits")}))
 
 
 if __name__ == "__main__":

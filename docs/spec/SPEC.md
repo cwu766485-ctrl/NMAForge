@@ -7,15 +7,27 @@ This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
 128-bit AXI4 DMA, 512 KiB default four-bank scratchpad (128/256 KiB variants; capacity reported by `SPAD_INFO`), CMDQ/CPLQ, ABI v7.4 descriptors,
+INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
+evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
+Chinese source-of-truth document, not a second ABI definition.
 
 Round 35 compatible extension (ABI v7.4): SFU descriptor `flags[7]` selects
 round-to-nearest for `REQUANT_I8` (0x36) and a programmable 256-entry INT8 LUT
 activation for `GELU_Q8_8` (0x35; LUT at `src1`, `code = sat8((x + 2^(s-1)) >>
 s)`, output `LUT[code+128]`, REQUANT output layouts). Configurations the
 streaming SFU cannot execute return `ERR_CONFIG`; see SPEC_ZH for details.
-INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
-evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
-Chinese source-of-truth document, not a second ABI definition.
+
+Round 37 compatible extension (ABI v7.4, `CAP2=0x1ff`): opcode `0x60`
+`DMA_COPY` runs the payload DMA as dispatcher engine 7 inside the parallel
+CMDQ (`{src1,src0}` external address, `dst` SPAD address, `length` words per
+row, `m_size` rows with 0 = 1D, `src0_stride`/`dst_stride` 2D row strides,
+`flags[0]` store; all other fields reserved; serial command processor rejects
+it). `CMD_CTRL[1]` (event-on-complete, default 0, latched at queue start)
+publishes a successful command's `signal_mask` at engine completion instead
+of in-order retirement; completions still retire in CMDQ order. The Product
+Top dispatcher keeps 32 in-flight records. `CMD_TAIL` is now writable while
+busy (append-only); if the queue drained before the append, software rings
+`DOORBELL` again. See SPEC_ZH for details.
 
 Opcode `0x50` (`BF16_DOT_ACC_FP32`) remains unchanged. A10 adds opcode `0x51`
 (`FP16_DOT_ACC_FP32`); both use the existing command lifecycle, scratchpad

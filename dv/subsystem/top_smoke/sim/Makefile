@@ -54,7 +54,7 @@ AI_CLUSTER_COV_RUN ?= /tmp/nmaforge_compute_cluster_dut_cov_$(shell date +%Y%m%d
 AI_CLUSTER_COV_METRICS := line+cond+fsm+branch
 AI_CLUSTER_COV_SEEDS ?= 20261021 20261022 20261023 20261024 20261025
 AI_CLUSTER_EXTRA_COV_DBS ?=
-.PHONY: ai_compute_cluster_cov
+.PHONY: ai_qdma_selftest ai_compute_cluster_cov
 ai_compute_cluster_cov:
 	test ! -e "$(AI_CLUSTER_COV_RUN)"
 	mkdir -p "$(AI_CLUSTER_COV_RUN)"
@@ -1756,6 +1756,15 @@ AI_COMPILED_AXI_WORDS ?= 2097152
 # Extra simv plusargs, e.g. +AI_COMPILED_SEG_TIMING for per-segment compute cycles.
 AI_COMPILED_SIM_ARGS ?=
 .PHONY: ai_compiled_program
+# Round 37 model-free queued-DMA (0x60) self-test: 1D/2D DMA load/store,
+# DDR round trip, footprint events, hoisting, event-on-complete, DDR CMDQ.
+AI_QDMA_SELFTEST_DIR ?= /tmp/nmaforge_qdma_selftest
+AI_QDMA_PYTHON ?= python3
+ai_qdma_selftest:
+	$(AI_QDMA_PYTHON) ../../../../sw/compiler/qdma_selftest.py --out $(AI_QDMA_SELFTEST_DIR)
+	$(MAKE) ai_compiled_program AI_COMPILED_DIR=$(AI_QDMA_SELFTEST_DIR)
+	grep -q '^COMPILED_PROGRAM_PASS format=3 segments=6 descriptors=43 queued_dma=25 queued_dma_stores=6 ' $(AI_QDMA_SELFTEST_DIR)/sim/run.log
+
 ai_compiled_program:
 	test -n "$(AI_COMPILED_DIR)" && test -f "$(AI_COMPILED_DIR)/program.memh"
 	mkdir -p "$(AI_COMPILED_RUN)"

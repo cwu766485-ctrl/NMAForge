@@ -6,6 +6,7 @@ set AI_ACCEL_RTL_FILES [list \
     "$REPO_ROOT/rtl/control/cdc/ai_cdc_event_buffer.v" \
     "$REPO_ROOT/rtl/control/cdc/ai_accel_dual_clock_command_path.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_burst_planner.v" \
+    "$REPO_ROOT/rtl/dma/ai_dma_queue_engine.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_read_slot_tracker.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_write_response_tracker.v" \
     "$REPO_ROOT/rtl/dma/ai_dma_spad_transfer_adapter.v" \

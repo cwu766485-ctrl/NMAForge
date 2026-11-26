@@ -1779,6 +1779,8 @@ module tb_ai_accel_smoke;
         .m_axi_rresp    (m_axi_rresp),
         .m_axi_rvalid   (m_axi_rvalid),
         .m_axi_rlast    (m_axi_rlast),
+        .m_axi_arid     (m_axi_arid),
+        .m_axi_rid      (m_axi_rid),
         .m_axi_rready   (m_axi_rready),
         .m_axi_awaddr   (m_axi_awaddr),
         .m_axi_awlen    (m_axi_awlen),
@@ -2678,6 +2680,153 @@ module tb_ai_accel_smoke;
 `else
     reg [31:0] cp_prog [0:15];
 `endif
+
+    // Program format v3: DMA runs as CMDQ opcode 0x60 descriptors with
+    // footprint-derived event dependencies and CMD_CTRL[1] event-on-complete.
+    // Each segment streams through the ring: descriptors are published into
+    // free slots while earlier ones execute, completions are checked and
+    // consumed as they retire, and checkpoint records (last descriptor of the
+    // segment only) are compared after the segment drains.
+    task run_compiled_program_v3;
+        input integer seg_timing;
+        reg [31:0] dw [0:15];
+        reg [31:0] cw [0:3];
+        reg [31:0] st, ch, ct, rv;
+        reg idle_ok;
+        integer cur, nseg, seg, ndma, ndesc, nck, i, w, qsize, dbase, cbase, k, nb;
+        integer cum, seg_start, pub, obs, consumed, last_ct, delta, poll, nfinal, slot, tail;
+        integer t_stage, t_total, t0, ts, total_desc, total_ck, bad, qdma, qdma_st, dma_bytes;
+        begin
+            qsize = cp_prog[2]; dbase = cp_prog[3]; cbase = cp_prog[4]; nseg = cp_prog[6];
+            // CMD_CTRL[0]=1 puts the ring in DDR at dbase: the host writes its
+            // own memory (backdoor into the AXI model), and descriptors are
+            // fetched over AXI.  A SPAD-resident ring would need host writes
+            // through the SPAD host port, which loses same-cycle conflicts.
+            if (!cp_prog[5][0]) $fatal(1, "v3 program expects an external CMDQ ring");
+            if (dbase + qsize * 64 > REPRESENTATIVE_AXI_BYTES)
+                $fatal(1, "v3 CMDQ ring %08h exceeds AXI model; raise AI_COMPILED_AXI_WORDS", dbase);
+            axi_write(REG_CMDQ_CTRL, cp_prog[5]);
+            axi_write(REG_CMDQ_BASE_LO, dbase);
+            axi_write(REG_CMDQ_BASE_HI, 32'd0);
+            axi_write(REG_CMDQ_SIZE, qsize);
+            axi_write(REG_CMDQ_HEAD, 32'd0);
+            axi_write(REG_CMDQ_TAIL, 32'd0);
+            axi_write(REG_CPLQ_BASE_LO, cbase);
+            axi_write(REG_CPLQ_SIZE, qsize);
+            axi_write(REG_CPLQ_HEAD, 32'd0);
+            axi_write(REG_CPLQ_TAIL, 32'd0);
+            cur = 7; cum = 0; t_stage = 0; t_total = 0; total_desc = 0; total_ck = 0;
+            qdma = 0; qdma_st = 0; dma_bytes = 0;
+            for (seg = 0; seg < nseg; seg = seg + 1) begin
+                ndma = cp_prog[cur]; ndesc = cp_prog[cur + 1]; nck = cp_prog[cur + 2]; cur = cur + 3;
+                if (ndma != 0) $fatal(1, "v3 program segment %0d has fenced DMA entries", seg);
+                t0 = transformer_top_cycle_counter;
+                seg_start = cum % qsize;
+                pub = 0; obs = 0; consumed = 0; last_ct = seg_start; poll = 0;
+                while (obs < ndesc) begin
+                    if (pub < ndesc && (pub - consumed) < qsize - 1) begin
+                        nb = ndesc - pub;
+                        if (nb > 8) nb = 8;
+                        if (nb > qsize - 1 - (pub - consumed)) nb = qsize - 1 - (pub - consumed);
+                        ts = transformer_top_cycle_counter;
+                        for (k = 0; k < nb; k = k + 1) begin
+                            for (w = 0; w < 16; w = w + 1) dw[w] = cp_prog[cur + (pub + k) * 16 + w];
+                            if (dw[0][7:0] == 8'h60) begin
+                                qdma = qdma + 1;
+                                if (dw[7][0]) qdma_st = qdma_st + 1;
+                                dma_bytes = dma_bytes + 4 * dw[6][15:0] *
+                                            ((dw[5][15:0] == 0) ? 1 : dw[5][15:0]);
+                            end
+                            for (w = 0; w < 16; w = w + 1)
+                                axi_mem_u.mem[(dbase + ((seg_start + pub + k) % qsize) * 64) / 4 + w] = dw[w];
+                        end
+                        pub = pub + nb;
+                        axi_write(REG_CMDQ_TAIL, (seg_start + pub) % qsize);
+                        t_stage = t_stage + (transformer_top_cycle_counter - ts);
+                    end
+                    if (dut.processor_cmdq_head != (seg_start + pub) % qsize &&
+                        !dut.processor_busy && !dut.dma_busy) begin
+                        if ($test$plusargs("AI_COMPILED_V3_TRACE"))
+                            $display("V3_DOORBELL t=%0t head=%0d tail=%0d pqmode=%0b legacy=%0b",
+                                     $time, dut.processor_cmdq_head, (seg_start + pub) % qsize,
+                                     dut.parallel_queue_mode_r, dut.legacy_queue_active_r);
+                        axi_write(REG_DOORBELL, 32'd1);
+                    end
+                    @(posedge aclk); #1;
+                    ct = dut.processor_cplq_tail;
+                    delta = (ct + qsize - last_ct) % qsize;
+                    for (k = 0; k < delta; k = k + 1) begin
+                        slot = (seg_start + obs) % qsize;
+                        for (w = 0; w < 4; w = w + 1)
+                            cw[w] = representative_spad_backdoor_read(cbase + slot * 16 + w * 4);
+                        if (cw[0] !== cp_prog[cur + obs * 16][31:16] || cw[1] !== 32'd1)
+                            $fatal(1, "COMPILED_COMPLETION_FAIL segment=%0d desc=%0d task=%08h status=%08h op=%02h",
+                                   seg, obs, cw[0], cw[1], cp_prog[cur + obs * 16][7:0]);
+                        obs = obs + 1;
+                    end
+                    if (delta != 0) poll = 0;
+                    last_ct = ct;
+                    if (obs - consumed >= 16 || (obs == ndesc && obs != consumed)) begin
+                        axi_write(REG_CPLQ_HEAD, ct);
+                        consumed = obs;
+                    end
+                    poll = poll + 1;
+                    if (poll > 2000000) begin
+                        $display("COMPILED_V3_STALL cmdq_head=%0d cplq_tail=%0d busy=%0b pqmode=%0b issue=%0d qactive=%0b fifo=%0d engines=%08b events=%04h engine_busy=%07b dma_busy=%0b qdma_busy=%0b",
+                                 dut.processor_cmdq_head, dut.processor_cplq_tail, dut.processor_busy,
+                                 dut.parallel_queue_mode_r,
+                                 dut.parallel_compute_dispatcher_u.issue_state_r,
+                                 dut.parallel_compute_dispatcher_u.queue_active_r,
+                                 dut.parallel_compute_dispatcher_u.fifo_count_r,
+                                 dut.parallel_compute_dispatcher_u.engine_active_r,
+                                 dut.parallel_compute_dispatcher_u.dependency_events,
+                                 dut.engine_busy, dut.dma_busy, dut.qdma_busy);
+                        $fatal(1, "compiled v3 segment %0d stalled pub=%0d observed=%0d/%0d", seg, pub, obs, ndesc);
+                    end
+                end
+                tail = (seg_start + ndesc) % qsize;
+                if (ndesc > 0) begin
+                    runtime_wait_queue_idle(tail, tail, idle_ok, st, ch, ct);
+                    if (!idle_ok) $fatal(1, "compiled v3 segment %0d did not retire", seg);
+                end
+                t_total = t_total + (transformer_top_cycle_counter - t0);
+                if (seg_timing)
+                    $display("COMPILED_SEGMENT seg=%0d descriptors=%0d compute_cycles=%0d",
+                             seg, ndesc, transformer_top_cycle_counter - t0);
+                cur = cur + ndesc * 16;
+                bad = 0;
+                for (i = 0; i < nck; i = i + 1) begin
+                    if (cp_prog[cur + 3 * i] != ndesc - 1)
+                        $fatal(1, "v3 checkpoint not on the last descriptor of segment %0d", seg);
+                    rv = representative_spad_backdoor_read(cp_prog[cur + 3 * i + 1]);
+                    if (rv !== cp_prog[cur + 3 * i + 2]) begin
+                        if (bad < 6)
+                            $display("COMPILED_CHECKPOINT_MISMATCH segment=%0d desc=%0d addr=%08h expected=%08h observed=%08h",
+                                     seg, ndesc - 1, cp_prog[cur + 3 * i + 1], cp_prog[cur + 3 * i + 2], rv);
+                        bad = bad + 1;
+                    end
+                end
+                if (bad) $fatal(1, "COMPILED_CHECKPOINT_FAIL segment=%0d mismatches=%0d", seg, bad);
+                total_ck = total_ck + nck;
+                cur = cur + nck * 3;
+                cum = cum + ndesc; total_desc = total_desc + ndesc;
+            end
+            nfinal = cp_prog[cur]; cur = cur + 1; bad = 0;
+            for (i = 0; i < nfinal; i = i + 1) begin
+                rv = representative_spad_backdoor_read(cp_prog[cur + 2 * i]);
+                if (rv !== cp_prog[cur + 2 * i + 1]) begin
+                    if (bad < 6)
+                        $display("COMPILED_FINAL_MISMATCH addr=%08h expected=%08h observed=%08h",
+                                 cp_prog[cur + 2 * i], cp_prog[cur + 2 * i + 1], rv);
+                    bad = bad + 1;
+                end
+            end
+            if (bad) $fatal(1, "COMPILED_FINAL_FAIL mismatches=%0d/%0d", bad, nfinal);
+            $display("COMPILED_PROGRAM_PASS format=3 segments=%0d descriptors=%0d queued_dma=%0d queued_dma_stores=%0d queued_dma_bytes=%0d checkpoint_words=%0d final_words=%0d end_to_end_cycles=%0d host_publish_cycles=%0d cmdq=ddr dma_fenced_cycles=0 host_spad_data_writes=0",
+                     nseg, total_desc, qdma, qdma_st, dma_bytes, total_ck, nfinal, t_total, t_stage);
+        end
+    endtask
+
     task run_compiled_program;
         reg [1023:0] cp_dir;
         reg [1023:0] cp_file;
@@ -2697,8 +2846,13 @@ module tb_ai_accel_smoke;
             $readmemh(cp_file, cp_prog);
             $sformat(cp_file, "%0s/ddr.memh", cp_dir);
             $readmemh(cp_file, axi_mem_u.mem);
-            if (cp_prog[0] !== 32'h4E4D4146 || (cp_prog[1] !== 32'd1 && cp_prog[1] !== 32'd2))
+            if (cp_prog[0] !== 32'h4E4D4146 ||
+                (cp_prog[1] !== 32'd1 && cp_prog[1] !== 32'd2 && cp_prog[1] !== 32'd3))
                 $fatal(1, "compiled program magic/version mismatch %08h %08h", cp_prog[0], cp_prog[1]);
+            if (cp_prog[1] == 32'd3) begin
+                run_compiled_program_v3(seg_timing);
+                return;
+            end
             cp_version = cp_prog[1];
             qsize = cp_prog[2]; dbase = cp_prog[3]; cbase = cp_prog[4]; nseg = cp_prog[5];
             axi_write(REG_CMDQ_CTRL, 32'd0);
@@ -7525,7 +7679,7 @@ module tb_ai_accel_smoke;
         expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
                     "mapped AXI aperture version");
         expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
-        expect_read(REG_CAP2, 32'h0000_00ff, "architectural capabilities");
+        expect_read(REG_CAP2, 32'h0000_01ff, "architectural capabilities");
         expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
         axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
         expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");

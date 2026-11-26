@@ -15,7 +15,7 @@ module tb_ai_parallel_compute_uvm;
     ai_parallel_compute_dispatcher dispatcher_dut (
         .clk(clk), .resetn(cl_if.resetn), .submit(cl_if.submit), .abort(cl_if.abort),
         .scheduler_ready(1'b1), .cmdq_base(64'h0000_0000_0000_1000), .cmdq_size(32'd8),
-        .cmdq_tail(cl_if.cmdq_tail), .desc_external(1'b0),
+        .cmdq_tail(cl_if.cmdq_tail), .desc_external(1'b0), .event_on_complete(1'b0),
         .cmdq_head_load(1'b0), .cmdq_head_seed(32'd0),
         .cplq_tail_load(1'b0), .cplq_tail_seed(32'd0),
         .cplq_base(32'h0000_8000), .cplq_size(cl_if.cplq_size), .cplq_head(cl_if.cplq_head),
@@ -32,10 +32,14 @@ module tb_ai_parallel_compute_uvm;
         .desc_batch_count(cl_if.desc_batch_count), .desc_head_count(cl_if.desc_head_count),
         .desc_wait_mask(cl_if.desc_wait_mask), .desc_signal_mask(cl_if.desc_signal_mask),
         .desc_clear_mask(cl_if.desc_clear_mask), .desc_version(cl_if.desc_version),
-        .engine_busy(cl_if.engine_busy), .engine_done(cl_if.engine_done),
-        .engine_error(cl_if.engine_error), .engine_error_code(cl_if.engine_error_code),
-        .engine_result(cl_if.engine_result), .engine_cycles(cl_if.engine_cycles),
-        .engine_elements(cl_if.engine_elements), .completion_busy(cl_if.completion_busy),
+        // Engine 7 (queued DMA, opcode 0x60) is outside this compute-only
+        // environment and is tied idle.
+        .engine_busy({1'b0, cl_if.engine_busy}), .engine_done({1'b0, cl_if.engine_done}),
+        .engine_error({1'b0, cl_if.engine_error}),
+        .engine_error_code({4'd0, cl_if.engine_error_code}),
+        .engine_result({32'd0, cl_if.engine_result}),
+        .engine_cycles({32'd0, cl_if.engine_cycles}),
+        .engine_elements({32'd0, cl_if.engine_elements}), .completion_busy(cl_if.completion_busy),
         .completion_done(cl_if.completion_done),
         .fetch_start(cl_if.fetch_start), .fetch_base(cl_if.fetch_base), .fetch_external(fetch_external),
         .launch_valid(cl_if.launch_valid), .launch_op(cl_if.launch_op),
@@ -84,7 +88,7 @@ module tb_ai_parallel_compute_uvm;
         dispatcher_dut.fifo_error_r[1], dispatcher_dut.fifo_error_r[0]
     };
     assign cl_if.debug_issue_state = dispatcher_dut.issue_state_r;
-    assign cl_if.debug_engine_active = dispatcher_dut.engine_active_r;
+    assign cl_if.debug_engine_active = dispatcher_dut.engine_active_r[6:0];
     assign cl_if.debug_desc_invalid = dispatcher_dut.descriptor_invalid;
     assign cl_if.debug_cplq_full = dispatcher_dut.cplq_full;
 

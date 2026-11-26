@@ -12,6 +12,8 @@ module tb_ai_descriptor_validator;
     reg [31:0] aux0, src0_stride, src1_stride, dst_stride;
     reg [15:0] batch_count, head_count;
     reg macro_child_fetch;
+    reg queued_dma_allowed;
+    integer qdma_checks;
 
     wire op_valid, is_macro, is_tensor_matrix, is_tensor_sfu;
     wire version_valid, dimensions_valid, alignment_error, descriptor_invalid;
@@ -33,6 +35,7 @@ module tb_ai_descriptor_validator;
         .aux0(aux0), .src0_stride(src0_stride), .src1_stride(src1_stride),
         .dst_stride(dst_stride), .batch_count(batch_count),
         .head_count(head_count), .macro_child_fetch(macro_child_fetch),
+        .queued_dma_allowed(queued_dma_allowed),
         .op_valid(op_valid), .is_macro(is_macro),
         .is_tensor_matrix(is_tensor_matrix), .is_tensor_sfu(is_tensor_sfu),
         .version_valid(version_valid), .dimensions_valid(dimensions_valid),
@@ -69,6 +72,7 @@ module tb_ai_descriptor_validator;
             batch_count = 16'd0;
             head_count = 16'd0;
             macro_child_fetch = 1'b0;
+            queued_dma_allowed = 1'b1;
             case (opcode)
                 8'h16, 8'h17, 8'h43, 8'h44: version = 8'd5;
                 8'h40, 8'h41, 8'h42: begin version = 8'd4; length = 16'd3; src0 = 32'h0000_0140; end
@@ -113,6 +117,22 @@ module tb_ai_descriptor_validator;
                 is_macro !== expected_macro || is_tensor_matrix !== expected_matrix || is_tensor_sfu !== expected_sfu)
                 $fatal(1, "opcode decoder class mismatch: op=0x%02h", opcode);
             legal_opcode_checks = legal_opcode_checks + 1;
+        end
+    endtask
+
+
+    task automatic set_qdma_defaults(input reg two_d);
+        begin
+            set_legal_defaults(8'h60);
+            src0 = 32'h0000_1000; src1 = 32'd0; dst = 32'h0000_0100;
+            length = 16'd64; m_size = two_d ? 16'd16 : 16'd0;
+            n_size = 16'd0; k_words = length; flags = two_d ? 8'h01 : 8'h00;
+            src0_stride = two_d ? 32'd256 : 32'd0;
+            dst_stride = two_d ? 32'd128 : 32'd0;
+            src1_stride = 32'd0; batch_count = 16'd0; head_count = 16'd0;
+            // Descriptor fetch decodes flags[0] as bias_enable as well.
+            aux0 = 32'd0; bias_enable = two_d; bias_base = 32'd0;
+            scale_shift = 5'd0; activation = 2'd0;
         end
     endtask
 
@@ -162,6 +182,29 @@ module tb_ai_descriptor_validator;
         supported_ops[27]=8'h52; supported_ops[28]=8'h53;
 
         for (i=0; i<29; i=i+1) check_legal(supported_ops[i]);
+
+        // Opcode 0x60 DMA_COPY (CAP2[8]) is dispatcher-only: it is not a
+        // compute-cluster opcode, so the launch decoder keeps op_valid=0.
+        qdma_checks = 0;
+        set_qdma_defaults(1'b0); #1;
+        if (descriptor_invalid || dec_valid !== 1'b0)
+            $fatal(1, "legal 1D DMA_COPY rejected or decoded as compute op");
+        qdma_checks = qdma_checks + 1;
+        set_qdma_defaults(1'b1); src1 = 32'h0000_0003; #1;   // 64-bit ext high word
+        if (descriptor_invalid) $fatal(1, "legal 2D DMA_COPY store rejected");
+        qdma_checks = qdma_checks + 1;
+        set_qdma_defaults(1'b0); queued_dma_allowed = 1'b0; check_invalid("DMA_COPY on serial processor");
+        set_qdma_defaults(1'b0); length = 16'd0; check_invalid("DMA_COPY zero length");
+        set_qdma_defaults(1'b0); src0 = 32'h0000_1002; check_invalid("DMA_COPY unaligned ext");
+        set_qdma_defaults(1'b0); dst = 32'h0000_0102; check_invalid("DMA_COPY unaligned spad");
+        set_qdma_defaults(1'b0); src0_stride = 32'd64; check_invalid("DMA_COPY 1D stride");
+        set_qdma_defaults(1'b1); bias_base = 32'h100; check_invalid("DMA_COPY reserved bias base");
+        set_qdma_defaults(1'b1); dst_stride = 32'd66; check_invalid("DMA_COPY 2D unaligned stride");
+        set_qdma_defaults(1'b0); flags = 8'h02; check_invalid("DMA_COPY reserved flag");
+        set_qdma_defaults(1'b0); aux0 = 32'd1; check_invalid("DMA_COPY reserved aux0");
+        set_qdma_defaults(1'b0); version = 8'd3; check_invalid("DMA_COPY version");
+        set_qdma_defaults(1'b0); dst = 32'hffff_fff0; check_invalid("DMA_COPY spad wrap");
+        qdma_checks = qdma_checks + 11;
 
         // The descriptor-only Matrix A tile packing mode has an additional
         // exact M*N==length contract beyond the ordinary SFU length rule.
@@ -379,11 +422,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 30 || invalid_rule_checks != 40 ||
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 51 ||
             boundary_accept_checks != 49 || boundary_reject_checks != 28)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/40/49/28",
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/51/49/28",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 tile_pack=1 invalid_rules=40 boundary_accept=49/49 boundary_reject=28/28 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0");
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 queued_dma=%0d tile_pack=1 invalid_rules=51 boundary_accept=49/49 boundary_reject=28/28 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0", qdma_checks);
         $finish;
     end
 endmodule

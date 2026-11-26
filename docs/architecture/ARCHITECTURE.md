@@ -39,6 +39,11 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
   跨引擎派发及按提交顺序退休；每个引擎最多一个在途任务。`ai_command_processor` 仍管理
   direct/tile 模式，并在普通任务排空后接管宏 descriptor 的串行子任务。软件发布 `CMDQ_TAIL`，
   消费 completion 后推进 `CPLQ_HEAD`。
+- 队列 DMA（Round 37）：`ai_dma_queue_engine` 是调度器的 engine 7，执行 CMDQ opcode `0x60`
+  `DMA_COPY`。它锁存描述符，在 `ai_axi128_dma` 空闲时经 `ai_accel_dma_request_mux` 发出一次
+  start（优先级 tile > 队列 DMA > 寄存器 DMA），完成后像计算引擎一样回报 done/error。产品 top
+  的在途记录 FIFO 为 32 项；`CMD_CTRL[1]` 打开“完成即发事件”，使后续计算只等待真正的数据依赖，
+  不被排在前面的长 DMA 的顺序退休阻塞。DMA 仍经 `ai_spad_arbiter` 的 DMA 客户端访问 SPAD。
 - 多引擎通过 `ai_compute_spad_mux` 汇入 `ai_spad_arbiter` 的单一 core 客户端。仲裁保持
   请求和响应归属，但不建立跨 descriptor 的数据依赖；软件要避免可能并发任务的 SPAD 读写冲突。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion
@@ -216,7 +221,8 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | 顶层 | `ai_accel_top` | 是 | 把 AXI、寄存器、命令、DMA、SRAM、计算核和 IRQ 接起来。 |
 | AXI-Lite | `axi_lite_reg_if` | 是 | AXI4-Lite 五通道协议适配，转换成内部寄存器读写请求。 |
 | 寄存器 | `ai_accel_regs` | 是 | 保存软件配置，生成 `submit`、`abort`、DMA start 等脉冲，回报状态、性能计数器和 IRQ。 |
-| 调度 | `ai_parallel_compute_dispatcher` | 是 | 普通 compute CMDQ 指针所有者；最多每引擎一个在途任务，维护任务归属并按 CMDQ 顺序退休。 |
+| 调度 | `ai_parallel_compute_dispatcher` | 是 | 普通 compute CMDQ 指针所有者；七个计算引擎加队列 DMA（engine 7）各最多一个在途任务，维护任务归属并按 CMDQ 顺序退休。 |
+| 队列 DMA | `ai_dma_queue_engine` | 是 | CMDQ opcode `0x60` 的执行者：把描述符转成一次 `ai_axi128_dma` 传输并产生普通 completion。 |
 | 串行命令控制 | `ai_command_processor` | 是 | 管理 direct/tile 命令，接收普通队列排空后的宏 descriptor handoff，并串行执行宏子任务。 |
 | Compute SPAD 子仲裁 | `ai_compute_spad_mux` | 是 | 将七个计算引擎的请求轮转映射到唯一 scheduler core-SPAD 客户端，并归还各自响应。 |
 | 片上 descriptor | `ai_desc_fetch` | 是 | 从 scratchpad 读取 64B descriptor。 |

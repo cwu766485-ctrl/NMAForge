@@ -42,6 +42,9 @@ module ai_accel_sva #(
     input wire        m_axi_rvalid,
     input wire        m_axi_rlast,
     input wire        m_axi_rready,
+    // Descriptor fetch owns AXI ID 0; payload DMA uses IDs 1..4.
+    input wire [3:0]  m_axi_arid,
+    input wire [3:0]  m_axi_rid,
     input wire [M_AXI_ADDR_WIDTH-1:0] m_axi_awaddr,
     input wire [7:0]  m_axi_awlen,
     input wire        m_axi_awvalid,
@@ -101,6 +104,7 @@ module ai_accel_sva #(
     reg        task_pending_r;
     reg [31:0] task_timer_r;
     reg [2:0]  m_read_outstanding_r;
+    reg        m_desc_read_outstanding_r;
 
     wire host_desc_conflict;
 
@@ -135,6 +139,7 @@ module ai_accel_sva #(
             task_pending_r <= 1'b0;
             task_timer_r <= 32'd0;
             m_read_outstanding_r <= 3'd0;
+            m_desc_read_outstanding_r <= 1'b0;
         end else begin
             if (s_axi_awvalid && !s_axi_awready) begin
                 if (!aw_hold_valid_r) begin
@@ -233,8 +238,25 @@ module ai_accel_sva #(
                     $fatal(1, "SVA FAIL: M_AXI AR burst crosses a 4KiB boundary");
             end
 
-            case ({m_axi_arvalid && m_axi_arready,
-                   m_axi_rvalid && m_axi_rready && m_axi_rlast})
+            // The DMA_CFG window bounds payload reads only (ID != 0). With a
+            // DDR-resident CMDQ, one descriptor fetch (ID 0) may overlap
+            // queued payload DMA, so it is tracked separately.
+            case ({m_axi_arvalid && m_axi_arready && (m_axi_arid == 4'd0),
+                   m_axi_rvalid && m_axi_rready && m_axi_rlast && (m_axi_rid == 4'd0)})
+              2'b10: begin
+                  if (m_desc_read_outstanding_r != 1'b0)
+                      $fatal(1, "SVA FAIL: more than one descriptor fetch read outstanding");
+                  m_desc_read_outstanding_r <= 1'b1;
+              end
+              2'b01: begin
+                  if (m_desc_read_outstanding_r == 1'b0)
+                      $fatal(1, "SVA FAIL: M_AXI ID0 RLAST arrived without an accepted AR");
+                  m_desc_read_outstanding_r <= 1'b0;
+              end
+              default: m_desc_read_outstanding_r <= m_desc_read_outstanding_r;
+            endcase
+            case ({m_axi_arvalid && m_axi_arready && (m_axi_arid != 4'd0),
+                   m_axi_rvalid && m_axi_rready && m_axi_rlast && (m_axi_rid != 4'd0)})
               2'b10: m_read_outstanding_r <= m_read_outstanding_r + 3'd1;
               2'b01: begin
                   if (m_read_outstanding_r == 3'd0)

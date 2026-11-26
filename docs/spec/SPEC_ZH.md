@@ -78,7 +78,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 ## 4. 队列、描述符与完成项
 
-软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。软件可在硬件仍 busy 时推进 `CPLQ_HEAD` 以释放满队列空间。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
+软件写 CMDQ 描述符并发布 `CMDQ_TAIL`，硬件消费并报告 `CMDQ_HEAD`；硬件写 CPLQ 完成项并发布 `CPLQ_TAIL`，软件消费后发布 `CPLQ_HEAD`。软件可在硬件仍 busy 时推进 `CPLQ_HEAD` 以释放满队列空间；自 Round 37 起也可在 busy 时推进 `CMDQ_TAIL`（只能追加：新 tail 前的槽位须已写好描述符，且未取指的槽位不得被覆盖），调度器实时采样 tail。若写入 tail 后 `STATUS.busy=0` 且 `CMDQ_HEAD≠CMDQ_TAIL`（队列在追加前已排空），软件须再写一次 `DOORBELL`。其余配置寄存器在 busy 时仍返回 SLVERR。CMDQ/CPLQ 可放在 scratchpad 或外部内存，`CMD_CTRL[0]` 选择外部描述符。CMD_HEAD/CPL_TAIL 的写仅用于复位/调试种子，不是正常运行时的软件推进方式。
 
 一条 ABI v7 描述符固定 64 字节、64 字节对齐、16 个 little-endian 32-bit word；A9/ABI v7.3 加入 `0x50 BF16_DOT_ACC_FP32`，A10/ABI v7.4 增加 `0x51 FP16_DOT_ACC_FP32`，均不改变描述符字节布局：
 
@@ -139,6 +139,11 @@ Round 35（ABI v7.4 兼容扩展）：SFU 描述符 `flags[7]`。`REQUANT_I8`（
 | 43/44 | KV write/KV read |
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
+| 60 (`0x60`) | 队列 DMA（`DMA_COPY`，仅并行 CMDQ；`CAP2[8]`） |
+
+**队列 DMA `0x60 DMA_COPY`（ABI v7.4 兼容扩展，`CAP2[8]`）。** 并行 CMDQ 调度器把 `0x60` 派发到第 8 个引擎（engine 7），由它驱动现有 128-bit AXI4 payload DMA，与计算引擎并行执行，并产生普通 completion。字段：`{src1,src0}` 为 64-bit 外部字节地址（word 对齐，`src1` 是高 32 位，不单独做对齐检查）；`dst` 为 SPAD 字节地址（word 对齐）；word 6 `length` 为每行 word 数（1D 时为总 word 数，word 6 同时解码为 `k_words`）；`m_size` 为行数，0 表示 1D；`src0_stride`/`dst_stride` 为外部/SPAD 行步长（仅 2D，须 word 对齐，1D 时须为 0）；`flags[0]`=0 为 DDR→SPAD load、1 为 SPAD→DDR store（该位同时按通用规则解码为 bias enable，validator 只要求二者一致且 `bias` 地址为 0）。版本须为 7；`n_size`、`bias`、`aux0`、`src1_stride`、`batch/head`、shift/activation 及其余 flags 保留且须为 0；SPAD 终止地址不得越过 32-bit 空间。成功时 completion `result=0`、`element count`=传输的 word 数；DMA 错误时 error 字段直接给出 payload DMA 错误码（1 配置、2 AXI 读、3 AXI 写、4 SPAD、5 abort，与 tile 路径一致），`result[31:28]=2` 标识 DMA 来源。读请求窗口与寄存器 DMA 相同（`DMA_CFG[10:8]`，复位值 4）；外部 CMDQ 时描述符取指（AXI ID 0）可与队列 DMA 的读（ID 1..4）同时在途。`0x60` 只在并行 CMDQ 中合法：串行命令处理器（宏子描述符及宏之后由其接管的队列）以 `ERR_DESC` 拒绝；它不是 compute cluster opcode，direct mode 不支持。队列 DMA 执行期间，寄存器 DMA（`DMA_CTRL` 在 processor busy 时本就被拒绝）和 tile DMA 不得使用同一 DMA；其 done/error 不更新寄存器 `DMA_STATUS`。
+
+**完成即发事件 `CMD_CTRL[1]`（默认 0）。** 为 0 时保持原语义：成功命令的 `signal_mask` 在按序退休时可见。为 1 时（在队列从空闲启动时锁存），成功命令的 `signal_mask` 在其引擎报告完成时即可见，不等待更早的命令退休；completion 记录、`CPLQ_TAIL` 和 error 仍按 CMDQ 顺序退休。失败或 abort 中完成的命令不发事件。该模式使排在长 DMA 之后、与其无数据依赖的计算不被顺序退休阻塞；软件须用事件位表达全部跨引擎 RAW/WAR/WAW 依赖（同一引擎的命令按发射顺序串行执行）。产品 top 的调度器在途记录 FIFO 为 32 项（`FIFO_DEPTH` 参数，模块默认 8）；FIFO 满时停止发射，直到队首退休。
 
 Product Matrix GEMV opcode `0x52` 使用共享的 16×16 INT8 阵列，仍采用 64 字节 ABI-v7 描述符。支持 `1<=M<=16`、`K>0`、`1<=N<=16`；宽输出形状还支持 `N=32,48,...,256`。有符号 INT8 A 按 row-major `[M,K]` 存储，每行补齐至 16 字节；B 按 row-major `[K,N]` 存储，每行 stride 为 `ceil(N/16)*16` 字节；输出是连续 INT32 `[M,N]`。不支持的 stride、转置、batch、保留字段和输入/输出重叠由 validator 拒绝；padding lane 不属于逻辑元素。宽 N 是 Round 32 对现有 opcode 的扩展，不增加 Matrix 阵列，也不改变描述符大小。
 
@@ -165,7 +170,7 @@ epsilon 输入）解释为从 0 开始的 query token 下标，且该下标包�
 
 全部寄存器为 32-bit、相对 AXI-Lite base 的字节偏移。`0x000~0x048` 为 CTRL/STATUS/直接模式配置/IRQ/VERSION/CAP；`0x080~0x0D0` 为 CMDQ/CPLQ、doorbell、abort、watchdog、DMA 和 queue status；`0x0D4~0x100` 是 R0~R3 保护区；`0x104~0x118` 为 DMA 二维/后处理；`0x120~0x148` 为 tile 外部地址、双缓冲和尺寸；`0x14C~0x1B0` 为性能、事件、64-bit 地址高字、ABI、错误来源和 CAP2。
 
-核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`ABI_INFO={16,64,4,7}`（completion bytes、descriptor bytes、minor、major）；`CAP2=0xff` 代表原有六项能力以及 BF16、FP16 dot-to-FP32。
+核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`CMD_CTRL` bit0=外部描述符、bit1=完成即发事件（见下）；`ABI_INFO={16,64,4,7}`（completion bytes、descriptor bytes、minor、major）；`CAP2=0x1ff` 代表原有六项能力、BF16/FP16 dot-to-FP32 以及 bit8 队列 DMA `0x60`。
 
 ## 7. 验证证据与边界
 

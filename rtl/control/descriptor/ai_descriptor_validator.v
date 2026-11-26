@@ -20,6 +20,9 @@ module ai_descriptor_validator (
     input  wire [15:0] batch_count,
     input  wire [15:0] head_count,
     input  wire        macro_child_fetch,
+    // 1 only for the parallel CMDQ dispatcher, which owns the queued DMA
+    // engine. The serial command processor rejects opcode 0x60.
+    input  wire        queued_dma_allowed,
 
     output wire        op_valid,
     output wire        is_macro,
@@ -38,7 +41,7 @@ module ai_descriptor_validator (
                       ((op >= 8'h30) && (op <= 8'h3b)) ||
                       ((op >= 8'h43) && (op <= 8'h44)) ||
                       is_macro || (op == 8'h50) || (op == 8'h51) ||
-                      (op == 8'h52) || (op == 8'h53);
+                      (op == 8'h52) || (op == 8'h53) || (op == 8'h60);
 
     assign is_tensor_matrix = (op == 8'h30) || (op == 8'h31) ||
                               (op == 8'h52) ||
@@ -47,6 +50,7 @@ module ai_descriptor_validator (
     wire is_bf16_dot = (op == 8'h50);
     wire is_fp16_dot = (op == 8'h51);
     wire is_fp_dot = is_bf16_dot || is_fp16_dot;
+    wire is_queued_dma = (op == 8'h60);
     wire [31:0] pack_tile_a_elements = {16'd0,m_size} * {16'd0,n_size};
     // Round 35: GELU flag[7] selects the LUT activation, which may pack like
     // REQUANT; packing on plain GELU is rejected.
@@ -113,6 +117,7 @@ module ai_descriptor_validator (
                               ((op == 8'h43 || op == 8'h44) && length != 0) ||
                               (is_fp_dot && length != 0 &&
                                m_size == 16'd1 && n_size == 16'd1) ||
+                              (is_queued_dma && length != 0) ||
                               (op == 8'h40 && length == 16'd3) ||
                               ((op == 8'h41 || op == 8'h42) &&
                                length >= 16'd3 && length <= 16'd256);
@@ -121,8 +126,10 @@ module ai_descriptor_validator (
     // list pointer {src1,src0}. Check alignment on the complete address via
     // src0's low bits; src1 is not an independently aligned data pointer.
     wire macro_v7_uses_64b_child_base = is_macro && (version == 8'd7);
+    // Queued DMA also carries a 64-bit external address in {src1,src0}.
     assign alignment_error = (|src0[1:0]) ||
-                             ((|src1[1:0]) && !macro_v7_uses_64b_child_base) ||
+                             ((|src1[1:0]) && !macro_v7_uses_64b_child_base &&
+                              !is_queued_dma) ||
                              (|dst[1:0]) ||
                              (bias_enable && (|bias_base[1:0])) ||
                              ((op == 8'h52) &&
@@ -242,6 +249,30 @@ module ai_descriptor_validator (
          (dst_stride == 32'd0) && (batch_count <= 16'd1) &&
          (head_count == 16'd0) && !gemv_range_error && !gemv_write_alias);
 
+    // Opcode 0x60 DMA_COPY (CAP2[8]): {src1,src0} external address, dst SPAD
+    // address, length words per row, m_size rows (0 = 1D), src0_stride and
+    // dst_stride row strides (2D only), flags[0] store. Word 6 also decodes
+    // as k_words (it mirrors length) and flags[0] also decodes as
+    // bias_enable. Every other field is reserved and must be zero. 2D strides must be word aligned and a 2D
+    // store may not use the gather path (the payload DMA has none).
+    wire [31:0] qdma_words = (m_size == 16'd0) ? {16'd0,length} :
+                             ({16'd0,length} * {16'd0,m_size});
+    wire [32:0] qdma_spad_last =
+        {1'b0,dst} +
+        ((m_size == 16'd0) ? ({1'b0,qdma_words} << 2) :
+         ({17'd0,m_size - 16'd1} * {1'b0,dst_stride}) +
+         ({17'd0,length} << 2));
+    wire qdma_fields_valid =
+        !is_queued_dma ||
+        ((version == 8'd7) && (flags[7:1] == 7'd0) && (bias_enable == flags[0]) &&
+         (bias_base == 32'd0) && (n_size == 16'd0) &&
+         (scale_shift == 5'd0) && (activation == 2'd0) && (aux0 == 32'd0) &&
+         (src1_stride == 32'd0) && (batch_count == 16'd0) &&
+         (head_count == 16'd0) &&
+         ((m_size == 16'd0) ? ((src0_stride == 32'd0) && (dst_stride == 32'd0)) :
+          ((src0_stride[1:0] == 2'd0) && (dst_stride[1:0] == 2'd0))) &&
+         !qdma_spad_last[32] && queued_dma_allowed);
+
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
                                 (flags[6] && !ln_tile_a_fields_valid) ||
@@ -257,6 +288,7 @@ module ai_descriptor_validator (
                                 !fused_matrix_fields_valid ||
                                 !repack_fields_valid ||
                                 !kv_fields_valid ||
-                                !gemv_fields_valid;
+                                !gemv_fields_valid ||
+                                !qdma_fields_valid;
 
 endmodule

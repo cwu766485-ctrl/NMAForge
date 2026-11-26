@@ -49,6 +49,8 @@ module ai_accel_regs #(
     output wire [31:0] region3_base, output wire [31:0] region3_limit, output wire [3:0] region3_perm,
     output wire [63:0] cmdq_base, output wire [31:0] cmdq_size,
     output wire [31:0] cmdq_tail, output reg cmdq_external,
+    // CMD_CTRL[1]: parallel CMDQ publishes signal masks at engine completion.
+    output reg cmdq_event_on_complete,
     output reg cmdq_head_load, output reg [31:0] cmdq_head_seed,
     output wire [31:0] cplq_base, output wire [31:0] cplq_size, output wire [31:0] cplq_head,
     output reg cplq_tail_load, output reg [31:0] cplq_tail_seed,
@@ -215,9 +217,12 @@ module ai_accel_regs #(
 
     wire known = is_known_address(a);
     wire readonly = is_read_only_address(a);
+    // CMD_TAIL stays writable while busy (Round 37) so software can append
+    // descriptors to a running queue; the dispatchers sample the tail live.
     wire cfg_locked = (processor_busy || dma_busy) && reg_req_write &&
                       !(a == STATUS || a == IRQ_STATUS ||
-                        a == DMA_STATUS || a == ABORT || a == CPL_HEAD);
+                        a == DMA_STATUS || a == ABORT || a == CPL_HEAD ||
+                        a == CMD_TAIL);
     assign cmdq_base={cmd_hi_r,cmd_base_r}; assign cmdq_size=cmd_size_r; assign cmdq_tail=cmd_tail_r;
     assign cplq_base=cpl_base_r; assign cplq_size=cpl_size_r; assign cplq_head=cpl_head_r;
     assign region0_base=r0b; assign region0_limit=r0l; assign region0_perm=r0p;
@@ -238,7 +243,7 @@ module ai_accel_regs #(
         LENGTH: reg_rsp_rdata={16'd0,length}; M: reg_rsp_rdata={16'd0,m_size}; N: reg_rsp_rdata={16'd0,n_size}; K: reg_rsp_rdata={16'd0,k_words}; QUANT: reg_rsp_rdata={25'd0,activation,scale_shift};
         RESULT: reg_rsp_rdata=result_r; ERROR: reg_rsp_rdata={28'd0,error_code_r}; CYCLES: reg_rsp_rdata=cycles_r; ELEMENTS: reg_rsp_rdata=elements_r;
         IRQ_STATUS: reg_rsp_rdata={31'd0,irq_status_r}; IRQ_ENABLE: reg_rsp_rdata={31'd0,irq_enable_r}; VERSION: reg_rsp_rdata=32'h1000_000a; CAP: reg_rsp_rdata=32'h001f_ff17;
-        CMD_BASE: reg_rsp_rdata=cmd_base_r; CMD_HI: reg_rsp_rdata=cmd_hi_r; CMD_SIZE: reg_rsp_rdata=cmd_size_r; CMD_HEAD: reg_rsp_rdata=processor_cmdq_head; CMD_TAIL: reg_rsp_rdata=cmd_tail_r; CMD_CTRL: reg_rsp_rdata={31'd0,cmdq_external};
+        CMD_BASE: reg_rsp_rdata=cmd_base_r; CMD_HI: reg_rsp_rdata=cmd_hi_r; CMD_SIZE: reg_rsp_rdata=cmd_size_r; CMD_HEAD: reg_rsp_rdata=processor_cmdq_head; CMD_TAIL: reg_rsp_rdata=cmd_tail_r; CMD_CTRL: reg_rsp_rdata={30'd0,cmdq_event_on_complete,cmdq_external};
         CPL_BASE: reg_rsp_rdata=cpl_base_r; CPL_HI: reg_rsp_rdata=cpl_hi_r; CPL_SIZE: reg_rsp_rdata=cpl_size_r; CPL_TAIL: reg_rsp_rdata=processor_cplq_tail; CPL_HEAD: reg_rsp_rdata=cpl_head_r; QUEUE_STATUS: reg_rsp_rdata={28'd0,processor_busy,cpl_full,cpl_empty,cmd_empty};
         WATCHDOG: reg_rsp_rdata=watchdog_limit; DMA_CTRL: reg_rsp_rdata={30'd0,dma_store,1'b0}; DMA_STATUS: reg_rsp_rdata={29'd0,dma_error_r,dma_done_r,dma_busy}; DMA_EXT: reg_rsp_rdata=dma_ext_addr[31:0]; DMA_EXT_HI: reg_rsp_rdata=dma_ext_addr[63:32]; DMA_SPAD: reg_rsp_rdata=dma_spad_addr; DMA_LEN: reg_rsp_rdata={16'd0,dma_length_words}; DMA_ERROR: reg_rsp_rdata={28'd0,dma_error_code_r};
         R0_BASE:reg_rsp_rdata=r0b; R0_LIMIT:reg_rsp_rdata=r0l; R0_PERM:reg_rsp_rdata={28'd0,r0p}; R1_BASE:reg_rsp_rdata=r1b; R1_LIMIT:reg_rsp_rdata=r1l; R1_PERM:reg_rsp_rdata={28'd0,r1p}; R2_BASE:reg_rsp_rdata=r2b; R2_LIMIT:reg_rsp_rdata=r2l; R2_PERM:reg_rsp_rdata={28'd0,r2p}; R3_BASE:reg_rsp_rdata=r3b; R3_LIMIT:reg_rsp_rdata=r3l; R3_PERM:reg_rsp_rdata={28'd0,r3p};
@@ -272,10 +277,11 @@ module ai_accel_regs #(
         PERF_DMA_RD_STATE:reg_rsp_rdata={26'd0,perf_dma_rd_highwater,perf_dma_rd_outstanding};
         PERF_DMA_R_STALL:reg_rsp_rdata=perf_dma_r_stall;
         // ABI 7.4: preserve v7 descriptor/completion sizes and 64-bit
-        // addressing; CAP2 bits 6/7 advertise BF16/FP16 dot-to-FP32.
+        // addressing; CAP2 bits 6/7 advertise BF16/FP16 dot-to-FP32 and
+        // bit 8 the queued CMDQ DMA_COPY opcode 0x60.
         ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd4,8'd7};
         ERROR_INFO:reg_rsp_rdata={24'd0,error_source_r,error_code_r};
-        CAP2:reg_rsp_rdata=32'h0000_00ff;
+        CAP2:reg_rsp_rdata=32'h0000_01ff;
       endcase
     end
     always @(posedge clk or negedge resetn) begin
@@ -284,7 +290,7 @@ module ai_accel_regs #(
         direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cmdq_head_seed<=0; cplq_tail_load<=0; cplq_tail_seed<=0; dma_store<=0; dma_ext_addr<=0; dma_spad_addr<=0; dma_length_words<=0; dma_row_words<=0; dma_row_count<=0; dma_ext_stride<=0; dma_spad_stride<=0; dma_gather_enable<=0; dma_gather_index_base<=0; dma_read_outstanding<=3'd4;
         op_mode<=0; src0_base<=0; src1_base<=0; dst_base<=0; length<=0; m_size<=0; n_size<=0; k_words<=0; scale_shift<=0; activation<=0; watchdog_limit<=0; bias_base<=0; bias_enable<=0;
         tile_count<=0; tile_ext_input_base<=0; tile_ext_output_base<=0; tile_ext_input_stride<=0; tile_ext_output_stride<=0; tile_buffer0_base<=0; tile_buffer1_base<=0; tile_output_offset<=0; tile_input_words<=0; tile_output_words<=0;
-        cmd_base_r<=0; cmd_hi_r<=0; cmd_size_r<=0; cmd_tail_r<=0; cmdq_external<=0; cpl_base_r<=0; cpl_hi_r<=0; cpl_size_r<=0; cpl_head_r<=0; dma_done_r<=0; dma_error_r<=0; dma_error_code_r<=0;
+        cmd_base_r<=0; cmd_hi_r<=0; cmd_size_r<=0; cmd_tail_r<=0; cmdq_external<=0; cmdq_event_on_complete<=0; cpl_base_r<=0; cpl_hi_r<=0; cpl_size_r<=0; cpl_head_r<=0; dma_done_r<=0; dma_error_r<=0; dma_error_code_r<=0;
         r0b<=0;r0l<=0;r0p<=0;r1b<=0;r1l<=0;r1p<=0;r2b<=0;r2l<=0;r2p<=0;r3b<=0;r3l<=0;r3p<=0;
       end else begin
         direct_start<=0; submit<=0; core_abort<=0; dma_start<=0; tile_start<=0; perf_clear<=0; cmdq_head_load<=0; cplq_tail_load<=0;
@@ -298,7 +304,7 @@ module ai_accel_regs #(
           STATUS: begin end
           OP:op_mode<=reg_req_wdata[7:0]; SRC0:src0_base<=reg_req_wdata; SRC1:src1_base<=reg_req_wdata; DST:dst_base<=reg_req_wdata; LENGTH:length<=reg_req_wdata[15:0]; M:m_size<=reg_req_wdata[15:0]; N:n_size<=reg_req_wdata[15:0]; K:k_words<=reg_req_wdata[15:0]; QUANT:begin scale_shift<=reg_req_wdata[4:0]; activation<=reg_req_wdata[6:5]; end
           IRQ_STATUS:begin end IRQ_ENABLE:irq_enable_r<=reg_req_wdata[0];
-          CMD_BASE:cmd_base_r<=reg_req_wdata; CMD_HI:cmd_hi_r<=reg_req_wdata; CMD_SIZE:cmd_size_r<=reg_req_wdata; CMD_HEAD:begin cmdq_head_load<=1; cmdq_head_seed<=reg_req_wdata; end CMD_TAIL:cmd_tail_r<=reg_req_wdata; CMD_CTRL:cmdq_external<=reg_req_wdata[0]; CPL_BASE:cpl_base_r<=reg_req_wdata; CPL_HI:cpl_hi_r<=reg_req_wdata; CPL_SIZE:cpl_size_r<=reg_req_wdata; CPL_TAIL:begin cplq_tail_load<=1; cplq_tail_seed<=reg_req_wdata; end CPL_HEAD:cpl_head_r<=reg_req_wdata;
+          CMD_BASE:cmd_base_r<=reg_req_wdata; CMD_HI:cmd_hi_r<=reg_req_wdata; CMD_SIZE:cmd_size_r<=reg_req_wdata; CMD_HEAD:begin cmdq_head_load<=1; cmdq_head_seed<=reg_req_wdata; end CMD_TAIL:cmd_tail_r<=reg_req_wdata; CMD_CTRL:begin cmdq_external<=reg_req_wdata[0]; cmdq_event_on_complete<=reg_req_wdata[1]; end CPL_BASE:cpl_base_r<=reg_req_wdata; CPL_HI:cpl_hi_r<=reg_req_wdata; CPL_SIZE:cpl_size_r<=reg_req_wdata; CPL_TAIL:begin cplq_tail_load<=1; cplq_tail_seed<=reg_req_wdata; end CPL_HEAD:cpl_head_r<=reg_req_wdata;
           DOORBELL:if(!processor_busy && !dma_busy) submit<=1;
           ABORT:if(reg_req_wdata[0]) core_abort<=1; WATCHDOG:watchdog_limit<=reg_req_wdata;
           DMA_CTRL:begin dma_store<=reg_req_wdata[1]; if(reg_req_wdata[0] && !processor_busy && !dma_busy) dma_start<=1; end

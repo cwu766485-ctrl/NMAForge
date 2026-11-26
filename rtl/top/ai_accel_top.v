@@ -220,6 +220,7 @@ module ai_accel_top #(
     wire [31:0] cmdq_desc_base;
     wire        doorbell_pulse;
     wire        cmdq_external;
+    wire        cmdq_event_on_complete;
     wire [31:0] cmdq_size;
     wire [31:0] cmdq_tail;
     wire [31:0] cplq_base_cfg;
@@ -525,6 +526,14 @@ module ai_accel_top #(
     wire [6:0]  engine_busy, engine_done, engine_error;
     wire [27:0] engine_error_code;
     wire [223:0] engine_result, engine_cycle_count, engine_element_count;
+    // Queued DMA (CMDQ opcode 0x60) is dispatcher engine 7.
+    wire        qdma_launch, qdma_own, qdma_start, qdma_store;
+    wire [63:0] qdma_ext_addr;
+    wire [31:0] qdma_spad_addr, qdma_ext_stride, qdma_spad_stride;
+    wire [15:0] qdma_length_words, qdma_row_words, qdma_row_count;
+    wire        qdma_busy, qdma_done, qdma_error;
+    wire [3:0]  qdma_error_code;
+    wire [31:0] qdma_result, qdma_cycles, qdma_elements;
     wire [6:0] compute_engine_req_valid, compute_engine_req_write;
     wire [223:0] compute_engine_req_addr, compute_engine_req_wdata;
     wire [6:0] compute_engine_ready, compute_engine_rsp_valid;
@@ -843,6 +852,11 @@ module ai_accel_top #(
         .tile_dma_start(tile_dma_start), .tile_dma_store(tile_dma_store),
         .tile_dma_ext_addr(tile_dma_ext_addr), .tile_dma_spad_addr(tile_dma_spad_addr),
         .tile_dma_length_words(tile_dma_length_words),
+        .qdma_own(qdma_own), .qdma_start(qdma_start), .qdma_store(qdma_store),
+        .qdma_ext_addr(qdma_ext_addr), .qdma_spad_addr(qdma_spad_addr),
+        .qdma_length_words(qdma_length_words), .qdma_row_words(qdma_row_words),
+        .qdma_row_count(qdma_row_count), .qdma_ext_stride(qdma_ext_stride),
+        .qdma_spad_stride(qdma_spad_stride),
         .dma_start_mux(dma_start_mux), .dma_store_mux(dma_store_mux),
         .dma_ext_addr_mux(dma_ext_addr_mux), .dma_spad_addr_mux(dma_spad_addr_mux),
         .dma_length_words_mux(dma_length_words_mux), .dma_row_words_mux(dma_row_words_mux),
@@ -952,8 +966,8 @@ module ai_accel_top #(
         .processor_cmdq_head(processor_cmdq_head),
         .processor_cplq_tail(processor_cplq_tail),
         .dma_busy           (dma_busy),
-        .dma_done           (dma_done),
-        .dma_error          (dma_error),
+        .dma_done           (dma_done && !qdma_own),
+        .dma_error          (dma_error && !qdma_own),
         .dma_error_code     (dma_error_code),
         .direct_start       (direct_start),
         .submit             (submit),
@@ -1027,6 +1041,7 @@ module ai_accel_top #(
         .cmdq_size          (cmdq_size),
         .cmdq_tail          (cmdq_tail),
         .cmdq_external      (cmdq_external),
+        .cmdq_event_on_complete(cmdq_event_on_complete),
         .cmdq_head_load     (cmdq_head_load),
         .cmdq_head_seed     (cmdq_head_seed),
         .cplq_base          (cplq_base_cfg),
@@ -1197,10 +1212,12 @@ module ai_accel_top #(
         .dependency_events(cp_dependency_events)
     );
 
-    ai_parallel_compute_dispatcher parallel_compute_dispatcher_u(
+    // 32 in-flight records let compute run ahead of a long queued DMA.
+    ai_parallel_compute_dispatcher #(.FIFO_DEPTH(32)) parallel_compute_dispatcher_u(
         .clk(aclk), .resetn(aresetn), .submit(parallel_submit), .abort(core_abort),
         .scheduler_ready(parallel_scheduler_ready), .cmdq_base(cmdq_base),
         .cmdq_size(cmdq_size), .cmdq_tail(cmdq_tail), .desc_external(cmdq_external),
+        .event_on_complete(cmdq_event_on_complete),
         .cmdq_head_load(cmdq_head_load), .cmdq_head_seed(cmdq_head_seed),
         .cplq_tail_load(cplq_tail_load), .cplq_tail_seed(cplq_tail_seed),
         .cplq_base(cplq_base_cfg), .cplq_size(cplq_size), .cplq_head(cplq_head),
@@ -1219,10 +1236,13 @@ module ai_accel_top #(
         .desc_dst_stride(desc_dst_stride), .desc_batch_count(desc_batch_count),
         .desc_head_count(desc_head_count), .desc_wait_mask(desc_wait_mask),
         .desc_signal_mask(desc_signal_mask), .desc_clear_mask(desc_clear_mask),
-        .desc_version(desc_version), .engine_busy(engine_busy), .engine_done(engine_done),
-        .engine_error(engine_error), .engine_error_code(engine_error_code),
-        .engine_result(engine_result), .engine_cycles(engine_cycle_count),
-        .engine_elements(engine_element_count), .completion_busy(cpl_busy),
+        .desc_version(desc_version),
+        .engine_busy({qdma_busy, engine_busy}), .engine_done({qdma_done, engine_done}),
+        .engine_error({qdma_error, engine_error}),
+        .engine_error_code({qdma_error_code, engine_error_code}),
+        .engine_result({qdma_result, engine_result}),
+        .engine_cycles({qdma_cycles, engine_cycle_count}),
+        .engine_elements({qdma_elements, engine_element_count}), .completion_busy(cpl_busy),
         .completion_done(cpl_done), .fetch_start(pd_fetch_start),
         .fetch_base(pd_fetch_base), .fetch_external(pd_fetch_external),
         .launch_valid(pd_launch_valid), .launch_op(pd_launch_op),
@@ -1245,7 +1265,29 @@ module ai_accel_top #(
         .event_cycles(pd_event_cycles), .event_elements(pd_event_elements),
         .dependency_events(pd_dependency_events), .legacy_handoff(pd_legacy_handoff)
     );
-    assign core_start = launch_valid;
+    // Opcode 0x60 is not a compute-cluster opcode: the parallel dispatcher
+    // routes it to the queued DMA engine instead of the cluster start.
+    assign qdma_launch = pd_launch_valid && (pd_launch_op == 8'h60) &&
+                         parallel_queue_mode_r && !legacy_queue_active_r;
+    assign core_start = launch_valid && !qdma_launch;
+
+    ai_dma_queue_engine dma_queue_engine_u(
+        .clk(aclk), .resetn(aresetn), .abort(core_abort), .launch(qdma_launch),
+        .src0(pd_launch_src0), .src1(pd_launch_src1), .dst(pd_launch_dst),
+        .length(pd_launch_length), .m_size(pd_launch_m),
+        .src0_stride(pd_launch_src0_stride), .dst_stride(pd_launch_dst_stride),
+        .flags(pd_launch_flags),
+        .dma_busy(dma_busy), .dma_done(dma_done), .dma_error(dma_error),
+        .dma_error_code(dma_error_code),
+        .own(qdma_own), .dma_start(qdma_start), .dma_store(qdma_store),
+        .dma_ext_addr(qdma_ext_addr), .dma_spad_addr(qdma_spad_addr),
+        .dma_length_words(qdma_length_words), .dma_row_words(qdma_row_words),
+        .dma_row_count(qdma_row_count), .dma_ext_stride(qdma_ext_stride),
+        .dma_spad_stride(qdma_spad_stride),
+        .busy(qdma_busy), .done(qdma_done), .error(qdma_error),
+        .error_code(qdma_error_code), .result(qdma_result),
+        .cycles(qdma_cycles), .elements(qdma_elements)
+    );
 
     ai_perf_monitor perf_monitor_u(
         .clk(aclk), .resetn(aresetn), .clear(perf_clear),
