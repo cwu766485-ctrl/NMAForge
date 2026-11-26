@@ -1,0 +1,3 @@
+GPT2_QUANT_READY model=models--gpt2 calib_s=23.0 hf_diff=1.53e-04 smooth_diff=2.44e-04
+GPT2_INT_PPL model=models--gpt2 ctx=256 windows=40 fp32=50.559 int=55.942 ln_sat=0.00e+00 s=135
+GPT2_PROGRAM_READY {"descriptors": 11860, "segments": 888, "dma_events": 2473, "dma_bytes": 87834624, "spad_high_water": 487936, "checkpoint_words": 319488, "final_words": 24576, "ddr_bytes": 87834624}

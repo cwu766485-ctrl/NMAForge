@@ -1751,16 +1751,20 @@ ai_deit_round31_attention_output_projection_256k:
 # paths are 128 characters).
 AI_COMPILED_DIR ?=
 AI_COMPILED_RUN ?= $(AI_COMPILED_DIR)/sim
+# AXI model depth in 32-bit words (8 MiB default; a 12-layer GPT-2 image needs ~96 MiB).
+AI_COMPILED_AXI_WORDS ?= 2097152
+# Extra simv plusargs, e.g. +AI_COMPILED_SEG_TIMING for per-segment compute cycles.
+AI_COMPILED_SIM_ARGS ?=
 .PHONY: ai_compiled_program
 ai_compiled_program:
 	test -n "$(AI_COMPILED_DIR)" && test -f "$(AI_COMPILED_DIR)/program.memh"
 	mkdir -p "$(AI_COMPILED_RUN)"
 	$(VCS) -full64 -sverilog -timescale=1ns/1ps +define+VCS +define+AI_COMPILED_PROGRAM +define+AI_REPRESENTATIVE_LONG_TASK \
-		+define+AI_SPAD_WORDS_PER_BANK=32768 \
+		+define+AI_SPAD_WORDS_PER_BANK=32768 +define+AI_COMPILED_AXI_WORDS=$(AI_COMPILED_AXI_WORDS) \
 		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent \
 		+incdir+../fixtures -Mdir=$(AI_COMPILED_RUN)/csrc -top tb_ai_accel_smoke -f ai_accel.f \
 		../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
 		-o $(AI_COMPILED_RUN)/simv -l $(AI_COMPILED_RUN)/compile.log
 	$(AI_COMPILED_RUN)/simv +ntb_random_seed=1 +AI_RANDOM_CASES=0 +AI_SEED=1 +ACLK_PERIOD_NS=10.0 \
-		+AI_COMPILED_PROGRAM +AI_COMPILED_DIR=$(AI_COMPILED_DIR) -l $(AI_COMPILED_RUN)/run.log
+		+AI_COMPILED_PROGRAM +AI_COMPILED_DIR=$(AI_COMPILED_DIR) $(AI_COMPILED_SIM_ARGS) -l $(AI_COMPILED_RUN)/run.log
 	grep -q '^COMPILED_PROGRAM_PASS ' $(AI_COMPILED_RUN)/run.log

@@ -95,7 +95,10 @@ module tb_ai_accel_smoke;
     localparam SPAD_BASE         = 32'h0001_0000;
     localparam [31:0] SPAD_BYTES = 4 * `AI_SPAD_WORDS_PER_BANK * 4;
 `ifdef AI_COMPILED_PROGRAM
-    localparam [31:0] REPRESENTATIVE_AXI_BYTES = 2097152 * 4;
+`ifndef AI_COMPILED_AXI_WORDS
+`define AI_COMPILED_AXI_WORDS 2097152
+`endif
+    localparam [31:0] REPRESENTATIVE_AXI_BYTES = `AI_COMPILED_AXI_WORDS * 4;
 `elsif AI_H64_WEIGHT_DMA
     localparam [31:0] REPRESENTATIVE_AXI_BYTES = 16384 * 4;
 `elsif AI_DEIT_R19_STREAM
@@ -1704,7 +1707,7 @@ module tb_ai_accel_smoke;
     );
 
 `ifdef AI_COMPILED_PROGRAM
-    axi_memory_model #(.WORDS(2097152)) axi_mem_u(
+    axi_memory_model #(.WORDS(`AI_COMPILED_AXI_WORDS)) axi_mem_u(
 `elsif AI_H64_WEIGHT_DMA
     axi_memory_model #(.WORDS(32768)) axi_mem_u(
 `elsif AI_DEIT_R19_STREAM
@@ -2684,16 +2687,19 @@ module tb_ai_accel_smoke;
         reg dma_ok, idle_ok;
         integer cur, nseg, seg, ndma, ndesc, nck, i, w, qsize, dbase, cbase;
         integer cum, seg_start, observed, done_cnt, poll, nfinal, slot, tail, ck_cur, ck_end;
-        integer t_dma, t_stage, t_compute, t0, total_desc, total_ck, bad;
+        integer t_dma, t_stage, t_compute, t0, total_desc, total_ck, bad, seg_timing;
+        integer cp_version, dma_stores;
         begin
+            seg_timing = $test$plusargs("AI_COMPILED_SEG_TIMING");
             if (!$value$plusargs("AI_COMPILED_DIR=%s", cp_dir))
                 $fatal(1, "AI_COMPILED_PROGRAM requires +AI_COMPILED_DIR");
             $sformat(cp_file, "%0s/program.memh", cp_dir);
             $readmemh(cp_file, cp_prog);
             $sformat(cp_file, "%0s/ddr.memh", cp_dir);
             $readmemh(cp_file, axi_mem_u.mem);
-            if (cp_prog[0] !== 32'h4E4D4146 || cp_prog[1] !== 32'd1)
+            if (cp_prog[0] !== 32'h4E4D4146 || (cp_prog[1] !== 32'd1 && cp_prog[1] !== 32'd2))
                 $fatal(1, "compiled program magic/version mismatch %08h %08h", cp_prog[0], cp_prog[1]);
+            cp_version = cp_prog[1];
             qsize = cp_prog[2]; dbase = cp_prog[3]; cbase = cp_prog[4]; nseg = cp_prog[5];
             axi_write(REG_CMDQ_CTRL, 32'd0);
             axi_write(REG_CMDQ_BASE_LO, dbase);
@@ -2705,18 +2711,28 @@ module tb_ai_accel_smoke;
             axi_write(REG_CPLQ_SIZE, qsize);
             axi_write(REG_CPLQ_HEAD, 32'd0);
             axi_write(REG_CPLQ_TAIL, 32'd0);
-            cur = 6; cum = 0; t_dma = 0; t_stage = 0; t_compute = 0; total_desc = 0; total_ck = 0;
+            cur = 6; cum = 0; dma_stores = 0; t_dma = 0; t_stage = 0; t_compute = 0; total_desc = 0; total_ck = 0;
             for (seg = 0; seg < nseg; seg = seg + 1) begin
                 ndma = cp_prog[cur]; ndesc = cp_prog[cur + 1]; nck = cp_prog[cur + 2]; cur = cur + 3;
                 t0 = transformer_top_cycle_counter;
                 for (i = 0; i < ndma; i = i + 1) begin
+                    // v1 entry: ext, spad, words (1D load).
+                    // v2 entry: ext, spad, {store, length/row_words[15:0]}, row_count,
+                    //           ext_stride, spad_stride (row_count == 0 is 1D).
                     axi_write(REG_DMA_EXT_ADDR, cp_prog[cur]);
                     axi_write(REG_DMA_SPAD_ADDR, cp_prog[cur + 1]);
-                    axi_write(REG_DMA_LENGTH, cp_prog[cur + 2]);
-                    axi_write(REG_DMA_CTRL, 32'd1);
+                    axi_write(REG_DMA_LENGTH, {16'd0, cp_prog[cur + 2][15:0]});
+                    if (cp_version == 2) begin
+                        axi_write(REG_DMA_ROW_WORDS, {16'd0, cp_prog[cur + 2][15:0]});
+                        axi_write(REG_DMA_ROW_COUNT, cp_prog[cur + 3]);
+                        axi_write(REG_DMA_EXT_STRIDE, cp_prog[cur + 4]);
+                        axi_write(REG_DMA_SPAD_STRIDE, cp_prog[cur + 5]);
+                        if (cp_prog[cur + 2][31]) dma_stores = dma_stores + 1;
+                    end
+                    axi_write(REG_DMA_CTRL, (cp_version == 2 && cp_prog[cur + 2][31]) ? 32'd3 : 32'd1);
                     runtime_wait_dma_fence(dma_ok);
                     if (!dma_ok) $fatal(1, "compiled DMA failed segment=%0d entry=%0d", seg, i);
-                    cur = cur + 3;
+                    cur = cur + ((cp_version == 2) ? 6 : 3);
                 end
                 t_dma = t_dma + (transformer_top_cycle_counter - t0);
                 if (ndesc >= qsize) $fatal(1, "compiled segment %0d exceeds queue", seg);
@@ -2770,6 +2786,9 @@ module tb_ai_accel_smoke;
                     axi_write(REG_CPLQ_HEAD, tail);
                 end
                 t_compute = t_compute + (transformer_top_cycle_counter - t0);
+                if (seg_timing)
+                    $display("COMPILED_SEGMENT seg=%0d descriptors=%0d compute_cycles=%0d",
+                             seg, ndesc, transformer_top_cycle_counter - t0);
                 if (ck_cur != ck_end) $fatal(1, "compiled checkpoint records unconsumed segment=%0d", seg);
                 cur = ck_end;
                 cum = cum + ndesc; total_desc = total_desc + ndesc;
@@ -2785,8 +2804,8 @@ module tb_ai_accel_smoke;
                 end
             end
             if (bad) $fatal(1, "COMPILED_FINAL_FAIL mismatches=%0d/%0d", bad, nfinal);
-            $display("COMPILED_PROGRAM_PASS segments=%0d descriptors=%0d checkpoint_words=%0d final_words=%0d compute_window_cycles=%0d dma_fenced_cycles=%0d descriptor_staging_cycles=%0d host_spad_data_writes=0",
-                     nseg, total_desc, total_ck, nfinal, t_compute, t_dma, t_stage);
+            $display("COMPILED_PROGRAM_PASS segments=%0d descriptors=%0d checkpoint_words=%0d final_words=%0d compute_window_cycles=%0d dma_fenced_cycles=%0d descriptor_staging_cycles=%0d dma_stores=%0d host_spad_data_writes=0",
+                     nseg, total_desc, total_ck, nfinal, t_compute, t_dma, t_stage, dma_stores);
         end
     endtask
 

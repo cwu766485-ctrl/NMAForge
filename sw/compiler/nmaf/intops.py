@@ -90,6 +90,18 @@ def softmax_rows(scores_q88: np.ndarray, length: int) -> np.ndarray:
     return np.clip((e << 15) // total, 0, 32768)
 
 
+def causal_softmax_rows(scores_q88: np.ndarray, q0: int = 0) -> np.ndarray:
+    """SFU 0x39 on each row r with query index q0 + r: columns > q0 + r are
+    excluded from max/sum and written as 0 (Q15 output, inclusive mask)."""
+    s = scores_q88.astype(np.int64)
+    rows, n = s.shape
+    keep = np.arange(n)[None, :] <= (q0 + np.arange(rows))[:, None]
+    mx = np.where(keep, s, np.iinfo(np.int64).min).max(-1, keepdims=True)
+    e = np.where(keep, exp2_pwl_q15(s - mx), 0)
+    total = e.sum(-1, keepdims=True)
+    return np.where(keep, np.clip((e << 15) // total, 0, 32768), 0)
+
+
 # ------------------------------------------------------------------ layouts
 def pack_a(m: np.ndarray) -> np.ndarray:
     """Matrix-A tile layout: word (r//4)*K + (k//4)*4 + r%4, bytes k%4 (LE)."""

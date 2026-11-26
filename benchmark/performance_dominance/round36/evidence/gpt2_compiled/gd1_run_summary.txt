@@ -1,0 +1,1 @@
+COMPILED_PROGRAM_PASS segments=435 descriptors=2564 checkpoint_words=91136 final_words=3072 compute_window_cycles=16289467 dma_fenced_cycles=7215078 descriptor_staging_cycles=246144 dma_stores=120 host_spad_data_writes=0

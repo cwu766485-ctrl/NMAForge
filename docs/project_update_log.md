@@ -1,5 +1,35 @@
 # Project update log
 
+## NMAForge V1.3 Round 36 — official GPT-2 small prefill + KV-cache decode on Product Top (2026-11-26)
+
+- **Result.** The new `sw/compiler/gpt2_compile.py` runs official `gpt2`
+  (124M) on Product Top at 512 KiB SPAD, bit-exact against the integer Golden:
+  - **12-layer prefill.** 32 WikiText-2 tokens: 11,860 descriptors, 319,488
+    checkpoint words and 24,576 final words. Compute window 106.6M cycles,
+    fenced DMA 16.9M.
+  - **Prefill + KV-cache decode.** 1 layer with debug checkpoints: 32-token
+    prefill plus 4 decode steps, with 120 DMA stores. The 12-layer prompt +
+    8-step decode run also passes: 43,473 descriptors, 2,592 DMA stores,
+    399,360 checkpoint words; compute window 212.2M cycles (prefill 32.7M,
+    about 22.4M per decode token), fenced DMA 154.7M; VCS wall 100.9 min.
+- **Decode schedule.** Each step recomputes the 4-token row group, so no hidden
+  state is kept. Per-head K/V caches live in DDR, and Vᵀ columns go there via
+  a 2D DMA store.
+- **Accuracy.** Integer model, WikiText-2 40×256: gpt2 PPL 55.94 (FP32 50.56);
+  distilgpt2 83.43 (FP32 75.22). The contract is the Round 35 one plus
+  SmoothQuant folded into LN/V, per-head and per-64-chunk power-of-two scales,
+  and exact accumulator doublings for coarse product grids.
+- **Runtime.** Program format v2 adds 1D/2D DMA loads and stores; the TB still
+  accepts v1, and the DeiT layer-0 program replays with identical cycles. New
+  `AI_COMPILED_AXI_WORDS` and `+AI_COMPILED_SEG_TIMING`. Long RESIDUALs are
+  chunked to stay under the dispatcher's 65,535-cycle dependency-wait limit.
+- **Verification.** `make ai_smoke` passes after the TB changes.
+- **Bottlenecks.** Partial-sum RESIDUALs (about 50% of prefill), M=4 GEMMs
+  and the fenced weight DMA in decode (about 40M cycles per token). Next:
+  DMA/compute overlap, a GEMM accumulate epilogue and INT4 GEMV.
+
+See the [report](benchmark/NMAFORGE_V1_3_ROUND36_GPT2_ON_PRODUCT_TOP.md).
+
 ## NMAForge V1.3 Round 35 — official DeiT-Tiny 12-layer encoder on Product Top (2026-11-26)
 
 - **Result.** The new compiler (`sw/compiler`) and the TB `+AI_COMPILED_PROGRAM`

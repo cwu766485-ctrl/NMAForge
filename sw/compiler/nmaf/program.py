@@ -1,17 +1,20 @@
 """NMAForge compiled-program builder.
 
 A program is a sequence of segments.  Each segment first runs fenced AXI DMA
-loads (DDR -> SPAD), then publishes up to `queue_size - 1` ABI-v7 descriptors
-as one resident ring batch.  Every descriptor is chained to its predecessor
+transfers (DDR -> SPAD loads or SPAD -> DDR stores, 1D or 2D), then publishes
+up to `queue_size - 1` ABI-v7 descriptors as one resident ring batch.  Every descriptor is chained to its predecessor
 with completion event bit 0, so ordering is enforced by the hardware
 dispatcher.  Checkpoints name a global descriptor index and the SPAD words
 that must hold at its retirement (observed passively by the testbench).
 
 File format (`program.memh`, one hex word per line):
-  magic 0x4E4D4146, version 1, queue_size, desc_base, cpl_base, n_segments,
-  per segment: n_dma, n_desc, n_ckpt, (ext, spad, words)*n_dma,
+  magic 0x4E4D4146, version 2, queue_size, desc_base, cpl_base, n_segments,
+  per segment: n_dma, n_desc, n_ckpt,
+               (ext, spad, store<<31 | row_words, row_count, ext_stride, spad_stride)*n_dma,
                16 words * n_desc, (desc_index_in_segment, addr, value)*n_ckpt,
   n_final, (addr, value)*n_final.
+row_count == 0 is a 1D transfer of `row_words` words.  Version 1 (3-word
+load-only DMA entries) is still accepted by the testbench.
 `ddr.memh` holds the external memory image (word 0 = byte address 0).
 """
 
@@ -41,7 +44,7 @@ class Region:
 
 @dataclass
 class Segment:
-    dma: list = field(default_factory=list)       # (ext, spad, words)
+    dma: list = field(default_factory=list)       # (ext, spad, ctl, rows, ext_stride, spad_stride)
     desc: list = field(default_factory=list)      # Descriptor
     names: list = field(default_factory=list)
 
@@ -84,14 +87,22 @@ class Program:
         return addr
 
     # ---------------------------------------------------------- program
-    def dma(self, ddr_name: str, spad_addr: int, words: int | None = None):
+    def dma(self, ddr_name: str, spad_addr: int, words: int | None = None, *, offset: int = 0,
+            rows: int = 0, ext_stride: int = 0, spad_stride: int = 0, store: bool = False):
+        """Fenced DMA before the next descriptors.  `offset` is a byte offset into
+        the DDR blob; rows > 0 makes `words` the per-row length of a 2D transfer."""
         ext, n = self.ddr_index[ddr_name]
-        n = n if words is None else words
+        n = n - offset // 4 if words is None else words
+        if not 0 < n < 65536 or offset % 4:
+            raise ValueError(f"DMA {ddr_name}: illegal length {n} / offset {offset}")
         if self.segments[-1].desc:
             self.segments.append(Segment())
-        self.segments[-1].dma.append((ext, spad_addr, n))
+        self.segments[-1].dma.append((ext + offset, spad_addr, (int(store) << 31) | n, rows,
+                                      ext_stride, spad_stride))
         self.stats["dma_events"] += 1
-        self.stats["dma_bytes"] += 4 * n
+        self.stats["dma_stores" if store else "dma_loads"] = \
+            self.stats.get("dma_stores" if store else "dma_loads", 0) + 1
+        self.stats["dma_bytes"] += 4 * n * max(rows, 1)
 
     def emit(self, name: str, op: int, src0: int, dst: int, **kw) -> int:
         seg = self.segments[-1]
@@ -138,9 +149,9 @@ class Program:
     # ---------------------------------------------------------- output
     def write(self, out: Path, meta: dict) -> dict:
         out.mkdir(parents=True, exist_ok=True)
-        last = self.segments[-1].desc[-1]
+        last = [seg for seg in self.segments if seg.desc][-1].desc[-1]
         last.signal_mask &= ~1
-        words = [MAGIC, 1, self.queue, self.desc_base, self.cpl_base, len(self.segments)]
+        words = [MAGIC, 2, self.queue, self.desc_base, self.cpl_base, len(self.segments)]
         base = 0
         for seg in self.segments:
             ck = [(g - base, a, v) for g, a, v in sorted(self.ckpt, key=lambda t: t[0])
