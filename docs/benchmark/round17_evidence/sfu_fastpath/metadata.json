@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "run_id": "nmaforge_r17_sfu_fastpath",
+  "tested_source_sha": "7f6fd2a40ef939a7df3a488e04df8ff89ae039e3",
+  "seed": 20261117,
+  "vcs": "V-2023.12-SP1_Full64",
+  "command": "cd dv/block/compute/sfu/sim && make random-latency-test PYTHON=python3.12 SEED=20261117 OUT_DIR=/tmp/nmaforge_r17_sfu_fastpath",
+  "result": "SFU_RANDOM_LATENCY_PASS cases=64 error_cases=9 late_faults=1 abort_watchdog=1 reset_fault_combo=1 reset_recovery=1 fsm_reset_states=39 fsm_abort_states=39 rms_gamma_bypass=1 tile_a_pack=1 seed=20261117 reads=979 responses=979 writes=451 max_rsp_delay=7 ready_stalls=486; SFU_PARAMETER_LATCH_PASS words=16",
+  "coverage": "Focused functional regression only; no Round 17 coverage closure claim."
+}

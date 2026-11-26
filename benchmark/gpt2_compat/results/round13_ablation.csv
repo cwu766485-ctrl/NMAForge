@@ -1,0 +1,4 @@
+workload,variant,status,descriptors,cycles,spad_read_bytes,spad_write_bytes,dma_bytes,cmdq_size,cplq_size,cmdq_wraps,cplq_wraps,useful_macs,executed_macs,padding_macs,golden_checks,completion_checks,reset_events,notes
+runtime_vdot_512,round13_ring_runtime,PASS,512,79471,4096,2048,0,8,4,64,128,NOT_APPLICABLE,NOT_APPLICABLE,NOT_APPLICABLE,512,512,0,"Completion/output payload verified with nonintrusive behavioral SRAM snapshot; AXI-Lite poll/head updates are real"
+h64_attention_ffn_batch,matrix_a_tile_round12_replay,PASS_BATCH_ONLY,229,338050,346496,222208,49152,256,256,NOT_REPORTED,NOT_REPORTED,297600,819200,521600,31,229,0,"Six-token static graph; DMA preload included; not persistent decode"
+h64_token_0_5,persistent_decode,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,NOT_RUN,NOT_MEASURED,"No token-scoped execution planner"

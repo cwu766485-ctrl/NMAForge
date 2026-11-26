@@ -1,0 +1,37 @@
+{
+  "run_id": "R27-HARISH-20261122-S20261122",
+  "nmaforge_tested_sha": "49441dfafa130731c822c43bf2e500023e58423c",
+  "branch": "research/harish-tiny-npu-fair-comparison-20261121",
+  "tiny_npu_repo": "https://github.com/harishsg993010/tiny-NPU",
+  "tiny_npu_sha": "38a2498af81f78b9dd8f81144026cf45e2b8328c",
+  "seed": "20261122",
+  "cnn_input_seed": 99,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052",
+    "python": "3.11.13",
+    "numpy": "2.4.6",
+    "onnx": "1.23.2",
+    "g++": "8.5"
+  },
+  "commands": {
+    "tiny_npu_and_paired_bench": "BENCH_RUN_ID=R27-HARISH-20261122-S20261122 SEED=20261122 TINYNPU_BENCH_OUT=/tmp/nmaforge_round27_full_20261122 TINYNPU_WORK_ROOT=/tmp/harish_tiny_npu_round27 TINY_NPU_ROOT=/tmp/harish_tiny_npu_round27 VERILATOR=/tmp/nmaforge_verilator_5.052/bin/verilator PYTHON=/tmp/nmaforge-round27-venv/bin/python JOBS=4 bash benchmark/tinynpu/run_comparison.sh",
+    "gemv_four_way": "make -C dv/block/compute/matrix/sim product-gemv-four-way-ablation SEEDS=20261122 PHYSICAL_ARRAY_SIZE=16 GEMV_FOUR_WAY_OUT=/tmp/nmaforge_round27_multirow_ablation_20261122",
+    "top_smoke": "make -C dv/subsystem/top_smoke/sim ai_smoke",
+    "seeded_top": "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+    "cnm_gemv_directed": "make -C dv/block/compute/cnm/sim ai_cnm_round27_gemv_1x64",
+    "gemv_prefetch_ablation": "make -C dv/block/compute/matrix/sim round27-gemv-prefetch-ablation SEEDS=20261122"
+  },
+  "results": {
+    "tinynpu_engine_regression": "PASS 6/6 at pinned SHA",
+    "common_mini_cnn": "PASS on both; output bytes match independent Golden",
+    "gemm_shape_matrix": "PASS 15/15 size/array combinations",
+    "four_way_gemv_ablation": "PASS 16/16 rows, all bit-exact",
+    "top_smoke": "PASS",
+    "seeded_top": "PASS; 20 random cases, seed 12345",
+    "cnm_gemv_directed": "PASS 64/64 output words",
+    "cnm_bank_stall_case": "PASS Golden; deterministic bank stalls lengthened run from 897 to 1010 cycles"
+  },
+  "endpoint_policy": "Do not calculate NMAForge-vs-TinyNPU system speedup: measured endpoints differ (controller+behavioral SPAD vs TinyNPU direct array/graph TB shim).",
+  "evidence_root": "benchmark/tinynpu/round27/R27-HARISH-20261122-S20261122/"
+}

@@ -1,0 +1,4 @@
+command: /tmp/nmaforge_deit_round17_venv/bin/python -u benchmark/gpt2_quality/train_round24_integer_qat.py --fp32 benchmark/gpt2_quality/results/round25/source_checkpoint/round23_product_qat_fp32.pt --corpus benchmark/gpt2_quality/results/round25/corpus/tinyshakespeare.txt --out-dir /tmp/round25_replay_seed20261125 --seed 20261125 --steps 500 --batch 16 --lr 2e-5 --validation-windows 512
+fa66d2ecd6709c0a49e5c23d6346de22adfbf2f0809f182e581fa63cbcb9a54b  /tmp/round25_replay_seed20261125/round24_integer_qat_model.npz
+fa66d2ecd6709c0a49e5c23d6346de22adfbf2f0809f182e581fa63cbcb9a54b  benchmark/gpt2_quality/results/round25/seed_20261125/round24_integer_qat_model.npz
+cmp_exit=0

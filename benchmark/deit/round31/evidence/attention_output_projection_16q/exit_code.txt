@@ -1,0 +1,2 @@
+make_exit_code=0
+simulator_exit_code=0

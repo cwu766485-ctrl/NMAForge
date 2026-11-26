@@ -6,7 +6,13 @@
 This file is the English compatibility entry point for the current A10
 specification. The complete, detailed specification is maintained in
 [SPEC_ZH.md](SPEC_ZH.md). It covers the same RTL contract: AXI4-Lite control,
-128-bit AXI4 DMA, 512 KiB four-bank scratchpad, CMDQ/CPLQ, ABI v7.4 descriptors,
+128-bit AXI4 DMA, 512 KiB default four-bank scratchpad (128/256 KiB variants; capacity reported by `SPAD_INFO`), CMDQ/CPLQ, ABI v7.4 descriptors,
+
+Round 35 compatible extension (ABI v7.4): SFU descriptor `flags[7]` selects
+round-to-nearest for `REQUANT_I8` (0x36) and a programmable 256-entry INT8 LUT
+activation for `GELU_Q8_8` (0x35; LUT at `src1`, `code = sat8((x + 2^(s-1)) >>
+s)`, output `LUT[code+128]`, REQUANT output layouts). Configurations the
+streaming SFU cannot execute return `ERR_CONFIG`; see SPEC_ZH for details.
 INT8/BF16/FP16/matrix/SFU/CNN/KV operators, protection, performance counters, verification
 evidence, and commercial-28-nm pre-layout limitations. It is the English companion of the
 Chinese source-of-truth document, not a second ABI definition.
@@ -43,6 +49,18 @@ versus scratchpad fetch (0). In v7, `src1` is the upper address word, not an
 independent data pointer, so byte alignment is checked on the full address via
 the low bits in `src0`, not on `src1` separately. A macro parent emits one
 completion; children execute in order and stop on the first failure.
+
+KV-cache opcodes `0x43/0x44` retain the ABI-v7 descriptor size and legacy
+`flags=0` behavior. For `0x43`, `aux0={head_index,token_index}` selects a cache
+position; `src0_stride` and `src1_stride` are the token and head strides. The
+optional `0x43 flags=8'h01` Matrix-B token-append mode accepts 4–16 INT8
+features in multiples of four, `src0_stride=16`, and a per-head cache span in
+`src1_stride` that yields a 4–16-token capacity in multiples of four. It reads
+a packed Matrix-A token row and performs byte-lane read/modify/write into the
+Matrix-B `[token,feature]` layout while preserving other tokens. Invalid
+dimensions, strides, token positions, or address ranges complete with a
+configuration error before writes begin. `0x44` and the old `flags=0` copy path
+are unchanged. The detailed field contract is in [SPEC_ZH.md](SPEC_ZH.md).
 
 ### Parallel compute CMDQ dispatch
 
@@ -105,6 +123,16 @@ indices greater than the query index are masked before Q15 Softmax. Thus query
 token zero keeps only score 0 and produces `[32768, 0, ...]`; normalization's
 nonzero epsilon default does not apply to this opcode. Software must provide a
 query index smaller than the vector length.
+
+Product Matrix GEMV opcode `0x52` uses the shared 16×16 INT8 array and keeps
+the 64-byte ABI-v7 descriptor. `1<=M<=16`, `K>0`, and `1<=N<=16` are accepted;
+wide output shapes additionally accept `N=32,48,...,256`. It reads signed INT8
+A as row-major `[M,K]` with each row padded to 16 bytes, B as row-major `[K,N]`
+with each row padded to `ceil(N/16)*16` bytes, and writes contiguous INT32
+`[M,N]` output. Operand/output aliasing, unsupported strides, transpose,
+batching, and reserved fields are rejected. Padding lanes are not logical
+elements. The wide-N path is a Round 32 extension of the existing opcode; it
+does not add a Matrix array or change descriptor size.
 
 ## Digital CNM datapath
 

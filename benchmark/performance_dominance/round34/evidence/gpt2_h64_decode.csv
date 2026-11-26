@@ -1,0 +1,6 @@
+run,row_mapping,publish_mode,sfu,decode_tokens,descriptor_publications,extension_cycles,cycles_per_token,speedup_vs_baseline,all_logits_bit_exact,generated_tokens
+base34,fixed_16_rows,per_descriptor_axil,legacy_sequential,3,3540,4190904,1396968.0,1.0,True,65 82 68 89
+bat,fixed_16_rows,batch_resident_program,legacy_sequential,3,3540,3351938,1117312.7,1.25,True,65 82 68 89
+act,active_rows,per_descriptor_axil,legacy_sequential,3,2595,995580,331860.0,4.21,True,65 82 68 89
+both,active_rows,batch_resident_program,legacy_sequential,3,2595,547819,182606.3,7.65,True,65 82 68 89
+sfu_both,active_rows,batch_resident_program,stream_fast_path,3,2595,384617,128205.7,10.896,True,65 82 68 89

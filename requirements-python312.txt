@@ -1,0 +1,7 @@
+# Runtime/model-generation and Python test utilities for Python 3.12.
+numpy==2.5.5
+scikit-learn==1.9.1
+onnx==1.23.2
+pytest==9.2.0
+PyYAML==6.0.4
+jsonschema==4.26.0

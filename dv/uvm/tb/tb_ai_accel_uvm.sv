@@ -1,4 +1,7 @@
 `timescale 1ns/1ps
+`ifndef AI_SPAD_WORDS_PER_BANK
+`define AI_SPAD_WORDS_PER_BANK 8192
+`endif
 module tb_ai_accel_uvm;
     import uvm_pkg::*;
     import ai_accel_uvm_types_pkg::*;
@@ -9,7 +12,9 @@ module tb_ai_accel_uvm;
     ai_axi4_if axi4(aclk, aresetn);
     ai_compute_cluster_if compute_obs(aclk);
 
-    ai_accel_top dut (
+    ai_accel_top #(
+        .SPAD_WORDS_PER_BANK(`AI_SPAD_WORDS_PER_BANK)
+    ) dut (
         .aclk(aclk), .aresetn(aresetn),
         .s_axi_awaddr(axil.awaddr), .s_axi_awvalid(axil.awvalid), .s_axi_awready(axil.awready),
         .s_axi_wdata(axil.wdata), .s_axi_wstrb(axil.wstrb), .s_axi_wvalid(axil.wvalid), .s_axi_wready(axil.wready),
@@ -118,6 +123,40 @@ module tb_ai_accel_uvm;
         dut.compute_cluster_u.tensor_matrix_u.perf_a_tile_cache_hits;
     assign compute_obs.matrix_prefetch_overlap_cycles =
         dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_overlap_cycles;
+    assign compute_obs.matrix_profile_cycle_count =
+        dut.compute_cluster_u.tensor_matrix_u.cycle_count;
+    assign compute_obs.matrix_profile_arbiter_stall_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_arbiter_stall_cycles;
+    assign compute_obs.matrix_profile_response_wait_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_response_wait_cycles;
+    assign compute_obs.matrix_profile_writeback_wait_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_writeback_wait_cycles;
+    assign compute_obs.matrix_profile_prefetch_a_req_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_a_req_cycles;
+    assign compute_obs.matrix_profile_prefetch_a_drain_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_a_drain_cycles;
+    assign compute_obs.matrix_profile_prefetch_b_req_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_b_req_cycles;
+    assign compute_obs.matrix_profile_prefetch_b_drain_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_b_drain_cycles;
+    assign compute_obs.matrix_profile_prefetch_overlap_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_overlap_cycles;
+    assign compute_obs.matrix_profile_prefetch_wait_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_wait_cycles;
+    assign compute_obs.matrix_profile_prefetch_completed =
+        dut.compute_cluster_u.tensor_matrix_u.perf_prefetch_completed;
+    assign compute_obs.matrix_profile_outstanding_highwater =
+        dut.compute_cluster_u.tensor_matrix_u.perf_outstanding_highwater;
+    assign compute_obs.matrix_profile_fifo_full_cycles =
+        dut.compute_cluster_u.tensor_matrix_u.perf_fifo_full_cycles;
+    genvar matrix_profile_idx;
+    generate
+        for (matrix_profile_idx = 0; matrix_profile_idx < 16;
+             matrix_profile_idx = matrix_profile_idx + 1) begin : g_matrix_profile
+            assign compute_obs.matrix_profile_state_cycles[matrix_profile_idx] =
+                dut.compute_cluster_u.tensor_matrix_u.perf_state_cycles[matrix_profile_idx];
+        end
+    endgenerate
     assign compute_obs.host_valid = dut.spad_req_valid;
     assign compute_obs.host_write = dut.reg_req_write_raw;
     assign compute_obs.host_addr = dut.reg_req_addr_local - 32'h0001_0000;

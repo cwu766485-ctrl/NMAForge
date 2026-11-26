@@ -1,7 +1,9 @@
 // Combinational adapter between DMA burst state and scratchpad transactions.
 // It neither stores state nor participates in AXI handshakes: ai_axi128_dma
 // remains the sole owner of transfer lifecycle and response bookkeeping.
-module ai_dma_spad_transfer_adapter (
+module ai_dma_spad_transfer_adapter #(
+    parameter integer MAX_BURST_BEATS = 16
+)(
     input  wire         read_active,
     input  wire         rd_drain_found,
     input  wire [15:0]  rd_word_index,
@@ -22,7 +24,7 @@ module ai_dma_spad_transfer_adapter (
     input  wire [15:0]  wr_word_index,
     input  wire [31:0]  wr_spad_base,
 
-    output wire [4:0]   rd_beat_index,
+    output wire [$clog2(MAX_BURST_BEATS+1)-1:0] rd_beat_index,
     output wire         rd_line_eligible,
     output wire         wr_line_eligible,
 

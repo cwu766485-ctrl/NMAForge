@@ -31,7 +31,7 @@ CPU -- 32-bit AXI4-Lite --> 寄存器/IRQ --> 命令处理器(CMDQ/CPLQ)
                                          v
                              唯一 scratchpad 仲裁器
                                          v
-                512 KiB、4-bank SRAM <--> 128-bit AXI4 DMA <--> DDR
+                默认 512 KiB、4-bank SRAM <--> 128-bit AXI4 DMA <--> DDR
 ```
 
 当前只有一个同步时钟域 `aclk`，低有效异步复位为 `aresetn`。控制接口是 32-bit AXI4-Lite；数据主接口为 128-bit AXI4、64-bit 地址、4-bit ID，AR/R 和 AW/W/B 独立，支持 burst、valid/ready 背压和窄传输兼容。`irq` 是由 `IRQ_ENABLE` 掩蔽的 sticky 完成/错误通知。
@@ -65,14 +65,14 @@ SRAM bank3 <-> LC3 + PE3 <--- cnm_addr3 / cnm_ready[3] / cnm_rsp_valid[3]
 
 | 属性 | 当前实现 |
 |---|---|
-| 总容量 | 512 KiB（`0x00080000`） |
-| 逻辑组织 | 4 bank × 32768 × 32-bit word |
-| 单 bank | 128 KiB |
+| 总容量 | 默认 512 KiB（`0x00080000`，Round 35 起的标准产品配置）；可选 128 KiB / 256 KiB；软件以 `SPAD_INFO` 读取实际容量 |
+| 逻辑组织 | 默认 4 bank × 32768 × 32-bit word；兼容 8192 / 16384 words/bank |
+| 单 bank | 默认 128 KiB；兼容 32 KiB / 64 KiB |
 | 数据 line | 128 bit，即四个 32-bit bank word |
-| 主机窗口 | `0x00010000` 起的 AXI-Lite scratchpad aperture |
+| 主机窗口 | AXI-Lite scratchpad aperture 为 `0x00010000` 起、长度 `SPAD_INFO`：默认 `0x00010000..0x0008ffff`（128 KiB 配置为 `..0x0002ffff`） |
 | 读时序 | 注册读，响应在后续周期有效 |
 
-VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
+VCS 通过 `+define+VCS` 使用 `rtl/memory/ai_scratchpad.v` 的行为 RAM；Vivado 使用 XPM 分支。历史 512 KiB 私有 ASIC overlay 将每个逻辑 bank 映射为 8 个 4K×32 单端口 macro，共 32 个 macro；具体 wrapper、库 view 和 macro 名称均不进入公开仓库。公开 SpyGlass profile 不展开 512 KiB 行为数组；实际综合和 STA 以私有、受许可的 `.db/.lib` 为权威。未对齐、越界、无权限或保护冲突访问必须报错。
 
 SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的起始字节地址，`LIMIT` 是不包含的结束字节地址。`PERM[0..3]` 依次表示 read、write、execute、enable；只有 enable 置位的区域参与匹配。有效请求必须在单个区域内完整结束（`addr + bytes <= LIMIT`），不能把相邻区域拼接；区域之间按 OR 匹配，任一完整匹配即可允许。若四区均禁用，保护检查为兼容模式并允许请求；启用任一区域后，零字节请求拒绝。无效请求不构成访问并通过保护检查。请求结束地址以 33 位计算，越过 32 位 SPAD 地址空间的访问不能匹配任何区域。该模块只产生 allow/deny；集成 fabric 负责把拒绝转换为对应客户端的保护错误与事务恢复行为。
 
@@ -88,7 +88,7 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 | 1~4 | src0/src1/bias/dst | 地址或宏子描述符参数 |
 | 5 | shape | M[15:0]、N[31:16] |
 | 6 | extent | K、向量长度或子描述符数 |
-| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8；bit5 `PACK_I8_TILE_A` |
+| 7 | flags | bit0 bias；bit1/2 transpose A/B；bit3 外部宏；bit4 packed INT8；bit5 `PACK_I8_TILE_A`；bit7 SFU 激活/舍入模式（见下） |
 | 8 | aux0 | 操作专用字段，例如 KV head/token |
 | 9 | postprocess | shift[4:0]、activation[6:5] |
 | 10~12 | strides | src0、src1、dst 实例/批次步长 |
@@ -100,7 +100,17 @@ SPAD 保护寄存器配置四个区域 R0–R3；每区的 `BASE` 是包含的�
 
 宏 opcode `0x40`–`0x42` 支持 v4 兼容地址与 ABI v7 地址：v4 从 `src0` 取 32-bit 子描述符列表基址；v7 从 `{src1,src0}` 取 64-bit 基址。列表基址需 64-byte 对齐，`length` 是子描述符数量，`flags[3]` 选择外部内存 fetch（1）或 scratchpad fetch（0）。v7 的 `src1` 是地址高 32 位，不作为独立数据指针做字节对齐检查；完整 64-bit 基址的低位对齐由 `src0` 检查。宏父命令只提交一个 completion，子命令顺序执行且失败时停止后续子命令。
 
+KV-cache opcode `0x43/0x44` 保持 ABI v7 descriptor 大小和旧 `flags=0` 行为不变。`aux0={head_index[15:0],token_index[15:0]}`；legacy 模式下 `src0_stride` 是 token stride、`src1_stride` 是 head stride，`0x43` 顺序复制 `length` 个 32-bit word，`0x44` 执行反向读取。`0x43 flags=8'h01` 可选地启用受限 Matrix-B Token Append：`length` 必须是 4 的倍数且为 4..16 个 INT8 feature，`src0_stride=16` 表示 Matrix-A tile 相邻 K-group 的字节步长，`src1_stride` 是每个 head 的 cache byte span，且必须能被 `length` 整除；推导出的 token capacity 必须为 4..16 且为 4 的倍数，`token_index` 必须小于 capacity。`src0` 指向一个 Matrix-A 打包 token row；引擎将每个 feature 写入 `[token,feature]` Matrix-B 物理布局对应的 byte lane，通过 SPAD 读改写保留其他 token。该模式仅允许 `flags=8'h01`，使用 `aux0` 的 head/token 选择，不改变旧模式或 `0x44`。发生非法尺寸、stride、token 或地址溢出时必须以配置错误完成，不得部分写入。
+
 SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果按输入连续顺序打包为 INT8。可选 `flags[5]=PACK_I8_TILE_A` 必须同时设置 `flags[4]`，并要求 `M,N` 为非零 4 的倍数且 `length=M×N`。输入仍按 row-major 读取；输出按 Matrix A 的 `[row_group][k_group][row_lane]` 顺序写入，每 word 的四个低字节对应连续四列 K。其 word index 为 `(((row/4)×(N/4)+k/4)×4)+(row mod 4)`，地址为 `dst+4×word_index`。该模式没有 partial word；legacy bit4-only 的线性 packing 语义不变。
+
+Round 35（ABI v7.4 兼容扩展）：SFU 描述符 `flags[7]`。`REQUANT_I8`（`0x36`）置位时在算术右移前加 `2^(shift-1)`（shift=0 时不加），即 round-to-nearest（ties toward +∞），再做 INT8 饱和，其余 layout 规则不变。`GELU_Q8_8`（`0x35`）置位时变为**可编程 LUT 激活**：先从 `src1` 读取 64 个 word 作为 256 项 signed INT8 表（第 i 项位于字节地址 `src1+i`，小端），对每个 INT32 输入计算 `code = sat8((x + 2^(shift-1)) >> shift)`，输出 `LUT[code+128]`；输出 layout 与 `REQUANT_I8` 相同（sign-extend word、`flags[4]` 线性打包、`flags[5]` Matrix-A tile 打包，约束相同）。未置 `flags[7]` 的 `0x35` 设置 `flags[4]/[5]` 为配置错误。两种模式由 SFU 流式快速路径执行：dst 与 src0 部分重叠（打包模式要求不重叠）或 LUT 区与 dst 重叠时，以及仅 legacy SFU 的构建，均返回 `ERR_CONFIG`，不会静默忽略该位。
+
+研究候选 `0x3a` 仅在隔离研究分支实现：它读取两路 signed INT32，先按 `RESIDUAL_I32` 的无移位加法合同求和，再按 `REQUANT_I8` 的 arithmetic shift、INT8 saturation 和 `flags[4]` packed layout 写回。`length` 必须为非零 4 的倍数，`flags[4]` 必须为 1，其他 reserved flags 必须为 0；其结果不得被视为当前产品 ABI 或产品 DV 闭合证据。
+
+研究候选 `0x3b`（`TENSOR_REPACK`）在隔离研究分支实现，用于把 Matrix-A 物理 Tile 中的 signed INT8 行按 Head 重排到 Attention 消费布局；它不执行数值变换或 MAC。ABI-v7 descriptor 要求 `flags=0`、`k_words=0`、`src1=0`、`src0_stride=src1_stride=0`、`dst_stride=m_size`、`batch_count=head_count=0`，关闭 Bias、Activation 和 Scale。`m_size` 是 16..256 的 16 倍数，`length` 为 1..m_size 的有效行数，`n_size` 是 48..384 的 48 倍数（总通道数，三个等宽 Head）。`aux0[1:0]` 选择 Q dense row-major（0）、K-major（1）或 V Matrix-B panel（2），`aux0[3:2]` 选择 Head 0..2，`aux0[4]` 选择源布局：0 为 legacy 稀疏 Matrix-A INT32 word tile（每 16×16 tile 占 1 KiB，源范围 `4*m_size*n_size` 字节），1 为 `0x53` packed INT8 Matrix-A tile（每 tile 占 256 B，源范围 `m_size*n_size` 字节）；`aux0[31:5]` 必须为 0。Q 输出按有效/填充行的连续 Head 向量写入，K 输出将 Token 维转为外层维，V 输出按 Matrix-B Panel/Bank 物理字节 Lane 写入。`length..m_size-1` 的无效 Token 由硬件写零，不读取源数据。源与目的范围不得重叠或溢出，起始地址须 word 对齐；合法命令通过共享 SPAD 调度端口读写并产生普通 Completion，软件应使用依赖事件保证消费者等待 Repack 完成。此为研究原型 ABI，不属于冻结产品 ABI；其描述符范围、打包布局及跨引擎连续执行仍须独立验证。
+
+对 `0x3b`，64-byte descriptor 的 word 6 仍承载 `length`；Descriptor Fetch 按 opcode 将派生的 `k_words` 置零。其他 Opcode 的 word 6 解码语义保持不变（包括 GEMM 的 K 维）。
 
 ### 4.1 Compute CMDQ 并行派发
 
@@ -124,10 +134,13 @@ SFU `REQUANT_I8`（opcode `0x36`）中 `flags[4]` 将饱和后的 INT32 结果�
 | 32/39 | Softmax/Causal Softmax Q15 |
 | 33/38 | RMSNorm/LayerNorm Q15 |
 | 34/35/36/37 | Residual、GELU、requant、SiLU |
+| 3A (`0x3a`) | 研究候选：Residual 直连 packed INT8 requant（不属于冻结产品 ABI） |
 | 40/41/42 | QKV/MHA/FFN 描述符宏编排 |
 | 43/44 | KV write/KV read |
 | 50 (`0x50`) | BF16 点积、FP32 累加与结果（`BF16_DOT_ACC_FP32`） |
 | 51 (`0x51`) | FP16 点积、FP32 累加与结果（`FP16_DOT_ACC_FP32`） |
+
+Product Matrix GEMV opcode `0x52` 使用共享的 16×16 INT8 阵列，仍采用 64 字节 ABI-v7 描述符。支持 `1<=M<=16`、`K>0`、`1<=N<=16`；宽输出形状还支持 `N=32,48,...,256`。有符号 INT8 A 按 row-major `[M,K]` 存储，每行补齐至 16 字节；B 按 row-major `[K,N]` 存储，每行 stride 为 `ceil(N/16)*16` 字节；输出是连续 INT32 `[M,N]`。不支持的 stride、转置、batch、保留字段和输入/输出重叠由 validator 拒绝；padding lane 不属于逻辑元素。宽 N 是 Round 32 对现有 opcode 的扩展，不增加 Matrix 阵列，也不改变描述符大小。
 
 Tensor GEMM descriptor ABI 与 4×4 tile-major SPAD operand 布局保持不变，M/N 仍须为 4 的倍数。Matrix controller 默认以 16×16 MAC array 执行宏 tile：每个 K word 从 SPAD 收集最多四组 4×4 A/B 数据，送入本地 operand buffer；尺寸大于 16 时按宏 tile 遍历，边缘 tile 只写有效元素。`ARRAY_SIZE=4/8/16` 参数配置均保留。
 

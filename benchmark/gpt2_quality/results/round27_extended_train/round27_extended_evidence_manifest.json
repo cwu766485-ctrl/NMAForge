@@ -1,0 +1,166 @@
+{
+  "artifacts_sha256": {
+    "benchmark/gpt2_quality/results/round25/corpus/tinyshakespeare.txt": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "benchmark/gpt2_quality/results/round27_extended_train/corpus_split.json": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+    "benchmark/gpt2_quality/results/round27_extended_train/round27_clean_split_metrics.csv": "388dd6a5095ed17cef205b6cab6ebf87f2c8342e3631c4f8d307743e3ebd27a6",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/manifest.json": "d217cdc6f0e89190fcce785e9ec681c44e23dca1ce3e98fccb4868a3adcb18d9",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/product_int8.npz": "e2122ca7b0066bcf861559480576c09ce72a80e081d4ff1adf141fc589c33e57",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/qat_float.pt": "f31caf676734e0e4e8733e6944af1a54dc813dfd2a82d0802b3beab4ef0ecbbf",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261222/fp32_before_qat.pt": "abc2f8f7106dc9b7b373e936ecadf18b996145d1e8932699a3a1e9389d8e3d31",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261222/manifest.json": "b15d5fd274d579b82c51d8121e37db61ca066279e24e9bef74752a4d535cde38",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261222/product_int8.npz": "7f83b84eb0a30bd3801e6bb689872dd5190560623da282b22f825cdc43d21bd7",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261222/qat_float.pt": "2dfae3db41cfa29b3a83becb0846742ccfb917a6ae48b8743f07dfff3f8917cf",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/fp32_before_qat.pt": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/manifest.json": "c4c4ed38ec1ae4307dfc91a856c5b8b07e4bed9b25ab102da9a7746a738dc181",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/product_int8.npz": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+    "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/qat_float.pt": "8674782e974cdbb1f43743b00762d854d37e3808b3a2426d3180b36bd99d3130",
+    "benchmark/gpt2_quality/results/round27_extended_train/summary.json": "1269f82f06c289dbd5e68bbaeee1c4d28d529e4b115af11b14950734106f3941",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/autoregressive_plan.json": "22a6aaab89d46ad650fd6eba9af3d77f5f09b681f880141ca806a830509cbc28",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/autoregressive_result.json": "78793046fe4b9eef1d27d504eb8f16b8a786529d2395341301183fe4f08d0ffb",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/compile.log.gz": "c1b86aa2756645fc8b33d20b5130e64df88318e1739a45845f0338eeb123cef2",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/four_layer_manifest.json": "be13a673abfe88cb5fbf73fe896c6e26d113244bca3d900880ae1da22fc7bd29",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/rtl_logits_context0.csv": "4e418c77f98f486ddd91d1b113c8b0490a5a22390ad915cf22131348f5325ec1",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/rtl_logits_context1.csv": "6f3f01dbef7a1846beb9e95ad3ab5f4a63bce4ca296cc253ca45110dbfe03385",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/rtl_logits_context2.csv": "0848b1843338ca71bad58958df839ec35067529fa50e7e035fa4d405d68c3643",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/rtl_logits_context3.csv": "17946be0988cc0d402ebbc4e69eb07aa5b73fede96d77a463dd969b86aaad536",
+    "benchmark/gpt2_quality/results/round27_extended_train/top_run/run.log.gz": "998078f3cb5b341b70d758319b0439e6c417f4bda161d3a5c08ce950770be5fa",
+    "benchmark/gpt2_quality/results/round27_extended_train/training_console.log.gz": "b7e4f4e68e8ceff2acea8e3ed98214b2ed4bd4fa6b6f9b3dc2356c020cf5a7fa",
+    "benchmark/gpt2_quality/round27_clean_split_experiment.py": "712868fcdbcc097a841555ed4054b251439ade2545a5c93bb24ccd2ca588dc92",
+    "benchmark/gpt2_quality/verify_round27_extended_evidence.py": "ab2e05064233b28d38e2ccdf890384aba087a617eb30ee118c9c9c3efee0920f"
+  },
+  "branch": "research/nmaforge-v1.2-round27-gpt2",
+  "experiment": {
+    "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "fp32_steps": 4000,
+    "qat_steps": 1200,
+    "scored_positions_per_window": 8,
+    "seeds": [
+      20261221,
+      20261222,
+      20261223
+    ],
+    "test_sample_sha256": "36c21c93a1c98515c4f8a6209fe016688babe19d991a3d0ad7af4573419376a2",
+    "test_windows": 512,
+    "validation_windows": 128
+  },
+  "limitations": [
+    "Tiny Shakespeare byte-level H64 research decoder, not imported GPT-2 pretrained weights",
+    "Product INT8 accuracy modestly exceeds bigram, but CE and perplexity remain worse than bigram",
+    "Top autoregressive feedback uses prefix recomputation, not query-only incremental KV decode",
+    "Top cycle counter is not complete host-to-host latency"
+  ],
+  "run_id": "R27-GPT2-H64-EXTENDED-CLEAN-SPLIT-SEED20261223-TOP",
+  "selected_by_validation_product_int8_accuracy": {
+    "package_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+    "seed": 20261223,
+    "validation_metrics": {
+      "accuracy": 0.28857421875,
+      "cross_entropy_nats": 2.624207558691655,
+      "fp32_top1_agreement": 0.49951171875,
+      "perplexity": 13.793639204475731
+    }
+  },
+  "status": "PRODUCT_TOP_PASS_MODEL_QUALITY_PARTIAL",
+  "test_metrics_mean_and_sample_std": {
+    "fake_quant": {
+      "accuracy_mean": 0.2782389322916667,
+      "accuracy_sample_std": 0.0021365210925822064,
+      "cross_entropy_nats_mean": 2.622251681234986,
+      "cross_entropy_nats_sample_std": 0.016425122673608763,
+      "perplexity_mean": 13.767928101434762,
+      "perplexity_sample_std": 0.22699555857809245
+    },
+    "fp32": {
+      "accuracy_mean": 0.35693359375,
+      "accuracy_sample_std": 0.002280461632357105,
+      "cross_entropy_nats_mean": 2.2173878740716337,
+      "cross_entropy_nats_sample_std": 0.006377761992078517,
+      "perplexity_mean": 9.183435941242049,
+      "perplexity_sample_std": 0.05848843135023324
+    },
+    "product_int8": {
+      "accuracy_mean": 0.2789713541666667,
+      "accuracy_sample_std": 0.002076391735379732,
+      "cross_entropy_nats_mean": 2.619435917181682,
+      "cross_entropy_nats_sample_std": 0.016600097838647788,
+      "perplexity_mean": 13.729240265681417,
+      "perplexity_sample_std": 0.22832597441100522
+    },
+    "qat_float": {
+      "accuracy_mean": 0.2984619140625,
+      "accuracy_sample_std": 0.015968831250605504,
+      "cross_entropy_nats_mean": 2.504500783698703,
+      "cross_entropy_nats_sample_std": 0.024061586593561456,
+      "perplexity_mean": 12.239819014962226,
+      "perplexity_sample_std": 0.29615331238881865
+    }
+  },
+  "tested_source_sha": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+  "top_logs_sha256": {
+    "compile.log": "c1b86aa2756645fc8b33d20b5130e64df88318e1739a45845f0338eeb123cef2",
+    "run.log": "998078f3cb5b341b70d758319b0439e6c417f4bda161d3a5c08ce950770be5fa"
+  },
+  "top_result": {
+    "contexts": [
+      {
+        "argmax_token": 83,
+        "context": 0,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "e021ea0d74fee70a8681a3ac805618b5a887f0cac26ee227ecc3693e5b71e841",
+        "row": 3,
+        "rtl_dump": "/tmp/nmaforge_round27_gpt2_extended_seed20261223_top/rtl_logits_context0.csv"
+      },
+      {
+        "argmax_token": 109,
+        "context": 1,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "0ed098c80a6447faa4dfbd8db98d512c14d62f5f89d6fedc79f9d6b34a2cf122",
+        "row": 4,
+        "rtl_dump": "/tmp/nmaforge_round27_gpt2_extended_seed20261223_top/rtl_logits_context1.csv"
+      },
+      {
+        "argmax_token": 104,
+        "context": 2,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "2b4838e7dabb3fb401611a33e1bc703b30c4ed931281617cad6c7ff8a672d3e9",
+        "row": 5,
+        "rtl_dump": "/tmp/nmaforge_round27_gpt2_extended_seed20261223_top/rtl_logits_context2.csv"
+      },
+      {
+        "argmax_token": 110,
+        "context": 3,
+        "golden_bit_exact": true,
+        "logit_count": 256,
+        "logits_sha256_le_i32": "886ef7381ab323b6e2403adaf9b03d5b10e60453936d1c3d271cdabfbe9bbc26",
+        "row": 6,
+        "rtl_dump": "/tmp/nmaforge_round27_gpt2_extended_seed20261223_top/rtl_logits_context3.csv"
+      }
+    ],
+    "generated_tokens": [
+      83,
+      109,
+      104,
+      110
+    ],
+    "mode": "four_layer_prefix_recompute_same_top_instance",
+    "prompt_tokens": [
+      1,
+      7,
+      42,
+      3
+    ],
+    "seed": 20261223,
+    "source_sha": "recorded by the enclosing run manifest",
+    "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+    "synthetic_model_quality_claim": false
+  },
+  "train_only_bigram": {
+    "accuracy": 0.2689208984375,
+    "cross_entropy_nats": 2.5378480440033466,
+    "perplexity": 12.652414215040778
+  }
+}

@@ -1,0 +1,9 @@
+# Innovation and scheduling ablations
+
+Raw evidence: `benchmark/representative/round29/` (CSV/JSON and lossless logs). Existing mechanisms are distinguished from the one new SFU optimization.
+
+1. Product 0x52: shared 256-MAC K-fold execution, existing local reuse storage assigned to command-local B cache. Four-way B-cache/next-K prefetch comparison rerun on M=8/16, N=16, K=19/65, same seeded responder, 16 rows and bit-exact outputs. Use `matrix/gemv_ablation.csv` for each shape's cycles, traffic, overlap, exclusive state partition and stall overlays. These block experiments are not trained H16 speedup evidence.
+2. Product 0x53: existing fused requant/row-major output and optional elastic forwarding. Same producer commits 153 cycles in both modes; consumer 141→118 cycles and 512→256 read bytes when forwarding is enabled. Golden, tag behavior and selected abort/reset checks pass. This is a local bounded handoff, not general coherent reuse.
+3. SFU Round 29: existing input cache fills once, then reused for variance/affine. Baseline LN exclusive busy buckets input/mean-var/reciprocal-sqrt/gamma-beta/affine/write/FSM are 49/50/72/96/48/16/1 =332. Candidate is 49/50/72/96/33/16/1 =317. Descriptor intervals 343→328; external launch/retire remainder stays 11 cycles. No SPAD read/write reduction. Input sum accumulation shares fetch response states; it cannot be counted separately and added again.
+
+Matrix default GEMM 16×16×16,16×16×32,32×32×64 remains 175/263/1407 cycles. Large case: 674 prefetch wait, 162 bank stalls, 258 arbiter stalls, 240 prefetch overlap, 384 accepted bank reads/6144 B, 4096 B writes. These counters overlap. Round 28 eight-switch results remain valid because Matrix RTL is identical; no new Matrix performance claim or second RTL optimization is made. Further schedule changes need request traces; aggregate stalls alone do not prove an issue policy improvement.

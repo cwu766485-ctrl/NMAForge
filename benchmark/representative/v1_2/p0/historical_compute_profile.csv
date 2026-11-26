@@ -1,0 +1,5 @@
+source_commit_sha,run_id,seed,engine,shape,config,cycles,useful_macs,macs_per_cycle,bank_reads,read_bytes,output_bytes,bank_stalls,line_stalls,golden
+49441dfafa130731c822c43bf2e500023e58423c,R27-GEMM64-S20261122,20261122,Matrix,64x64x64,fixed_one_cycle_spad,3413,262144,76.808,1280,20480,16384,0,0,PASS_4096_WORDS
+49441dfafa130731c822c43bf2e500023e58423c,R27-GEMM64-S20261122,20261122,Matrix,64x64x64,seeded_ready_line_backpressure,4822,262144,54.364,1280,20480,16384,538,371,PASS_4096_WORDS
+49441dfafa130731c822c43bf2e500023e58423c,R27-GEMV1X64-PREFETCH0-S20261122,20261122,Matrix_GEMV_0x52,1x64x64,fixed_one_cycle_spad_prefetch_off_bcache_off,632,4096,6.481,272,4352,256,0,0,PASS_64_WORDS
+49441dfafa130731c822c43bf2e500023e58423c,R27-GEMV1X64-PREFETCH1-S20261122,20261122,Matrix_GEMV_0x52,1x64x64,fixed_one_cycle_spad_prefetch_on_bcache_off,584,4096,7.014,272,4352,256,0,0,PASS_64_WORDS

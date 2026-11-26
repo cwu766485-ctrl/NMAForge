@@ -1,0 +1,5 @@
+context_id,valid_tokens,output_token,descriptors,rtl_command_cycles,cumulative_command_cycles,top_reset,mode,logits_bit_exact
+0,4,107,933,1048740,1048740,false,prefix_recompute,true
+1,5,103,981,1413702,2462442,false,prefix_recompute,true
+2,6,32,1029,1446042,3908484,false,prefix_recompute,true
+3,7,111,1077,1479012,5387496,false,prefix_recompute,true

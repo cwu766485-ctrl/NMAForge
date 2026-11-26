@@ -1,0 +1,4 @@
+layout,valid_rows,physical_rows,n,heads,commands,golden_words,completion_count,command_cycles,testbench_end_to_end_cycles,preloaded_spad_fixture_bytes,test_only_poison_bytes,preload_axi_cycles,spad_read_bytes,spad_write_bytes,useful_macs,status,qkv_to_repack_in_same_session,attention
+q_dense,197,208,192,3,3,9984,3,38977,338856,199920,161904,299879,37824,39936,0,PRODUCT_TOP_REPACK_ONLY_PASS,NOT_RUN,NOT_RUN
+k_major,197,208,192,3,3,9984,3,38976,338855,199920,161904,299879,37824,39936,0,PRODUCT_TOP_REPACK_ONLY_PASS,NOT_RUN,NOT_RUN
+v_matrix_b,197,208,192,3,3,12288,3,38976,352679,209136,171120,313703,37824,39936,0,PRODUCT_TOP_REPACK_ONLY_PASS,NOT_RUN,NOT_RUN

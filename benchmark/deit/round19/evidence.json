@@ -1,0 +1,143 @@
+{
+  "round": 19,
+  "track": "B_DEIT_TINY_PATCH_EMBEDDING",
+  "branch": "research/nmaforge-v1.2-round19-deit",
+  "base_sha": "0e54224510a24e316674df7fa50262ccf2b46429",
+  "checkpoint": {
+    "model": "facebook/deit-tiny-patch16-224",
+    "revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+    "weights_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "config_sha256": "e8786a68c993c04b8721c4d379e4f9de6a9564fba5987704dbf8696d53b7972d",
+    "processor_config_sha256": "90d1ae427c27d2b9dcb01f6a62ba96aa67aac2de1697c59cd212055b5035c4a2"
+  },
+  "input": {
+    "kind": "deterministic_synthetic_rgb_fixture",
+    "image_sha256": "d2029eee4ae0be2479a662a7ed549836200929b41987d23caa68d924f0c89f0a",
+    "official_processed_pixels_sha256": "028bcacc0b989481a9e7b1fb119974605721e2cc063a76d1dd1b248d088f9b88",
+    "seed": 20261117
+  },
+  "shape": {
+    "patches": 196,
+    "tokens_with_cls": 197,
+    "hidden": 192,
+    "input_k": 768,
+    "physical_rows": 208,
+    "output_channels": 192
+  },
+  "spad": {
+    "capacity_bytes": 262144,
+    "banks": 4,
+    "words_per_bank": 16384,
+    "queue_entries": 512,
+    "cmdq_bytes": 32768,
+    "cplq_bytes": 8192,
+    "data_high_water_exclusive": 219904,
+    "descriptor_base": 221184,
+    "completion_base": 253952,
+    "free_gap_before_queues_bytes": 1280,
+    "allocations": {
+      "input": [
+        4096,
+        163840
+      ],
+      "streamed_weight_tile": [
+        163840,
+        176128
+      ],
+      "bias": [
+        176128,
+        176896
+      ],
+      "gemm_scratch": [
+        176896,
+        177920
+      ],
+      "residual_scratch": [
+        177920,
+        178944
+      ],
+      "position_tile": [
+        178944,
+        179968
+      ],
+      "packed_output": [
+        179968,
+        219904
+      ]
+    }
+  },
+  "quantization": {
+    "input_scale": 0.007874015748031496,
+    "weight_scale_global": 0.0023313497933815782,
+    "accumulator_scale": 1.835708498725652e-05,
+    "requant_opcode": "0x36",
+    "requant_shift": 13,
+    "output_scale": 0.15038124021560542,
+    "input_and_weight_rounding": "round-to-nearest-even, symmetric int8 saturation",
+    "requant": "arithmetic right shift and signed int8 saturation, no rounding"
+  },
+  "workload": {
+    "status": "FULL_PATCH_EMBEDDING_PRODUCT_TOP_PASS",
+    "descriptors": 468,
+    "golden_words": 9984,
+    "useful_macs": 28901376,
+    "executed_macs": 30670848,
+    "padding_macs": 1769472,
+    "dma_events": 300,
+    "weight_dma_bytes": 147456,
+    "position_correction_dma_bytes": 159744,
+    "late_dma_payload_bytes": 307200,
+    "axi_read_bursts": 1200,
+    "axi_read_beats": 19200,
+    "command_cycles": 921283,
+    "command_cycles_excluding_late_dma": 829747,
+    "late_dma_window_cycles": 91536,
+    "dma_busy_cycles": 81000,
+    "end_to_end_top_session_cycles": 1409279,
+    "readback_cycles": 65520,
+    "useful_mac_per_command_cycle": 31.3708,
+    "useful_array_utilization_pct": 94.23,
+    "spad_read_bytes": 4323072,
+    "spad_write_bytes": 359424,
+    "host_fixture_bytes": 241664,
+    "test_only_poison_bytes": 51200,
+    "fp32_comparison": {
+      "mae": 0.07562581637968144,
+      "rmse": 0.08748197353646349,
+      "max_abs_by_token_max": 0.1839398502642034
+    },
+    "output_layout": "16x16 macro-tile-major, each macro tile local Matrix-A packed; logical rows 0..196 contain CLS and patches",
+    "model_accuracy": "NOT_MEASURED synthetic input image"
+  },
+  "gates": {
+    "G0_256k_top_and_allocation": "PASS",
+    "G1_full_patch_embedding": "PASS",
+    "G2_encoder_layer0": "NOT_RUN",
+    "G3_twelve_layers_classifier": "NOT_RUN"
+  },
+  "tool_versions": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.5.4",
+    "pytorch": "2.6.0+cpu",
+    "transformers": "4.48.3"
+  },
+  "run_id": "R19-B-FULL-PATCH-EMBEDDING-256K-20261117",
+  "run_dir_external": "/tmp/nmaforge_deit_r19_top_002",
+  "compile_log_sha256": "b62dba21268cfeacc060d720d68eb1a1bca18930886adfd676d8534b4cb39b6a",
+  "run_log_sha256": "b540bd83306df4943025a5e6487cc24e1adf313850f4c15e5f60408fa9f613fb",
+  "workload_manifest_sha256": "73515857719e8aacf82e4430b67bdd95469b3e32c32faf91fc15542eb471a01a",
+  "artifact_hashes": {
+    "model_memory.memh": "4a1bc6efda70899f209f7c3331d0d2c10dacfffa18501c7972269afb9afb8698",
+    "model_golden.memh": "7c7e15693e3ca6654d78e93cb64fd5a63a8c81ca871012c2c71fceaf223597a3",
+    "dma_payload.memh": "c44fe19e72e38f9096a6d1ff84670fecdb936e25171a8574cb8f53921434ebf2",
+    "late_dma_plan.memh": "b60929870d5ba63eb968527f75d976ca6ec6dd67f63387d27e890f6b210f08b0"
+  },
+  "limitations": [
+    "Patch Embedding only; no Encoder Layer or classification.",
+    "Deterministic synthetic image; no ImageNet quality claim.",
+    "VCS cycle-counter results are not wall-clock or ASIC performance.",
+    "Model preprocessing/checkpoint loading is outside the measured Product Top session."
+  ],
+  "tested_source_commit_sha": "0a1d7545d84de6f8c3a771c3764c0a3616fc8d2f"
+}

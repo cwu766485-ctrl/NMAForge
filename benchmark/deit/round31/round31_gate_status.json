@@ -1,0 +1,110 @@
+{
+  "av_scratch_lifetime_audit": {
+    "av_layout": "av_base = AV_BASE + head*0x1000; four subtile destinations av_base + i*0x400 for i=0..3",
+    "current_av_scratch_bytes": 12288,
+    "current_av_scratch_is_full_all_query_tensor": false,
+    "evidence_files": [
+      "benchmark/deit/round30/evidence/continuous_attention/full_197/generated_manifest.json",
+      "benchmark/deit/round30/generate_qkv_attention_continuous.py",
+      "benchmark/deit/round31/round31_av_scratch_audit.csv"
+    ],
+    "full_197x192_int32_bytes_if_retained": 151296,
+    "full_197x192_packed_int8_bytes_if_retained": 37824,
+    "generator": "benchmark/deit/round30/generate_qkv_attention_continuous.py",
+    "heads": 3,
+    "last_block_valid_queries": 5,
+    "physical_tokens": 208,
+    "query_blocks": 13,
+    "recommended_bounded_continuation": "Query-block-major: run AV for all 3 heads, requant/pack and merge into output-projection consumer layout, retire/fence output projection, then reuse the 12 KiB AV block scratch.",
+    "recommended_continuation_measured_or_implemented": false,
+    "reuse": "The same per-head AV 4 KiB range is overwritten for every query block after that batch is retired and Golden-observed.",
+    "round30_attention_spad_high_water_bytes": 211968,
+    "round30_spad_capacity_bytes": 262144,
+    "round31_encoder_layer0_status": "NOT_RUN",
+    "source_run_id": "round30-deit-full197-passive",
+    "source_sha": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+    "status": "HISTORICAL_DESCRIPTOR_LIFETIME_AUDIT_NOT_LAYER0_PASS",
+    "these_full_tensor_bytes_in_round30_high_water": false,
+    "valid_queries_per_block": 16,
+    "valid_tokens": 197
+  },
+  "branch": "research/nmaforge-v1.2-round31-deit",
+  "branch_start_sha": "1ec352ea261892eb882824bf476f3df76e8ae986",
+  "disposition": "PARTIAL",
+  "first_round31_failure_descriptor": null,
+  "gates": {
+    "continuous_197_query_three_head_attention": {
+      "scope": "QKV -> 0x3B Repack -> QK -> Softmax(197) -> probability pack -> AV",
+      "status": "PASS_REUSED_HISTORICAL_EVIDENCE"
+    },
+    "continuous_encoder_layer0_197x192": {
+      "status": "NOT_RUN"
+    },
+    "external_descriptor_fetch_and_recovery": {
+      "status": "PARTIAL"
+    },
+    "head_merge_to_output_projection": {
+      "evidence": "benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json",
+      "remaining": "181 of 197 valid query rows are not projected; no Residual1/LN2/FFN/GELU/Residual2",
+      "status": "PARTIAL_PASS_ONE_16_QUERY_BLOCK"
+    },
+    "output_projection_residual_ln2_ffn_gelu_residual2": {
+      "evidence": "768 final INT8 Wo output words pass for one 16-query block; downstream Layer-0 operations NOT_RUN",
+      "status": "PARTIAL_OUTPUT_PROJECTION_ONLY"
+    },
+    "twelve_layer_classifier_and_labeled_image_accuracy": {
+      "status": "NOT_RUN"
+    }
+  },
+  "historical_evidence_reused": {
+    "batches": 159,
+    "descriptors": 10032,
+    "evidence_directory": "benchmark/deit/round30/evidence/continuous_attention/full_197_passive_backdoor",
+    "golden_words": 361920,
+    "host_intermediate_readback_words": 0,
+    "host_intermediate_writeback_words": 0,
+    "make_exit": 0,
+    "product_rtl_diff_sha256": "3da860fa51351257122cc613741e77bef975b426dde360806c50c10579a78b10",
+    "ring_wraps": 19,
+    "round": 30,
+    "run_exit": 0,
+    "run_id": "round30-deit-full197-passive",
+    "run_reexecuted_in_round31": false,
+    "runtime_cycles": 7949430,
+    "seed": 300030,
+    "spad_bytes": 262144,
+    "spad_high_water_bytes": 211968,
+    "status": "PASS_CONTINUOUS_QKV_REPACK_THREE_HEAD_FULL_197_QUERY_ATTENTION",
+    "tested_base_sha": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+    "tracked_source_diff_sha256": "1114b805c89b9a2181526722dc65f21e95d5e438020d686efd51b2dbde63cea3",
+    "vcs": "V-2023.12-SP1_Full64"
+  },
+  "integrated_round31_evidence": {
+    "batches": 64,
+    "branch": "research/nmaforge-v1.2-integrated-model-dv",
+    "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "final_int8_output_words": 768,
+    "golden_words_checked": 72384,
+    "make_exit_code": 0,
+    "manifest": "benchmark/deit/round31/evidence/attention_output_projection_16q/run_manifest.json",
+    "new_output_projection_descriptors": 120,
+    "product_rtl_changed": false,
+    "ring_wraps": 2,
+    "rtl_source_tree_sha256": "57bb84647e5bc34fe5a833e7d4895b7ef1b969fc747d462f1f1a53d1ce05bc68",
+    "run_id": "nmaforge-v1.2-round31-deit-wo-16q-integrated-v1",
+    "runtime_cycles": 821466,
+    "simulator_exit_code": 0,
+    "source_revision": "ad58507fa5052ccec61e05428c4e36e493796b8b",
+    "tested_valid_queries": 16,
+    "total_descriptors": 1332,
+    "total_valid_queries": 197,
+    "wo_dma_bytes": 37632,
+    "wo_dma_cycles": 11670,
+    "wo_dma_events": 48
+  },
+  "reason_no_failure_descriptor": "The initial software AV flattening experiment failed the AV-requant Golden at 0x3004 and was corrected by panel-row-group layout generation; corrected Product Top run passes. This was a software layout mismatch, not an RTL failure. Full Layer 0 remains incomplete.",
+  "round": 31,
+  "round31_product_rtl_changed": false,
+  "round31_vcs_run": "PASS_PARTIAL_OUTPUT_PROJECTION_16Q",
+  "track": "DeiT-Tiny"
+}

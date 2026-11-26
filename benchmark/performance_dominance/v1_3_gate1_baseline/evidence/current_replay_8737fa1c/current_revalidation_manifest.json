@@ -1,0 +1,407 @@
+{
+  "run_id": "NMAFORGE-V1.3-CURRENT-SOURCE-REVALIDATION-20261124",
+  "status": "PARTIAL_WITH_CURRENT_SOURCE_SIMULATION_FORMAL_MUTATION_CNN_AB_AND_NEGATIVE_GPT2_SOFTWARE_EVAL; MODEL_AND_FULL_DV_GATES_OPEN",
+  "measured_source_commit_sha": "8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "source_freeze_path": "benchmark/performance_dominance/v1_3_source_freeze.json",
+  "source_freeze_sha256": "c65e8fd455efa6e045f2c99d66a24be1f8bb30f85a499296080d32b9360f4cd3",
+  "rtl_sha256": {
+    "rtl/compute/matrix/ai_tensor_matrix_core.v": "64a822e51bfb90a34843b42ceb49d0fa533f26b2d22a6838d014ff727f5df03b",
+    "rtl/compute/matrix/ai_tensor_matrix_array.sv": "66add786e18cc0ce29df245311fc502266aa803f7aa7a425b6f0f018d6bafb8b",
+    "rtl/compute/matrix/ai_tensor_matrix_datapath.v": "c7fc6ab36d39df0f4890dec11c3c39265a0b8efec79ce4806560d96a2fe5aac9",
+    "rtl/top/ai_accel_top.v": "4108cc1c47761085cb6ba012ea2227b8fbe5522f48b46d910342ca2c17e43735",
+    "rtl/memory/ai_spad_arbiter.v": "a228f30583889ddc62ce2886e8b3f7eb81d05afe140c44b92871b0e6679d9288"
+  },
+  "configuration": {
+    "Product Top": "4-bank behavioral SPAD, 128 KiB for top smoke/seeded run",
+    "Compute Cluster SPAD capacities_kib": [
+      128,
+      256,
+      512
+    ],
+    "Matrix array": "16x16",
+    "Matrix max outstanding reads": 4,
+    "Matrix A-tile cache": 1,
+    "Matrix next-K prefetch": 1,
+    "GEMV B-tile cache": 0,
+    "no RTL changes": "true"
+  },
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "vc_formal": "V-2023.12-SP2"
+  },
+  "commands": [
+    {
+      "name": "ai_smoke",
+      "command": "make ai_smoke AI_RANDOM_CASES=4 AI_SEED=12345 SEED=20261124",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/top/ai_smoke_make.log.gz",
+        "evidence/current_replay_8737fa1c/top/ai_smoke_compile.log.gz",
+        "evidence/current_replay_8737fa1c/top/ai_smoke_sim.log.gz"
+      ]
+    },
+    {
+      "name": "ai_run_20",
+      "command": "make ai_run AI_RANDOM_CASES=20 AI_SEED=12345 SEED=12345",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/top/ai_run20_make.log.gz",
+        "evidence/current_replay_8737fa1c/top/ai_run20_sim.log.gz"
+      ]
+    },
+    {
+      "name": "compute_cluster_uvm_128kib",
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=128 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v13_current_8737/cluster_128 COMPUTE_CLUSTER_UVM_SEEDS='20261124'",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/cluster_128/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_128/seed_20261124_run.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_128/make.log.gz"
+      ]
+    },
+    {
+      "name": "compute_cluster_uvm_256kib",
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=256 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v13_current_8737fa1c/cluster_256 COMPUTE_CLUSTER_UVM_SEEDS='20261124'",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/cluster_256/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_256/seed_20261124_run.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_256/make.log.gz"
+      ]
+    },
+    {
+      "name": "compute_cluster_uvm_512kib",
+      "command": "make uvm_compute_cluster_regress SPAD_KIB=512 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_v13_current_8737fa1c/cluster_512 COMPUTE_CLUSTER_UVM_SEEDS='20261124'",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/cluster_512/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_512/seed_20261124_run.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_512/make.log.gz"
+      ]
+    },
+    {
+      "name": "matrix_gemm_compile",
+      "command": "vcs -full64 -licwait 1 -sverilog -debug_access+all -timescale=1ns/1ps +define+MATRIX_MAX_OUTSTANDING_READS=4 +define+MATRIX_A_TILE_CACHE_ENABLE=1 +define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 +define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=1 +define+MATRIX_ARRAY_SIZE=16 -top tb_ai_tensor_matrix_core_random rtl/compute/matrix/ai_tensor_matrix_datapath.v rtl/compute/matrix/ai_tensor_matrix_array.sv rtl/compute/matrix/ai_tensor_matrix_core.v benchmark/performance_dominance/v1_3_gate1_baseline/evidence/source/tb_ai_tensor_matrix_core_random_r27.sv -Mdir=/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/csrc -o /tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/simv -l /tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/compile.log",
+      "exit_code": 0,
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/matrix/gemm_compile.log.gz"
+      ]
+    },
+    {
+      "name": "matrix_gemm_runs",
+      "commands": [
+        "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/simv +SEED=20261122 +MATRIX_FIXED_MEMORY +TINY_NPU_MATCH_MULTI",
+        "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/simv +SEED=20261122 +TINY_NPU_MATCH_MULTI",
+        "/tmp/nmaforge_v13_current_8737fa1c/matrix_gemm/simv +SEED=20261124 +TINY_NPU_MATCH_MULTI"
+      ],
+      "exit_codes": [
+        0,
+        0,
+        0
+      ],
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/matrix/gemm_fixed_seed20261122.log.gz",
+        "evidence/current_replay_8737fa1c/matrix/gemm_seeded_seed20261122.log.gz",
+        "evidence/current_replay_8737fa1c/matrix/gemm_seeded_seed20261124.log.gz"
+      ]
+    },
+    {
+      "name": "matrix_gemv_compile_and_runs",
+      "compile_exit_codes": {
+        "prefetch0": 0,
+        "prefetch1": 0
+      },
+      "commands": [
+        "simv +SEED=20261122 +MATRIX_FIXED_MEMORY +MATRIX_GEMV_1X64_BENCH (prefetch=0)",
+        "simv +SEED=20261122 +MATRIX_FIXED_MEMORY +MATRIX_GEMV_1X64_BENCH (prefetch=1)"
+      ],
+      "run_exit_codes": [
+        0,
+        0
+      ],
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/matrix/gemv_prefetch0_compile.log.gz",
+        "evidence/current_replay_8737fa1c/matrix/gemv_prefetch0_seed20261122.log.gz",
+        "evidence/current_replay_8737fa1c/matrix/gemv_prefetch1_compile.log.gz",
+        "evidence/current_replay_8737fa1c/matrix/gemv_prefetch1_seed20261122.log.gz"
+      ]
+    },
+    {
+      "name": "compute_cluster_serial_formal",
+      "command": "make -C dv/subsystem/tensor_datapath/formal run OUT=/tmp/nmaforge_v13_current_8737fa1c/formal_serial TIMEOUT=300",
+      "exit_code": 0,
+      "result": "PASS",
+      "formal_tool": "VC Formal V-2023.12-SP2",
+      "proofs": 3,
+      "reachability_covers": 7,
+      "setup_issues": 0,
+      "logs": [
+        "evidence/current_replay_8737fa1c/formal/serial_make.log.gz",
+        "evidence/current_replay_8737fa1c/formal/serial_vc_formal.log.gz"
+      ]
+    },
+    {
+      "name": "parallel_dispatcher_pairs_formal_first_attempt",
+      "command": "make -C dv/subsystem/tensor_datapath/formal dispatcher-pairs OUT=/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher TIMEOUT=300",
+      "make_exit_code": 2,
+      "timeout_exit_code": 124,
+      "result": "TIMEOUT_PARTIAL_NOT_PASS",
+      "details": "Some properties proved; formal target stopped at 300 seconds before its required proof and cover totals.",
+      "logs": [
+        "evidence/current_replay_8737fa1c/formal/dispatcher_timeout300_make.log.gz",
+        "evidence/current_replay_8737fa1c/formal/dispatcher_timeout300_vc_formal.log.gz"
+      ]
+    },
+    {
+      "name": "parallel_dispatcher_pairs_formal_retry",
+      "command": "make -C dv/subsystem/tensor_datapath/formal dispatcher-pairs OUT=/tmp/nmaforge_v13_current_8737fa1c/formal_dispatcher_retry TIMEOUT=900",
+      "result": "PASS",
+      "logs": [
+        "evidence/current_replay_8737fa1c/formal/dispatcher_retry900_make.log.gz",
+        "evidence/current_replay_8737fa1c/formal/dispatcher_retry900_vc_formal.log.gz"
+      ],
+      "exit_code": 0,
+      "proofs": 5,
+      "non_vacuous_assertions": 4,
+      "pairwise_covers": 23,
+      "setup_issues": 0
+    },
+    {
+      "name": "compute_cluster_real_rtl_mutation",
+      "command": "make uvm_compute_cluster_dut_mutation COMPUTE_CLUSTER_DUT_MUTATION_OUT=/tmp/nmaforge_v13_current_8737fa1c/cluster_dut_mutation",
+      "exit_code": 0,
+      "result": "PASS: 7/7 real RTL mutants detected by the intended independent scoreboard/checker",
+      "individual_simulator_native_exit_codes": "not retained by target harness; aggregate make exit=0 and each checker marker/summary retained",
+      "mutants": [
+        {
+          "name": "address",
+          "expected_checker": "CLUSTER_MEMORY_UNKNOWN",
+          "mutated_rtl_file": "ai_compute_spad_mux.v",
+          "mutated_rtl_sha256": "c4c53a25aeac49c2ae6c93cc657fa2827249bc58723d6b0f5a89ef04ab1a7e88",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/address/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/address/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/address/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/address/run.stdout.log.gz"
+        },
+        {
+          "name": "data",
+          "expected_checker": "CLUSTER_GOLDEN",
+          "mutated_rtl_file": "ai_compute_spad_mux.v",
+          "mutated_rtl_sha256": "8ae5f39a9c6c6ca3ae3e6ddfe399d9dad2865d7e019b6b5407f7f65d32f296b6",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/data/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/data/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/data/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/data/run.stdout.log.gz"
+        },
+        {
+          "name": "response_owner",
+          "expected_checker": "CLUSTER_ENGINE_RESPONSE_OWNER",
+          "mutated_rtl_file": "ai_compute_spad_mux.v",
+          "mutated_rtl_sha256": "a855cfa315405c45df2170b1ff855e7d00331bac6955c3cd607bb3f11c07dc5a",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/response_owner/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/response_owner/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/response_owner/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/response_owner/run.stdout.log.gz"
+        },
+        {
+          "name": "wstrb",
+          "expected_checker": "CLUSTER_MATRIX_WSTRB",
+          "mutated_rtl_file": "ai_tensor_matrix_core.v",
+          "mutated_rtl_sha256": "14a6fd824a358cfae91ef0ca3b94439f363a63eea1e3bfe894d9d3cf7d41cb9d",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/wstrb/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/wstrb/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/wstrb/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/wstrb/run.stdout.log.gz"
+        },
+        {
+          "name": "completion_error",
+          "expected_checker": "CLUSTER_COMPLETION_ERROR_CODE",
+          "mutated_rtl_file": "ai_parallel_compute_dispatcher.v",
+          "mutated_rtl_sha256": "2edb4d8f79af682d41cb9463361578601128fd007bc979551586f944c294f843",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/completion_error/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/completion_error/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/completion_error/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/completion_error/run.stdout.log.gz"
+        },
+        {
+          "name": "missing_done",
+          "expected_checker": "CLUSTER_MISSING_DONE",
+          "mutated_rtl_file": "ai_accel_compute_cluster.v",
+          "mutated_rtl_sha256": "49663c01825f584c853fa142ebf3f007767a540ed9a73df7db4859abcd6d9263",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/missing_done/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/missing_done/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/missing_done/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/missing_done/run.stdout.log.gz"
+        },
+        {
+          "name": "duplicate_done",
+          "expected_checker": "CLUSTER_DONE_WITHOUT_ACTIVE",
+          "mutated_rtl_file": "ai_accel_compute_cluster.v",
+          "mutated_rtl_sha256": "4698dd21edaeb19bc6f2dd2787c12f6e6722fea4f3e94fe70690fda1dd4fbf7c",
+          "checker_caught": true,
+          "make_target_exit_code": 0,
+          "individual_simulator_native_exit_code": "not retained by harness",
+          "compile_log_artifact": "cluster_mutation/duplicate_done/compile.log.gz",
+          "run_log_artifact": "cluster_mutation/duplicate_done/run.log.gz",
+          "compile_stdout_log_artifact": "cluster_mutation/duplicate_done/compile.stdout.log.gz",
+          "run_stdout_log_artifact": "cluster_mutation/duplicate_done/run.stdout.log.gz"
+        }
+      ],
+      "logs": [
+        "evidence/current_replay_8737fa1c/cluster_mutation/make.log.gz",
+        "evidence/current_replay_8737fa1c/cluster_mutation/summary.txt"
+      ]
+    },
+    {
+      "name": "product_top_cnn_fusion_ab",
+      "exit_codes": {
+        "legacy": 0,
+        "first": 0,
+        "both": 0
+      },
+      "result": "PASS: all three Product Top runs match the same independent Golden across 20,480 words",
+      "manifest": "benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.json",
+      "csv": "benchmark/performance_dominance/v1_3_current_cnn_fusion_ab.csv",
+      "logs": [
+        "evidence/current_replay_8737fa1c/cnn/legacy/make.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/first/make.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/both/make.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/legacy/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/first/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/both/compile.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/legacy/run.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/first/run.log.gz",
+        "evidence/current_replay_8737fa1c/cnn/both/run.log.gz"
+      ]
+    },
+    {
+      "name": "gpt2_independent_external_text_software_eval_first_attempt",
+      "command": "/tmp/nmaforge_v13_gpt2_venv/bin/python benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --dataset-name \"Pride and Prejudice byte-level (Project Gutenberg #1342)\" --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+      "exit_code": 1,
+      "result": "EVALUATOR_SCHEMA_ERROR_FIXED_BEFORE_RETRY",
+      "logs": [
+        "evidence/current_replay_8737fa1c/gpt2/first_attempt_checkpoint_schema_error.log.gz"
+      ]
+    },
+    {
+      "name": "gpt2_independent_external_text_software_eval",
+      "command": "/tmp/nmaforge_v13_gpt2_venv/bin/python benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --dataset-name \"Pride and Prejudice byte-level (Project Gutenberg #1342)\" --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval_retry.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+      "exit_code": 0,
+      "result": "SOFTWARE_EVAL_PASS_EXECUTION; MODEL_QUALITY_BELOW_FP32_AND_BIGRAM",
+      "model_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+      "fp32_sha256": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+      "prepared_dataset_sha256": "0f8bb9eb3b6aad9b634f46844fc3d066dca2a1c1cf5ca9cdb9bb276bce0783d5",
+      "eval_seed": 20261124,
+      "windows": 64,
+      "top_rtl": "NOT_RUN",
+      "manifest": "benchmark/performance_dominance/v1_3_gpt2_independent_software_eval.json",
+      "logs": [
+        "evidence/current_replay_8737fa1c/gpt2/software_quality_eval.json",
+        "evidence/current_replay_8737fa1c/gpt2/software_quality_eval.stdout.log.gz",
+        "evidence/current_replay_8737fa1c/gpt2/dependency_install.log.gz",
+        "evidence/current_replay_8737fa1c/gpt2/python_freeze.txt"
+      ]
+    },
+    {
+      "name": "gpt2_independent_external_text_environment_bootstrap_attempt",
+      "command": "python3.12 benchmark/gpt2_quality/evaluate_h64_byte_lm.py --package benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz --fp32 benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt --corpus /tmp/nmaforge_v13_independent_gpt2/pride_and_prejudice_body_utf8.txt --out /tmp/nmaforge_v13_independent_gpt2/software_quality_eval.json --seed 20261124 --windows 64 --source-sha 8737fa1c7c6d08a894913a904a8a52aff4fb5840",
+      "exit_code": 1,
+      "result": "BLOCKED_ENV_NO_NUMPY_RESOLVED_WITH_ISOLATED_VENV",
+      "logs": [
+        "evidence/current_replay_8737fa1c/gpt2/environment_attempt_no_numpy.log.gz",
+        "evidence/current_replay_8737fa1c/gpt2/dependency_install.log.gz"
+      ]
+    }
+  ],
+  "results": {
+    "product_top": {
+      "ai_smoke": "PASS",
+      "ai_run_20_seed12345": "PASS",
+      "matrix_cnm_profile": "golden=bit-exact; cycles_closed=1; response_alias_seen=0"
+    },
+    "cluster_uvm": {
+      "status": "PASS",
+      "runs": "3/3 current source, seed 20261124",
+      "spad_map_required_end": "0x00020000 at each capacity",
+      "protection_bounds_check": "enabled at each capacity",
+      "focused_functional_coverage": "100.0% applicable bins in each run"
+    },
+    "gate1_matrix": {
+      "status": "PASS_FOR_NMAFORGE_STANDALONE_BASELINE",
+      "gemm_64x64x64_seed20261122_backpressure_cycles": 4822,
+      "gemm_64x64x64_seed20261122_fixed_memory_cycles": 3413,
+      "gemm_64x64x64_seed20261124_backpressure_cycles": 4746,
+      "gemv_1x64x64_prefetch0_cycles": 632,
+      "gemv_1x64x64_prefetch1_cycles": 584,
+      "all_outputs": "independent INT32 Golden PASS",
+      "exclusive_stall_partition": "NOT_REPORTED"
+    },
+    "tiny_npu_comparison": {
+      "status": "NOT_COMPARABLE",
+      "reason": "Historical TinyNPU is direct-array output-stable; current NMAForge timing includes Matrix controller and behavioral SPAD; no system speedup claimed."
+    },
+    "formal": {
+      "serial": "PASS: 3 assertions, 7 covers",
+      "dispatcher_pairs": "PASS: 5 proofs, 4 non-vacuous checks, 23 covers; initial 300-second attempt timed out (exit 124), 900-second retry passed."
+    },
+    "gpt2": {
+      "status": "PARTIAL; independent external-text software evaluation completed with negative product-contract INT8 quality result",
+      "dataset": "Pride and Prejudice byte-level; prepared SHA256 0f8bb9eb3b6aad9b634f46844fc3d066dca2a1c1cf5ca9cdb9bb276bce0783d5",
+      "seed": 20261124,
+      "windows": 64,
+      "fp32_accuracy": 0.3076171875,
+      "product_int8_accuracy": 0.1123046875,
+      "same_windows_bigram_accuracy": 0.2763671875,
+      "product_int8_perplexity": 216.5023547538319,
+      "top_rtl_independent_logits": "NOT_RUN",
+      "selected_package_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4"
+    },
+    "deit_tiny": "PARTIAL; no model run repeated; existing evidence covers 16 of 197 queries only.",
+    "physical_closure": "NOT_RUN",
+    "mutation": {
+      "status": "PASS",
+      "caught": "7/7",
+      "individual_simulator_native_exit_codes": "not retained by target harness; aggregate make target exit code zero"
+    },
+    "cnn_fusion_ab": {
+      "status": "PASS",
+      "command_cycles_by_mode": {
+        "legacy": 60930,
+        "first": 34324,
+        "both": 7708
+      },
+      "golden_words_per_mode": 20480,
+      "same_output_sha256": "6f81ea743327c2b7daa5d4e11e8e2e88848398b99bfaca97d170c570ccc3170e",
+      "scope": "synthetic deterministic untrained pointwise CNN; no accuracy or TinyNPU system claim"
+    }
+  },
+  "integrity_index": "evidence/current_replay_8737fa1c/artifacts.json",
+  "generated_vcs_binaries_and_coverage_databases": "not included in repository evidence package"
+}

@@ -1,0 +1,101 @@
+{
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "limitations": [
+    "This is a fixed 512-window software quality audit, not a fresh Product Top run.",
+    "Byte-level Tiny Shakespeare is a narrow task.",
+    "The source FP32 model and QAT-updated Float quality are reported separately; neither is assumed to be a language-quality baseline.",
+    "Validation overlap weakens checkpoint selection evidence; final held-out sample remains separate."
+  ],
+  "product_integer_contract": "round21_contract_ablation.CONTRACTS['residual_gelu_aligned']; package l*.up_q8_8 aliases l*.up; same Round-25 Product Top numerical profile",
+  "same_sample_bigram_accuracy": 0.275390625,
+  "same_sample_fp32": {
+    "cross_entropy_nats": 2.668258534511573,
+    "next_byte_accuracy": 0.232421875,
+    "perplexity": 14.414844368156853
+  },
+  "sample": {
+    "context": 16,
+    "seed": 20261128,
+    "start_target_sha256": "e4af87d7432803547c727f0546c5d9715cc8a68e412f76fe3066925afd5d9e62",
+    "windows": 512
+  },
+  "seed_results": [
+    {
+      "bigram_accuracy": 0.275390625,
+      "checkpoint_sha256": "73801ce5682759ecb37f581ba6423c1a06abda9dba4e4538461d9b524817b796",
+      "fp32_accuracy": 0.232421875,
+      "fp32_ce": 2.668258534511573,
+      "fp32_int8_top1_agreement": 0.3046875,
+      "fp32_ppl": 14.414844368156853,
+      "package_sha256": "fa66d2ecd6709c0a49e5c23d6346de22adfbf2f0809f182e581fa63cbcb9a54b",
+      "product_contract_int8_accuracy": 0.294921875,
+      "product_contract_int8_ce": 2.465224615968933,
+      "product_contract_int8_ppl": 11.76612471469174,
+      "qat_float_accuracy": 0.224609375,
+      "qat_float_ce": 2.7084717186193816,
+      "qat_float_int8_top1_agreement": 0.306640625,
+      "qat_float_ppl": 15.006324095522459,
+      "seed": 20261125,
+      "source_fp32_sha256": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+      "test_sample_sha256": "e4af87d7432803547c727f0546c5d9715cc8a68e412f76fe3066925afd5d9e62",
+      "test_windows": 512
+    },
+    {
+      "bigram_accuracy": 0.275390625,
+      "checkpoint_sha256": "0143f10d2d8293de21da33f8ddde29df8f6fedeb7cbf32b25ad868eb7e9a704e",
+      "fp32_accuracy": 0.232421875,
+      "fp32_ce": 2.668258534511573,
+      "fp32_int8_top1_agreement": 0.3359375,
+      "fp32_ppl": 14.414844368156853,
+      "package_sha256": "9d29560f7c3ff0a79c4eb99971f2c0e3dbeaa40063dcb7fd6352c9af283c8e42",
+      "product_contract_int8_accuracy": 0.296875,
+      "product_contract_int8_ce": 2.510971433180374,
+      "product_contract_int8_ppl": 12.31688928570698,
+      "qat_float_accuracy": 0.228515625,
+      "qat_float_ce": 2.7172507055210744,
+      "qat_float_int8_top1_agreement": 0.3203125,
+      "qat_float_ppl": 15.138644387421591,
+      "seed": 20261126,
+      "source_fp32_sha256": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+      "test_sample_sha256": "e4af87d7432803547c727f0546c5d9715cc8a68e412f76fe3066925afd5d9e62",
+      "test_windows": 512
+    },
+    {
+      "bigram_accuracy": 0.275390625,
+      "checkpoint_sha256": "a86b1e32a0836bfcac85a36d79e4c859afe2dc86fae88bf9ff1237103a4db005",
+      "fp32_accuracy": 0.232421875,
+      "fp32_ce": 2.668258534511573,
+      "fp32_int8_top1_agreement": 0.333984375,
+      "fp32_ppl": 14.414844368156853,
+      "package_sha256": "54b90424435f81d16dc8fa312d53d3cc280ac57a2a00b5fc3bd969b8f33a96f9",
+      "product_contract_int8_accuracy": 0.2890625,
+      "product_contract_int8_ce": 2.482375827100311,
+      "product_contract_int8_ppl": 11.969668525728931,
+      "qat_float_accuracy": 0.228515625,
+      "qat_float_ce": 2.7247079370144487,
+      "qat_float_int8_top1_agreement": 0.330078125,
+      "qat_float_ppl": 15.25195874368759,
+      "seed": 20261127,
+      "source_fp32_sha256": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+      "test_sample_sha256": "e4af87d7432803547c727f0546c5d9715cc8a68e412f76fe3066925afd5d9e62",
+      "test_windows": 512
+    }
+  ],
+  "source_fp32_sha256": "fea7b0f819ad3cfe9d8ab3f5f12cab632ae005aabf444cd75611846acbf6bde3",
+  "split": {
+    "heldout_bytes": 111540,
+    "overlap_assessment": "validation windows are drawn from the QAT training byte partition; no final held-out bytes are used for training, but validation is not corpus-disjoint from training",
+    "round24_validation_start_range_in_train_partition": [
+      803069,
+      1003837
+    ],
+    "training_development_bytes": 1003854,
+    "training_start_range": [
+      0,
+      1003837
+    ],
+    "validation_sampling_seed": 2026112401,
+    "validation_windows": 512
+  },
+  "status": "ROUND26_FIXED_SAMPLE_REEVALUATION_SOFTWARE_ONLY"
+}

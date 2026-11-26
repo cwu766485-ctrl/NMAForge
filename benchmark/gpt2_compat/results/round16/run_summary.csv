@@ -1,0 +1,4 @@
+run_id,token_ids,status,first_layer_descriptors,useful_macs,first_layer_command_cycles,reported_first_layer_end_to_end_cycles,initial_preload_axi_cycles,initial_preload_dma_window_cycles,initial_preloaded_spad_bytes,first_layer_useful_mac_per_cycle,spad_read_bytes,spad_write_bytes,final_logits_physical_words,final_output_layout
+four_layer_one_token_id4,4,PASS,189,49280,258037,346421,73439,14945,99136,0.1910,340096,218688,4096,matrix_n_tile_major_16x256
+four_layer_four_token_prompt,"1,7,42,3",PASS,225,197888,263017,354857,76895,14945,101440,0.7524,343552,220416,4096,matrix_n_tile_major_16x256
+legacy_two_token_compatibility,"1,7",PASS,201,98688,259568,327400,53303,14529,84688,0.3802,341248,219264,N/A,N/A

@@ -21,7 +21,7 @@ module tb_ai_tensor_a3_gemm_bench;
     .src0_base(0),.src1_base(32'h4000),.bias_base(0),.dst_base(32'h8000),
     .m_size(16'd4),.n_size(16'd4),.k_words(k_words),.instance_count(32'd1),
     .src0_batch_stride(32'd0),.src1_batch_stride(32'd0),.dst_batch_stride(32'd0),
-    .transpose_a(1'b0),.transpose_b(1'b0),.bias_enable(1'b0),.scale_shift(5'd0),.activation(2'd0),.watchdog_limit(32'd0),
+    .transpose_a(1'b0),.transpose_b(1'b0),.bias_enable(1'b0),.scale_shift(5'd0),.activation(2'd0),.aux0(32'd0),.watchdog_limit(32'd0),
     .bank0_data(32'h01010101),.bank1_data(32'h01010101),.bank2_data(32'h01010101),.bank3_data(32'h01010101),
     .bank_parity_error(4'd0),.banked_read_valid(banked_valid),.banked_addr(banked_addr),
     .banked_ready(banked_ready),.banked_rsp_valid(banked_rsp_valid),.banked_protection_error(1'b0),

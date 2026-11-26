@@ -1,0 +1,17 @@
+{
+  "status": "PASS",
+  "run_id": "nmaforge_r17_profile_gemm",
+  "target_branch": "feature/npu-architecture-v2",
+  "tested_source_sha": "bd1fbc91374e6fc9371935e575f399122a0a2fa9",
+  "product_rtl_baseline_sha": "79bdfbf550e6b2dccf9e0cb830b8dbab1f878459",
+  "model_sha256": "43ea1d5012e825d068a9dde137c18f2b7e0b95d725a753278331791d86c8ae61",
+  "seed": 20261117,
+  "projection_policy": "gemm",
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13",
+  "command": "cd dv/subsystem/top_smoke/sim && make ai_h16_incremental_decode AI_H16_INCREMENTAL_RUN=/tmp/nmaforge_r17_profile_gemm AI_H16_INCREMENTAL_POLICY=gemm AI_H16_INCREMENTAL_SEED=20261117",
+  "profile_command": "python3.12 sw/tools/summarize_round17_profile.py --run-dir /tmp/nmaforge_r17_profile_gemm --source-sha bd1fbc91374e6fc9371935e575f399122a0a2fa9 --vcs-version V-2023.12-SP1_Full64 --csv docs/benchmark/ROUND17_BASELINE_PROFILE.csv --json docs/benchmark/ROUND17_BASELINE_PROFILE.json",
+  "golden": "PASS; 368 prefill and 1,216 words for each of four decode stages",
+  "scope": "H16, 2 heads, 1 layer, INT8, 128 KiB behavioral SPAD; host supplies decode tokens 4-7",
+  "licence": "VCS compilation and simulation completed; no license error"
+}

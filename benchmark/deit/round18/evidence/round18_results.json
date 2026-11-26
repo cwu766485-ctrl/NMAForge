@@ -1,0 +1,149 @@
+{
+  "branch": "research/nmaforge-v1.2-round18",
+  "disposition": "PARTIAL",
+  "gates": [
+    {
+      "command": "make ai_smoke AI_SPAD_WORDS_PER_BANK=16384",
+      "compile_log_path": "/tmp/nmaforge-v1.2-round18/dv/subsystem/top_smoke/sim/ai_comp.log",
+      "compile_log_sha256": "1f2d6fec93ab9ab8215d26ef6d3390638ac77a790095f1158468ab99deb98eea",
+      "gate": "G0",
+      "log_path": "/tmp/nmaforge-v1.2-round18/dv/subsystem/top_smoke/sim/ai_accel_smoke.log",
+      "log_sha256": "dd025d8fabe0fbec76a958214dd00f7b1fafa3b62be79e4cba8e8a93075ad067",
+      "pass_marker": "TEST PASS",
+      "run_id": "R18-G0-256K-TOP-SMOKE-20261116",
+      "status": "PASS",
+      "compile_errors": 0,
+      "compile_warnings": [
+        "Warning-[LOOP-REROLL-ENABLED] Loop reroll optimization is enabled"
+      ]
+    },
+    {
+      "checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+      "command": "make ai_deit_round18_patch_tile_256k AI_DEIT_R18_RUN=/tmp/nmaforge_deit_round18_patch_20261116",
+      "compile_log_path": "/tmp/nmaforge_deit_round18_patch_20261116/compile.log",
+      "compile_log_sha256": "36503181bce8b7247027cd18d94ed1e47e94c81b4eddf6eac0007d0661cb135e",
+      "gate": "G1",
+      "metrics": {
+        "command_cycles": 2442,
+        "descriptor_count": 1,
+        "dma_preload_included": false,
+        "end_to_end_cycles": 40961,
+        "golden_words": 256,
+        "matrix_mac_cycles": 768,
+        "physical_output_elements": 256,
+        "preload_axi_cycles": 38519,
+        "preloaded_spad_bytes": 25680,
+        "spad_read_bytes": 24576,
+        "spad_write_bytes": 1024,
+        "useful_macs": 12288,
+        "useful_output_elements": 16
+      },
+      "model_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+      "pass_marker": "REPRESENTATIVE_MODEL_PASS desc=1 prefill_desc=0 decode_desc=0 golden_words=256 useful_macs=12288 executed_macs=196608 padding_macs=184320 useful_output_elements=16 physical_output_elements=256 command_cycles=2442 end_to_end_cycles=40961 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=2442 preload_axi_cycles=38519 preload_dma_window_cycles=0 preload_dma_busy_cycles=0 preloaded_spad_bytes=25680 useful_mac_per_cycle=5.0319 executed_array_utilization_pct=100.00 useful_array_utilization_pct=6.25 matrix_mac_cycles=768 matrix_req_wait=0 matrix_rsp_wait=0 matrix_writeback=64 matrix_other=1543 sfu_busy=0 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=67 dma_busy_overlap=0 spad_read_bytes=24576 spad_write_bytes=1024",
+      "run_id": "R18-G1-OFFICIAL-DEIT-PATCH-TILE-20261116",
+      "run_log_path": "/tmp/nmaforge_deit_round18_patch_20261116/run.log",
+      "run_log_sha256": "134f89dcb9636a9ebf8a05a324f8397ab56c4a2ac6ee2dcb4fe52b74df17d52d",
+      "scope": "1 of 196 patches, first 16 of 192 output channels; not full embedding",
+      "status": "PARTIAL",
+      "compile_errors": 0,
+      "compile_warnings": [
+        "Warning-[LOOP-REROLL-ENABLED] Loop reroll optimization is enabled"
+      ]
+    },
+    {
+      "command": "make ai_deit_round18_softmax197_256k AI_DEIT_R18_SM_RUN=/tmp/nmaforge_deit_round18_softmax197_pass_20261116",
+      "compile_log_path": "/tmp/nmaforge_deit_round18_softmax197_pass_20261116/compile.log",
+      "compile_log_sha256": "8b7ed2e5f4946c7c0368b58084421fd9708d234de651b4145b2ba8fefc77c522",
+      "gate": "G2",
+      "metrics": {
+        "command_cycles": 8036,
+        "cycles": 7969,
+        "divider_busy_cycles": 5407,
+        "end_to_end_cycles": 22783,
+        "golden_words": 197,
+        "length": 197,
+        "pass0_cycles": 591,
+        "pass1_cycles": 591,
+        "pass2_cycles": 6786,
+        "spad_read_accepts": 591,
+        "spad_read_bytes": 2364,
+        "spad_write_accepts": 197,
+        "spad_write_bytes": 788
+      },
+      "pass_marker": "REPRESENTATIVE_MODEL_PASS desc=1 prefill_desc=0 decode_desc=0 golden_words=197 useful_macs=0 executed_macs=-1 padding_macs=-1 useful_output_elements=-1 physical_output_elements=-1 command_cycles=8036 end_to_end_cycles=22783 dma_preload_included=0 prefill_command_cycles=0 decode_command_cycles=0 prefill_exclusive_cycles=0 decode_exclusive_cycles=0 exclusive_profile_cycles=8036 preload_axi_cycles=14747 preload_dma_window_cycles=0 preload_dma_busy_cycles=0 preloaded_spad_bytes=9832 useful_mac_per_cycle=0.0000 executed_array_utilization_pct=0.00 useful_array_utilization_pct=0.00 matrix_mac_cycles=0 matrix_req_wait=0 matrix_rsp_wait=0 matrix_writeback=0 matrix_other=0 sfu_busy=7969 kv_busy=0 conv_busy=0 banked_busy=0 fp_busy=0 scalar_busy=0 no_engine_dispatch_remainder=67 dma_busy_overlap=0 spad_read_bytes=2364 spad_write_bytes=788",
+      "profile_marker": "R9_SFU_COMMAND index=0 opcode=0x32 length=197 cycles=7969 pass0=591 pass1=591 pass2=6786 math=0 other=1 spad_request_stall=0 spad_response_wait=591 spad_read_accepts=591 spad_write_accepts=197 divider_busy=5407 sqrt_busy=0 cycles_closed=7969",
+      "run_id": "R18-G2-SOFTMAX-197-ROW-20261116",
+      "run_log_path": "/tmp/nmaforge_deit_round18_softmax197_pass_20261116/run.log",
+      "run_log_sha256": "31b15825daced3659d81b92cea13871d517d026738afd906db5b21afc94570d2",
+      "scope": "one opcode 0x32 vector only; not 3-head attention or encoder layer",
+      "status": "PARTIAL",
+      "compile_errors": 0,
+      "compile_warnings": [
+        "Warning-[LOOP-REROLL-ENABLED] Loop reroll optimization is enabled"
+      ]
+    },
+    {
+      "gate": "G3",
+      "reason": "G2 full 197-token Encoder was not passed. Static 12-layer schedule is not Product Top evidence.",
+      "static_kv_bytes_context197": 907776,
+      "status": "NOT_RUN"
+    },
+    {
+      "command": "make ai_h64_four_layer_top_argmax AI_H64_AUTOREGRESSIVE=1 AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_round18_h64_ar_20261116",
+      "compile_log_path": "/tmp/nmaforge_round18_h64_ar_20261116/compile.log",
+      "compile_log_sha256": "74eafb09d589ddb7730d177d54087d4e3e4ae0b5ced9c2a5f6165c038634bbf0",
+      "gate": "GPT2_ROUND17_REGRESSION",
+      "result_marker": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+      "run_id": "R18-PRESERVE-H64-AR-20261116",
+      "run_log_path": "/tmp/nmaforge_round18_h64_ar_20261116/run.log",
+      "run_log_sha256": "3486bc54b30980b168fc5e61650ba781fd1219b39da2155dd2116f75853d6d64",
+      "sequence_marker": "H64_AUTOREGRESSIVE_SEQUENCE_PASS generated_tokens=4 total_publications=4020 extension_cycles=4343004 reset_events=0 host_intermediate_words=0 mode=prefix_recompute",
+      "status": "PASS",
+      "result_path": "/tmp/nmaforge_round18_h64_ar_20261116/autoregressive_result.json",
+      "result_sha256": "a648a07fd6b568c3ff0c82e97a8319ee551debffd7188ff886245d1d86134dc8",
+      "generated_tokens": [
+        114,
+        162,
+        193,
+        193
+      ],
+      "all_logits_bit_exact": true,
+      "compile_errors": 0,
+      "compile_warnings": [
+        "Warning-[LOOP-REROLL-ENABLED] Loop reroll optimization is enabled"
+      ]
+    }
+  ],
+  "product_rtl_changed": false,
+  "queue_geometry": {
+    "cmdq_bytes": 32768,
+    "cmdq_entry_bytes": 64,
+    "cmdq_host_address": "0x46000",
+    "cmdq_offset": "0x36000",
+    "cplq_bytes": 8192,
+    "cplq_entry_bytes": 16,
+    "cplq_host_address": "0x4e000",
+    "cplq_offset": "0x3e000",
+    "end_host_address_exclusive": "0x50000",
+    "entries_each": 512,
+    "total_bytes": 40960
+  },
+  "round": "NMAForge-V1.2 Round 18",
+  "spad_geometry": {
+    "banks": 4,
+    "bytes": 262144,
+    "host_base": "0x10000",
+    "host_limit_exclusive": "0x50000",
+    "words_per_bank": 16384
+  },
+  "static_allocation_evidence": "benchmark/deit/round18/evidence/deit_tiny_spad_allocation_static.json",
+  "tested_baseline_sha": "72af7bf389da8e74d66702f43f4a11d3f2bae740",
+  "tiny_npu_reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tools": {
+    "numpy": "2.5.4",
+    "python": "3.12",
+    "torch": "2.6.0+cpu",
+    "transformers": "4.48.3",
+    "vcs": "V-2023.12-SP1_Full64"
+  }
+}

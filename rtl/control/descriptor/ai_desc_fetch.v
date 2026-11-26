@@ -150,7 +150,14 @@ module ai_desc_fetch(
                                 desc_n_size <= spad_rdata[31:16];
                             end
                             5'd6: begin
-                                desc_k_words <= spad_rdata[15:0];
+                                // TENSOR_REPACK (research opcode 0x3b) uses
+                                // the ABI extent field as valid-row length;
+                                // it has no K dimension. Keep the shared
+                                // 64-byte descriptor layout and expose the
+                                // opcode-specific semantic value to the
+                                // validator/core.
+                                desc_k_words <= (desc_op == 8'h3b) ? 16'd0 :
+                                                spad_rdata[15:0];
                                 desc_length  <= spad_rdata[15:0];
                             end
                             5'd7: begin

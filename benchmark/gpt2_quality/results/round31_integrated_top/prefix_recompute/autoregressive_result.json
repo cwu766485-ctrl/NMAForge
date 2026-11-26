@@ -1,0 +1,94 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261116,
+  "kv_mode": "prefix_recompute",
+  "synthetic_model_quality_claim": false,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    65,
+    82,
+    68,
+    89
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 65,
+      "logits_sha256_le_i32": "7bafe74e439a34ea0619cc9775bb3b71608233e7af364c33c216daeab6218a41",
+      "rtl_dump": "/tmp/nmaforge_v1_2_integrated_gpt2_rerun2/rtl_logits_context0.csv"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 82,
+      "logits_sha256_le_i32": "e993e164e7e173b1522bb7ef09ee6d7962e1128228a00adaada911f3ce43eb6a",
+      "rtl_dump": "/tmp/nmaforge_v1_2_integrated_gpt2_rerun2/rtl_logits_context1.csv"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 68,
+      "logits_sha256_le_i32": "2c92156d89d622fc6f1298759205e24d9cde5e8865886a93033e0ba3a2948847",
+      "rtl_dump": "/tmp/nmaforge_v1_2_integrated_gpt2_rerun2/rtl_logits_context2.csv"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 89,
+      "logits_sha256_le_i32": "bce397820a23ee610bca35bc86007baf69679250ae4085a7b7606701c5b235ff",
+      "rtl_dump": "/tmp/nmaforge_v1_2_integrated_gpt2_rerun2/rtl_logits_context3.csv"
+    }
+  ],
+  "decode_context_cycles": [
+    {
+      "mode": "prefix_recompute",
+      "context": 1,
+      "valid_tokens": 5,
+      "generated_token": 82,
+      "descriptor_publications": 981,
+      "product_cycles": 1414260,
+      "cumulative_product_cycles": 1414260,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    },
+    {
+      "mode": "prefix_recompute",
+      "context": 2,
+      "valid_tokens": 6,
+      "generated_token": 68,
+      "descriptor_publications": 1029,
+      "product_cycles": 1446816,
+      "cumulative_product_cycles": 2861076,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    },
+    {
+      "mode": "prefix_recompute",
+      "context": 3,
+      "valid_tokens": 7,
+      "generated_token": 89,
+      "descriptor_publications": 1077,
+      "product_cycles": 1479660,
+      "cumulative_product_cycles": 4340736,
+      "host_intermediate_words": 0,
+      "reset_events": 0
+    }
+  ],
+  "extension_cycles": 4340736,
+  "source_sha": "recorded by the enclosing run manifest"
+}

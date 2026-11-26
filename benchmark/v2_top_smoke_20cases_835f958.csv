@@ -1,0 +1,4 @@
+run_id,source_sha,ai_seed,ntb_random_seed,random_cases,status,directed_checks,log_archive_sha256
+V2-TOP-SMOKE-20X-835F958-20261130,835f958b5f486b3f3e4808e735a788721f4f1441,20261130,1793945994,20,PASS,"legacy GEMM, 0x52 GEMV tail/M8 K-tail, 0x53 tile-forward, CNM and smoke checks",7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117
+V2-TOP-SMOKE-20X-835F958-20261131,835f958b5f486b3f3e4808e735a788721f4f1441,20261131,1793945994,20,PASS,"legacy GEMM, 0x52 GEMV tail/M8 K-tail, 0x53 tile-forward, CNM and smoke checks",7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117
+V2-TOP-SMOKE-20X-835F958-20261132,835f958b5f486b3f3e4808e735a788721f4f1441,20261132,1793945995,20,PASS,"legacy GEMM, 0x52 GEMV tail/M8 K-tail, 0x53 tile-forward, CNM and smoke checks",7b71e6a3b5815173e8bc256fec0d323b6efe0d71e5f41f171ef4496ac5df3117

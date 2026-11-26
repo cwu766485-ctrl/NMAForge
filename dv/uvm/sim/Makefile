@@ -1,9 +1,14 @@
 # Run from dv/uvm/sim on the Linux/VCS environment.
 UVM_TEST ?= ai_version_smoke_test
 VCS_HOME ?= /opt/Synopsys/vcs/V-2023.12-SP1
+SPAD_KIB ?= 512
+ifeq ($(filter $(SPAD_KIB),128 256 512),)
+$(error SPAD_KIB must be one of 128, 256, or 512)
+endif
+SPAD_WORDS_PER_BANK := $(shell expr $(SPAD_KIB) \* 64)
 # Assign in the makefile so a stale shell VCS_UVM=/bin/vcs cannot shadow the
 # configured installation. Callers can still override VCS_HOME or VCS_UVM.
-VCS_UVM = $(VCS_HOME)/bin/vcs -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -kdb -timescale=1ns/1ns +define+VCS
+VCS_UVM = $(VCS_HOME)/bin/vcs -full64 -sverilog -ntb_opts uvm-1.2 -debug_access+all -kdb -timescale=1ns/1ns +define+VCS +define+AI_SPAD_WORDS_PER_BANK=$(SPAD_WORDS_PER_BANK)
 RUN_LOG  ?= uvm_run_$(UVM_TEST).log
 MIXED_E2E_SEEDS ?= 20261014 712345 987654 20261015 20261016 20261017
 MIXED_E2E_COV_SEEDS ?= 20261014 712345 987654 20261015 20261016 20261017 20261018 20261019 20261020 20261021 20261022 20261023 20261024 20261025 20261026 20261027
@@ -47,6 +52,7 @@ uvm_external_macro_ddr_e2e:
 # compute SPAD mux, scheduler arbiter, protection, and four-bank SRAM are active.
 # Coverage and generated files stay outside the source tree.
 uvm_compute_cluster_compile:
+	python3 ../tests/check_compact_spad_alloc.py --spad-kib $(SPAD_KIB)
 	mkdir -p $(COMPUTE_CLUSTER_UVM_OUT)/csrc
 	$(VCS_UVM) -cm $(UVM_COV_METRICS) -cm_dir $(COMPUTE_CLUSTER_UVM_OUT)/compile.vdb \
 		-Mdir=$(COMPUTE_CLUSTER_UVM_OUT)/csrc -top tb_ai_accel_uvm -f ai_accel_uvm.f \
@@ -60,10 +66,17 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		logs="$$logs $$log"; cov_dbs="$$cov_dbs $$db"; \
 		"$$out/simv_uvm" +UVM_TESTNAME=ai_compute_cluster_e2e_test \
 			+COMPUTE_CLUSTER_SEED=$$seed +ntb_random_seed=$$seed \
+			+COMPUTE_CLUSTER_SPAD_KIB=$(SPAD_KIB) \
 			-cm $(UVM_COV_METRICS) -cm_dir "$$db" -l "$$log"; \
+		grep -q '\[CLUSTER_SPAD_MAP_PASS\].*capacity=$(SPAD_KIB)KiB' "$$log" || { echo "ERROR: capacity-aware SPAD map marker missing for $(SPAD_KIB) KiB in $$log"; exit 1; }; \
 		grep -q '\[COMPUTE_CLUSTER_REAL_UVM_PASS\]' "$$log" || { echo "ERROR: real Compute Cluster pass marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_A_CACHE_BASELINE_PASS\]' "$$log" || { echo "ERROR: standalone Matrix A-tile cache baseline marker missing in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_OWNER_PASS\]' "$$log" || { echo "ERROR: Matrix/CNM independent response-owner check missing in $$log"; exit 1; }; \
+	grep -Eq '\[CLUSTER_CMDQ_GEMV_CNM_OWNER_PASS\].*real CMDQ 0x52 GEMV \+ CNM concurrent; overlap cycles=[1-9][0-9]* collision grants Matrix/CNM=[0-9]+/[1-9][0-9]* accepted reads=32/[1-9][0-9]* returned CNM=[1-9][0-9]* Matrix responses=32 CNM responses=[1-9][0-9]* route mismatches=0; dual Golden/completions pass; owner bins=100%' "$$log" || { echo "ERROR: real opcode-0x52 GEMV/CNM concurrent response-owner and Golden cross missing or failed in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CMDQ_GEMV_EXT_SHAPES_PASS\].*cases=3/3 shapes=1x16x17,8x13x65,15x16x31 independent Golden/guards/completion/response-owner checks passed; focused bins=3/3 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ GEMV extended-shape Golden/owner coverage is incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CMDQ_GEMV_AB_ALIAS_PASS\].*cases=1/1 real CMDQ 0x52 shape=1x16x16 srcA==srcB; 256 B source unchanged; 16/16 INT32 Golden outputs, two guards, completion and accepted/returned Matrix reads=[1-9][0-9]*/[1-9][0-9]* passed; focused bins=1/1 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ GEMV legal read-only A/B alias Golden/immutability/ownership coverage is incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CMDQ_GEMV_TAIL_CROSS_PASS\].*legal M/N/K alignment-tail combinations bins=8/8 coverage=100\.0%; every bin completed independent signed INT32 Golden, guards, completion and response-owner checks' "$$log" || { echo "ERROR: real CMDQ GEMV alignment/tail cross coverage is incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CMDQ_GEMV_LONG_K_PASS\].*cases=1/1 real CMDQ shape=1x1x256; output, two guards, completion and all accepted/returned Matrix reads checked against independent signed INT32 Golden; focused max-K bin=1/1 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ GEMV maximum-K Golden/owner coverage is incomplete in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_MATRIX_CNM_BANKED_COLLISION_PASS\].*collision cycles=[1-9][0-9]* admitted collisions=[1-9][0-9]* Matrix wait cycles=[1-9][0-9]* held-payload checks=[1-9][0-9]* owner violations=0 hold violations=0' "$$log" || { echo "ERROR: real Matrix banked/CNM admission collision, Matrix wait stability, or single-owner check missing or failed in $$log"; exit 1; }; \
 		grep -q '\[CLUSTER_CNM_ADDR_PASS\]' "$$log" || { echo "ERROR: four-lane CNM address scoreboard check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_ALL_ENGINES_PASS\].*real pair overlaps=21/21 mask=1fffff' "$$log" || { echo "ERROR: real seven-engine pairwise overlap Golden sweep missing or incomplete in $$log"; exit 1; }; \
@@ -105,7 +118,7 @@ uvm_compute_cluster_regress: uvm_compute_cluster_compile
 		grep -q '\[CLUSTER_KV_PARAMETER_LATCH_PASS\]' "$$log" || { echo "ERROR: real KV in-flight descriptor parameter-latch check missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_OPCODE_DISPATCH_PASS\].*GEMV 0x11 then GEMM 0x12.*6/6 output words' "$$log" || { echo "ERROR: real CMDQ Scalar GEMV/GEMM dispatch and Golden comparison missing in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_VDOT_MIN_BOUNDARY_PASS\].*minimum length=1 accepted; four signed INT8 lanes.*one completion and adjacent guard passed' "$$log" || { echo "ERROR: real CMDQ Scalar VDOT minimum-length boundary check missing in $$log"; exit 1; }; \
-		grep -Eq '\[CLUSTER_CMDQ_INVALID_DESCRIPTOR_PASS\].*cases=8/8 engines_and_macro=8 ERR_DESC=8 ordered_head=8 no_launch=1 no_compute_or_dma_request_cycles=0 sentinels=16/16 focused_bins=8/8 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ per-engine invalid-descriptor ERR_DESC/no-launch coverage is missing or incomplete in $$log"; exit 1; }; \
+		grep -Eq '\[CLUSTER_CMDQ_INVALID_DESCRIPTOR_PASS\].*cases=12/12 engines_and_macro=8 v2_gemv=4 ERR_DESC=12 ordered_head=12 no_launch=1 no_compute_or_dma_request_cycles=0 sentinels=24/24 focused_bins=12/12 coverage=100\.0%' "$$log" || { echo "ERROR: real CMDQ invalid-descriptor, v2 GEMV alias/alignment/range rejection, ERR_DESC/no-launch or sentinel coverage is missing or incomplete in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_CMDQ_NUMERIC_BOUNDARY_PASS\].*case_mask=7f outputs=7/7 completions=7/7' "$$log" || { echo "ERROR: real CMDQ Scalar numeric boundary cases are incomplete in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_ABORT_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/16.*read_drain=[1-9][0-9]*/[1-9][0-9]* post_abort_writes=0 completion=ERR_ABORT' "$$log" || { echo "ERROR: real CMDQ Scalar GEMV accepted-write Abort prefix/drain check missing or failed in $$log"; exit 1; }; \
 		grep -Eq '\[CLUSTER_SCALAR_RESET_WRITE_PREFIX_PASS\].*accepted_output_prefix=[1-9][0-9]*/16 old_completion_suppressed=1 reset_dropped_reads=[0-9]+ full_golden_recovery=16/16 focused_bins=6/6' "$$log" || { echo "ERROR: real Scalar GEMV accepted-write Reset prefix, old-epoch suppression, or Golden recovery check missing in $$log"; exit 1; }; \

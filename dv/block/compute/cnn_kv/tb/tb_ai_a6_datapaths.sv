@@ -15,7 +15,7 @@ module tb_ai_a6_datapaths;
     .clk(clk),.resetn(resetn),.start(conv_start),.abort(1'b0),.op_mode(8'h16),.src0_base(32'd0),.src1_base(32'h100),.dst_base(32'h200),.height(16'd3),.width(16'd3),.watchdog_limit(32'd0),
     .spad_valid(cv),.spad_write(cw),.spad_addr(ca),.spad_wdata(cd),.spad_ready(1'b1),.spad_rsp_valid(rsp_valid),.spad_rdata(rsp_data),.spad_error(1'b0),.busy(cb),.done(cdone),.error(ce),.error_code(cec),.result(cr),.cycle_count(ccyc),.element_count(cel));
   ai_kv_cache_engine kv(
-    .clk(clk),.resetn(resetn),.start(kv_start),.abort(1'b0),.op_mode(kv_op?8'h44:8'h43),.src0_base(kv_op?32'h400:32'h300),.dst_base(kv_op?32'h500:32'h400),.length(16'd4),.src0_stride(32'd64),.src1_stride(32'd16),.aux0({16'd2,16'd3}),.watchdog_limit(32'd0),
+    .clk(clk),.resetn(resetn),.start(kv_start),.abort(1'b0),.op_mode(kv_op?8'h44:8'h43),.src0_base(kv_op?32'h400:32'h300),.dst_base(kv_op?32'h500:32'h400),.length(16'd4),.src0_stride(32'd64),.src1_stride(32'd16),.flags(8'd0),.aux0({16'd2,16'd3}),.watchdog_limit(32'd0),
     .spad_valid(kvv),.spad_write(kvw),.spad_addr(kva),.spad_wdata(kvd),.spad_ready(1'b1),.spad_rsp_valid(rsp_valid),.spad_rdata(rsp_data),.spad_error(1'b0),.busy(kvb),.done(kvdone),.error(kve),.error_code(kvec),.result(kvr),.cycle_count(kvcyc),.element_count(kvel));
   always @(posedge clk) begin
     rsp_valid<=0;

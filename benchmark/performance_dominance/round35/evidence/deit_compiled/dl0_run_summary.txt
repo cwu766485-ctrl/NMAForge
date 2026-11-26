@@ -1,0 +1,2 @@
+COMPILED_PROGRAM_PASS segments=27 descriptors=1344 checkpoint_words=78800 final_words=37824 compute_window_cycles=3126609 dma_fenced_cycles=576354 descriptor_staging_cycles=129024 host_spad_data_writes=0
+CPU Time:     96.200 seconds;       Data structure size:   0.7Mb

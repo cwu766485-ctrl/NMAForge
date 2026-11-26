@@ -1,0 +1,33 @@
+{
+  "completion_base": 253952,
+  "datatype": {
+    "input": "signed Q8.8 encoded in int32",
+    "output": "Q0.15 encoded in int32"
+  },
+  "descriptor_base": 221184,
+  "descriptor_count": 1,
+  "destination_address": 4928,
+  "golden_image_sha256": "790df8799a34aad53aa10b48aa68dc955d66a93c9175c1bed067d91c08b0fc84",
+  "golden_sha256": "0d4f38fa3fc6652a21f38f56dc4b2fcf51f7219cc5a55c94b56b399e5d4a6963",
+  "golden_words": 197,
+  "input_scores_sha256": "e2caa9502ce7d3f0ebd1695b35cab8a9b35f403ef32acbfce7138c1f0ed0af64",
+  "length": 197,
+  "memory_image_sha256": "13aa800a7ffe98204159e4ab93e46638db8f7d0d8df7a681d332e07e9cc0407f",
+  "opcode": "0x32",
+  "queue_bytes": 40960,
+  "queue_entries": 512,
+  "scope_limit": "isolated 0x32 full 197-element row only; does not prove three-head tiled attention or full DeiT encoder",
+  "seed": 20261118,
+  "source_address": 4096,
+  "status": "PRODUCT_TOP_PASS_ISOLATED_SOFTMAX_ROW_ONLY",
+  "simulation_evidence": {
+    "run_id": "R18-G2-SOFTMAX-197-ROW-20261116",
+    "compile_log": "/tmp/nmaforge_deit_round18_softmax197_pass_20261116/compile.log",
+    "compile_log_sha256": "8b7ed2e5f4946c7c0368b58084421fd9708d234de651b4145b2ba8fefc77c522",
+    "run_log": "/tmp/nmaforge_deit_round18_softmax197_pass_20261116/run.log",
+    "run_log_sha256": "31b15825daced3659d81b92cea13871d517d026738afd906db5b21afc94570d2",
+    "command_cycles": 8036,
+    "softmax_command_cycles": 7969,
+    "golden_words_checked": 197
+  }
+}

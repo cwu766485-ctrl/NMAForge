@@ -1,0 +1,40 @@
+{
+  "artifacts": {
+    "golden_sha256": "f88f374c038187a1cdfa6c121431f9cd4826ab8650d376f53d2907a938b78364",
+    "memory_sha256": "80dab18e5d0ba623b975214ce324737417309bb9a55fd968c22e05f8b75d69bf"
+  },
+  "dependency_contract": {
+    "clear": "first QK descriptor at queue entry",
+    "consumers": "all four AV N-panel descriptors wait; sticky event is retained for all consumers",
+    "event_bit": 15,
+    "signal": "probability pack descriptor successful retirement"
+  },
+  "descriptors": 245,
+  "head": 2,
+  "head_dim": 64,
+  "omit_av_golden": false,
+  "physical_keys": 208,
+  "projection_golden_sha256": "0e80b814562772cee306f2b10a368e97920e035aa78e5524c6a432b0cb0655ce",
+  "projection_kv_dump_sha256": "8a171096632b757dd875bc7d1e96c209a5454469f4535c4a6ed02c6d76cb73f0",
+  "projection_q_dump_sha256": "8a171096632b757dd875bc7d1e96c209a5454469f4535c4a6ed02c6d76cb73f0",
+  "query_rows": 16,
+  "softmax": {
+    "domain": "Q8.8 log2",
+    "length_per_query": 197,
+    "opcode": "0x32",
+    "padding_in_denominator": false,
+    "score_right_shift": 5
+  },
+  "spad": {
+    "allocation_high_water": 181248,
+    "capacity_bytes": 262144,
+    "completion_base": 253952,
+    "descriptor_base": 221184,
+    "host_data_movement": "Q/K/V are prior Product Top readbacks; host only converts Matrix-A tiles into dense Q and Matrix-B panels; no QK/Softmax/AV values are host-filled",
+    "queue_entries": 512
+  },
+  "status": "DEIT_PRODUCT_ATTENTION_QBLOCK_WORKLOAD",
+  "stop_before_av": false,
+  "useful_macs": 605184,
+  "valid_keys": 197
+}

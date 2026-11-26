@@ -1,0 +1,40 @@
+{
+  "stage": "C",
+  "status": "PARTIAL",
+  "baseline_sha": "4e65a2ac2fc176acc5621aebec000874f2c5ab24",
+  "rtl_tree": "479f24f33af0ccfa87fd7458ac9c43f94aae7398",
+  "product_rtl_changed": false,
+  "abi_changed": false,
+  "a3_transparent_bypass": "REJECT",
+  "k64": "PARTIAL_NO_RTL",
+  "h32": "FUNCTIONAL_PASS_QUALITY_LIMITED",
+  "scheduling": "NO_RTL_ADMITTED",
+  "tiny_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+  "tiny_source_clean": true,
+  "new_data_flops": 0,
+  "new_metadata_bits": 0,
+  "new_mac": 0,
+  "new_spad_ports": 0,
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "verilator": "5.052",
+    "training_torch": "2.7.1+cpu",
+    "python": "3.12"
+  },
+  "model_sha256": "e4ded992c6f4ed686f5d4531b861041ffedeba0392a1998b1f7a1dfbe9cd15aa",
+  "source_hashes": {
+    "tools/benchmark/stage_c/scheduling.py": "d7f9688499e59571bcbaf60d3b968352e8d4c15ea34ab782d85418fb1e094a68",
+    "tools/benchmark/stage_c/bench.py": "598907820624f803800c277574f7ffc6d9926e30807ae0f9b99975a775caec8b",
+    "tools/benchmark/stage_c/generate.py": "0999c098e78c9f26058932f21b47653c36af8d874ea064095c21596ad4510e42",
+    "tools/benchmark/stage_c/analyze.py": "5c8f9233ed69e2e6bb9ec76b65160678d741acf364fad65dc66e3b4378b2c5fe",
+    "tools/benchmark/stage_c/k64.py": "bc53b1dcc72f986dd5c788010ce85cd47ab37ddb542e89bf4895b29291d3788b",
+    "tools/benchmark/stage_c/train.py": "e61f66167785d0d5eef2eaac3aeb8451532447057fbe9000df52b9f97d1dc28d",
+    "tools/benchmark/stage_c/reference.py": "b4a7a8f3fdc597ce1754decc163a7211b8e57c84c66ba17263b6ace0e97a3050",
+    "tools/benchmark/stage_c/archive.py": "d09344ff6f1e48cb914914ddeaf133a16d521731d0cd2f394c74d11fbb8e9ad4",
+    "tools/benchmark/stage_c/validate.py": "988542660f5bbad2f6e03211595de6ecb5097809b7efab993650c3337237a324",
+    "tools/benchmark/stage_c/prepare_bench.py": "99fa965fb0d83cdad145e4b26456b5bbaf5bce50cc0a33130d05bd0ea1ee4e8d",
+    "tools/benchmark/stage_c/run_bench.sh": "c19709d4edd07d86588dccccf53454895188212e0f2eadb50e181f5d6763de3f",
+    "tools/benchmark/stage_c/run_top.sh": "5ec9a8d807224beb69805f1a36ef2b40c58b2f4bf99c8c66e818b3532708f975",
+    "dv/subsystem/top_smoke/tb/tb_ai_accel_smoke.sv": "126433f464fab119c0db3fc80c99c5706f8b71f05a65af82e7caa5b50bb4fb04"
+  }
+}

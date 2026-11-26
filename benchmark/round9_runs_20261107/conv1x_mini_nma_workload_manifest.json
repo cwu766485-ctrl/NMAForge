@@ -1,0 +1,40 @@
+{
+  "model": "conv1x_mini.onnx",
+  "model_kind": "onnx_reference_graph",
+  "model_sha256": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+  "input_seed": 99,
+  "input_label": null,
+  "input_npz_sha256": null,
+  "input_scale": 0.011320315946744182,
+  "spad_base_shift_bytes": 0,
+  "spad_descriptor_base": 131072,
+  "spad_completion_base": 135168,
+  "spad_descriptor_count": 8,
+  "spad_max_allocated_exclusive": 135296,
+  "input_int8_sha256": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+  "conv_weight_scale": 0.002203613519668579,
+  "fc_weight_scale": 0.002544137905901811,
+  "conv_shape": "8x8x1 -> 6x6x4, im2col GEMM K=9",
+  "num_classes": 4,
+  "padded_classes": 4,
+  "fc_shape": "1x144 x 144x4; output groups of four on padded M=4 matrix",
+  "golden_int8": [
+    -83,
+    127,
+    -128,
+    8
+  ],
+  "golden_class_count": 4,
+  "golden_sha256": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c",
+  "fc_output_group_count": 1,
+  "stage_order": [
+    "Conv GEMM + round",
+    "INT8 clamp",
+    "Conv bias + ReLU",
+    "flatten/layout pack",
+    "FC GEMM + round",
+    "INT8 clamp",
+    "FC bias",
+    "INT8 output"
+  ]
+}

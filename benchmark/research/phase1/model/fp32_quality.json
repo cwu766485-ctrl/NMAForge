@@ -1,0 +1,26 @@
+{
+  "task": "period-3 recall of three distinct random vocabulary symbols; causal next-token, not language modeling",
+  "split": "disjoint triples including cyclic rotations; all token IDs shared, compositions unseen",
+  "train": {
+    "accuracy": 1.0,
+    "cross_entropy": 0.00019524725212249905,
+    "perplexity": 1.0001952663141078
+  },
+  "fp32": {
+    "accuracy": 1.0,
+    "cross_entropy": 0.0003102142654825002,
+    "perplexity": 1.0003102623869036
+  },
+  "baselines": {
+    "unigram": 0.0234375,
+    "copy_current": 0.0,
+    "trained_bigram": 0.041666666666666664,
+    "lag3_task_oracle": 1.0
+  },
+  "fp32_admitted": true,
+  "train_count": 1024,
+  "test_count": 128,
+  "overlap": 0,
+  "seed": 20261112,
+  "framework": "2.7.1+cpu"
+}

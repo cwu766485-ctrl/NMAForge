@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] spad_config.tcl]
 # Generate an A53 standalone application skeleton and an FSBL directly from
 # the board XSA. This HSI-only flow works with the Vitis embedded installer;
 # it does not require the removed Classic Vitis IDE.
@@ -37,6 +38,14 @@ hsi::close_hw_design [hsi::current_hw_design]
 set bringup_dir "$OUTPUT_DIR/bringup"
 file copy -force "$REPO_ROOT/sw/baremetal/cimforge_bringup.c" $bringup_dir
 file copy -force "$REPO_ROOT/sw/include/cimforge_regs.h" $bringup_dir
+# Match the elaborated bitstream without changing the public ABI default.
+set config_fd [open "$bringup_dir/cimforge_regs.h" r]
+set config_text [read $config_fd]
+close $config_fd
+set config_fd [open "$bringup_dir/cimforge_regs.h" w]
+puts $config_fd "#define CIMFORGE_SPAD_BYTES_EXPECTED $SPAD_BYTES"
+puts -nonewline $config_fd $config_text
+close $config_fd
 
 # Keep all application code and its static DMA/descriptor buffers below 4 GiB,
 # while leaving low DDR clear for exception/null-pointer diagnostics.

@@ -1,0 +1,27 @@
+{
+  "artifacts_sha256": {
+    "round28_paired_quality.json": "e55f58b9b8f05f4f492b4741e3369ef58f9b6ff29bc15e192ab1ddc8fbcac6a6",
+    "round28_paired_windows.csv": "5b81a2abc966fef5a8d7ddaa1321557afaa9fbd60899ff2a62cf25f15f0cb743",
+    "run.log": "5d6e0fb4284485171c942a42f053f314cdbf0a62b2e53e7b403e348db75b2716"
+  },
+  "command": "/tmp/nmaforge_deit_round17_venv/bin/python benchmark/gpt2_quality/round28_paired_quality_audit.py --evidence benchmark/gpt2_quality/results/round27_extended_train --corpus benchmark/gpt2_quality/results/round25/corpus/tinyshakespeare.txt --out benchmark/gpt2_quality/results/round29/paired_quality",
+  "exit_status": 0,
+  "inputs_sha256": {
+    "corpus": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+    "fp32_checkpoint": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+    "product_int8_package": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+    "qat_checkpoint": "8674782e974cdbb1f43743b00762d854d37e3808b3a2426d3180b36bd99d3130",
+    "split_manifest": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00"
+  },
+  "run_id": "round29-gpt-paired-20261118T165341Z",
+  "runtime_versions": "Python 3.12.13; NumPy 2.5.4; PyTorch 2.6.0+cpu",
+  "source_head": "40423c543fae5e9a00defb368291d5aa43a7939c",
+  "test": {
+    "bootstrap_draws": 20000,
+    "bootstrap_seed": 20261128,
+    "sampling_seed": 20261223,
+    "targets": 8192,
+    "windows": 512
+  },
+  "utc_time": "2026-11-18T16:53:41.943694+00:00"
+}

@@ -1,0 +1,57 @@
+{
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "seed": 20261223,
+  "synthetic_model_quality_claim": false,
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "generated_tokens": [
+    83,
+    109,
+    104,
+    110
+  ],
+  "contexts": [
+    {
+      "context": 0,
+      "row": 3,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 83,
+      "logits_sha256_le_i32": "e021ea0d74fee70a8681a3ac805618b5a887f0cac26ee227ecc3693e5b71e841",
+      "rtl_dump": "/tmp/nmaforge_r28_gpt2_seed20261223_top/rtl_logits_context0.csv"
+    },
+    {
+      "context": 1,
+      "row": 4,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 109,
+      "logits_sha256_le_i32": "0ed098c80a6447faa4dfbd8db98d512c14d62f5f89d6fedc79f9d6b34a2cf122",
+      "rtl_dump": "/tmp/nmaforge_r28_gpt2_seed20261223_top/rtl_logits_context1.csv"
+    },
+    {
+      "context": 2,
+      "row": 5,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 104,
+      "logits_sha256_le_i32": "2b4838e7dabb3fb401611a33e1bc703b30c4ed931281617cad6c7ff8a672d3e9",
+      "rtl_dump": "/tmp/nmaforge_r28_gpt2_seed20261223_top/rtl_logits_context2.csv"
+    },
+    {
+      "context": 3,
+      "row": 6,
+      "logit_count": 256,
+      "golden_bit_exact": true,
+      "argmax_token": 110,
+      "logits_sha256_le_i32": "886ef7381ab323b6e2403adaf9b03d5b10e60453936d1c3d271cdabfbe9bbc26",
+      "rtl_dump": "/tmp/nmaforge_r28_gpt2_seed20261223_top/rtl_logits_context3.csv"
+    }
+  ],
+  "source_sha": "recorded by the enclosing run manifest"
+}

@@ -1,0 +1,80 @@
+{
+  "base_source_sha": "c45e307f12d05542f16068aeeb87bd8877176ed6",
+  "batch": 8,
+  "candidates": [
+    {
+      "package_sha256": "ebd3c6f639cd062f4394aa8d34c4090052da11366df218f8774cb4069fd59ac4",
+      "qat_seed": 20263031,
+      "source_seed": 20261221,
+      "test_int8_accuracy": 0.213134765625,
+      "validation_int8_accuracy": 0.21826171875
+    },
+    {
+      "package_sha256": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+      "qat_seed": 20263032,
+      "source_seed": 20261221,
+      "test_int8_accuracy": 0.2078857421875,
+      "validation_int8_accuracy": 0.22119140625
+    },
+    {
+      "package_sha256": "e4cf158fdb979cc739e4e8570e01d3ee1e33dab2bbb16062a33fc35a26b9883c",
+      "qat_seed": 20263033,
+      "source_seed": 20261221,
+      "test_int8_accuracy": 0.2064208984375,
+      "validation_int8_accuracy": 0.20947265625
+    }
+  ],
+  "context": 16,
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "elapsed_seconds": 143.1402144432068,
+  "guard_bytes": 17,
+  "learning_rate": 1e-05,
+  "qat_steps_per_seed": 200,
+  "seeds": [
+    {
+      "qat_seed": 20263031,
+      "source_seed": 20261221
+    },
+    {
+      "qat_seed": 20263032,
+      "source_seed": 20261221
+    },
+    {
+      "qat_seed": 20263033,
+      "source_seed": 20261221
+    }
+  ],
+  "split_manifest_sha256": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+  "split_ranges_half_open": {
+    "test": [
+      948101,
+      1115394
+    ],
+    "train": [
+      0,
+      780758
+    ],
+    "validation": [
+      780792,
+      948067
+    ]
+  },
+  "status": "SOFTWARE_QAT_EXPERIMENT_PRODUCT_TOP_NOT_RUN",
+  "test_starts_sha256": "c45940574e2c014f319bada52b16e13021fe5f17088486ed29b153734981fbec",
+  "test_used_for_selection": false,
+  "test_windows": 512,
+  "tool_versions": {
+    "numpy": "2.5.4",
+    "python": "3.12.13",
+    "torch": "2.6.0+cpu"
+  },
+  "train_target_bytes": 780742,
+  "validation_selected_candidate": {
+    "package_sha256": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+    "qat_seed": 20263032,
+    "rule": "highest validation product-int8 accuracy; CE tie-break",
+    "source_seed": 20261221
+  },
+  "validation_starts_sha256": "f95dae1d5b1a2e9b55aad0ea0be6173640d93e93acee3bf422a9ed0880571c4a",
+  "validation_windows": 128
+}

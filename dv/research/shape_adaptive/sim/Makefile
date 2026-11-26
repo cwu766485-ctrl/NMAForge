@@ -12,7 +12,7 @@ SPAD_JSON := $(REPO_ROOT)/benchmark/shape_adaptive_spad_summary.json
 RUN_DIR ?= /tmp/nmaforge_shape_adaptive_$(shell date +%Y%m%d_%H%M%S)
 SEEDS ?= 20261025 20261026 20261027
 VCS ?= vcs
-PYTHON ?= python3
+PYTHON ?= python3.12
 SOURCE_SHA ?= $(shell git -C "$(REPO_ROOT)" rev-parse HEAD)
 
 .PHONY: shape-adaptive-regress shape-adaptive-spad-regress
@@ -42,7 +42,7 @@ shape-adaptive-spad-regress:
 	@set -eu; for seed in $(SEEDS); do \
 	  "$(RUN_DIR)/simv" +SEED=$$seed -l "$(RUN_DIR)/seed_$$seed.log" \
 	    > "$(RUN_DIR)/seed_$$seed.stdout" 2>&1; \
-	  grep -q "^SHAPE_ADAPTIVE_SPAD_PASS seed=$$seed shapes=4 aborts=3 reset=1$$" "$(RUN_DIR)/seed_$$seed.log"; \
+	  grep -q "^SHAPE_ADAPTIVE_SPAD_PASS seed=$$seed shapes=9 aborts=3 reset=1$$" "$(RUN_DIR)/seed_$$seed.log"; \
 	done; \
 	vcs_version="$$(sed -n 's/.*Version \(V-[^ ]*\).*/\1/p' "$(RUN_DIR)/compile.log" | head -1)"; \
 	$(PYTHON) "$(SPAD_SUMMARIZER)" --run-dir "$(RUN_DIR)" --seeds $(SEEDS) \

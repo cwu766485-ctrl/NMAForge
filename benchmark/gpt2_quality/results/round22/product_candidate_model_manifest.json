@@ -1,0 +1,26 @@
+{
+  "status": "PRODUCT_TOP_CANDIDATE_PACKAGE",
+  "profile": "round21_residual_gelu_aligned",
+  "source_package": "benchmark/gpt2_quality/models/canonical_h64_byte_lm_int8.npz",
+  "source_package_sha256": "2132835994c2ecce03dc1d8e7345474eeddb271d86e34de9cc1f5ccdf2fecfc2",
+  "fp32_checkpoint": "/tmp/nmaforge_v12_r20_gpt2_quality_corrected/h64_byte_lm_fp32.pt",
+  "fp32_checkpoint_sha256": "1d59cf803c328149add9ddb004766e63043b3babdb56ea178bf96d7a51fda8df",
+  "candidate_package": "/tmp/round22_gpt2_candidate/model.npz",
+  "candidate_package_sha256": "765bfa29f545716f774c6d3ddbb7dc80106b75a5ebc40801075331d6040d3e3e",
+  "beta_transform": "round-to-even(beta / 8) for all LN beta vectors",
+  "up_weight_transform": "round-to-even(fp32 up weight * 256), signed INT8 saturation",
+  "up_weight_saturated_values": {
+    "l0.up": 0,
+    "l1.up": 0,
+    "l2.up": 0,
+    "l3.up": 0
+  },
+  "descriptor_shifts": {
+    "qkv": 0,
+    "attention_output": 7,
+    "gelu_to_int8": 5,
+    "ffn_down": 5,
+    "lm_head": 0
+  },
+  "compatibility": "candidate experiment only; does not modify product ABI defaults"
+}

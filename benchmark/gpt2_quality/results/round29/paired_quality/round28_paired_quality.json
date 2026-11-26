@@ -1,0 +1,170 @@
+{
+  "bootstrap": {
+    "draws": 20000,
+    "product_accuracy_ci95": [
+      0.2698974609375,
+      0.288330078125
+    ],
+    "product_minus_bigram_accuracy_pp_ci95": [
+      0.03662109375,
+      1.98974609375
+    ],
+    "product_minus_bigram_accuracy_pp_mean": 1.01318359375,
+    "product_minus_bigram_ce_nats_ci95": [
+      0.04232489146602169,
+      0.09093571923905208
+    ],
+    "product_minus_bigram_ce_nats_mean": 0.06641793764672901,
+    "seed": 20261128
+  },
+  "contract": {
+    "matrix_shifts": {
+      "down": 5,
+      "gelu_to_i8": 5,
+      "lm_head": 0,
+      "o": 7,
+      "qkv": 0,
+      "up": 0
+    },
+    "scales": {
+      "ln_beta_from_package_divisor": 8,
+      "logit_dequant": 32
+    },
+    "up_weight_suffix": "up_q8_8"
+  },
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "heldout_metrics": {
+    "bigram": {
+      "accuracy": 0.2689208984375,
+      "cross_entropy_nats": 2.5378480440033466,
+      "perplexity": 12.652414215040778
+    },
+    "fake_quant": {
+      "accuracy": 0.076171875,
+      "cross_entropy_nats": 6.496495982667739,
+      "perplexity": 662.8150438187663
+    },
+    "fp32": {
+      "accuracy": 0.3572998046875,
+      "cross_entropy_nats": 2.2224826504411803,
+      "perplexity": 9.230217848351662
+    },
+    "product_fp32_top1_agreement": 0.4681396484375,
+    "product_int8": {
+      "accuracy": 0.279052734375,
+      "cross_entropy_nats": 2.6042659816500757,
+      "perplexity": 13.521296779383416
+    },
+    "qat_float": {
+      "accuracy": 0.2802734375,
+      "cross_entropy_nats": 2.4958017783910273,
+      "perplexity": 12.13145635984759
+    }
+  },
+  "independent_sampling_unit": "window; bootstrap resamples whole context windows",
+  "limits": [
+    "This is byte-level Tiny-Shakespeare H64 research, not pretrained GPT-2.",
+    "Only one validation-selected seed is paired-resampled here; three-seed metrics remain separately reported.",
+    "A Product Top exact-logit pass establishes implementation correctness, not language-model quality closure."
+  ],
+  "package_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+  "paired_csv_sha256": "5b81a2abc966fef5a8d7ddaa1321557afaa9fbd60899ff2a62cf25f15f0cb743",
+  "seed": 20261223,
+  "source_note": "frozen Round27 three-seed clean-split training evidence, re-audited in Round28 worktree",
+  "status": "SOFTWARE_PAIRED_QUALITY_AUDIT_COMPLETE_PRODUCT_TOP_REQUIRED",
+  "targets_per_window": 16,
+  "test_start_sha256": "36c21c93a1c98515c4f8a6209fe016688babe19d991a3d0ad7af4573419376a2",
+  "test_window_count": 512,
+  "three_seed_aggregate_from_frozen_source": [
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.276123046875,
+        "cross_entropy_nats": 2.6407982435198605,
+        "fp32_top1_agreement": 0.4166259765625,
+        "perplexity": 14.024394022449783
+      },
+      "fp32": {
+        "accuracy": 0.3590087890625,
+        "cross_entropy_nats": 2.2194457316279514,
+        "perplexity": 9.202228947638881
+      },
+      "product_int8": {
+        "accuracy": 0.27685546875,
+        "cross_entropy_nats": 2.6371682018454567,
+        "fp32_top1_agreement": 0.4949951171875,
+        "perplexity": 13.973577177125154
+      },
+      "qat_float": {
+        "accuracy": 0.304931640625,
+        "cross_entropy_nats": 2.5317021009280234,
+        "fp32_top1_agreement": 0.5107421875,
+        "perplexity": 12.574891666115075
+      }
+    },
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.2781982421875,
+        "cross_entropy_nats": 2.609542788734573,
+        "fp32_top1_agreement": 0.3994140625,
+        "perplexity": 13.592834633753109
+      },
+      "fp32": {
+        "accuracy": 0.3544921875,
+        "cross_entropy_nats": 2.21023524014577,
+        "perplexity": 9.117861027735602
+      },
+      "product_int8": {
+        "accuracy": 0.281005859375,
+        "cross_entropy_nats": 2.616873568049513,
+        "fp32_top1_agreement": 0.4423828125,
+        "perplexity": 13.69284684053568
+      },
+      "qat_float": {
+        "accuracy": 0.3101806640625,
+        "cross_entropy_nats": 2.4859984717770587,
+        "fp32_top1_agreement": 0.4984130859375,
+        "perplexity": 12.013109018924014
+      }
+    },
+    {
+      "bigram": {
+        "accuracy": 0.2689208984375,
+        "cross_entropy_nats": 2.5378480440033466,
+        "perplexity": 12.652414215040778
+      },
+      "fake_quant": {
+        "accuracy": 0.2803955078125,
+        "cross_entropy_nats": 2.6164140114505248,
+        "fp32_top1_agreement": 0.3695068359375,
+        "perplexity": 13.686555648101395
+      },
+      "fp32": {
+        "accuracy": 0.3572998046875,
+        "cross_entropy_nats": 2.2224826504411803,
+        "perplexity": 9.230217848351662
+      },
+      "product_int8": {
+        "accuracy": 0.279052734375,
+        "cross_entropy_nats": 2.6042659816500757,
+        "fp32_top1_agreement": 0.4681396484375,
+        "perplexity": 13.521296779383416
+      },
+      "qat_float": {
+        "accuracy": 0.2802734375,
+        "cross_entropy_nats": 2.4958017783910273,
+        "fp32_top1_agreement": 0.6234130859375,
+        "perplexity": 12.13145635984759
+      }
+    }
+  ]
+}

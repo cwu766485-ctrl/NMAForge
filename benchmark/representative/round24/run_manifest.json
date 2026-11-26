@@ -1,0 +1,586 @@
+{
+  "artifact_hashes": {
+    "benchmark/representative/round24/dataset_manifest.json": {
+      "bytes": 418,
+      "sha256": "2dbe973c335689a0461aa15b92e8cf305901cd25bf94981e4dfc581469a121a6"
+    },
+    "benchmark/representative/round24/heldout_sequences.json": {
+      "bytes": 26890,
+      "sha256": "e08a5d641e83fe5b5062ddcceccba512ee1bf3739a89aadabd62da54f429856f"
+    },
+    "benchmark/representative/round24/layerwise_error_baseline.csv": {
+      "bytes": 2500,
+      "sha256": "8c9c0b0652af2c2ffab98234bee520004d3903caa676a60ff70155f1e95ab425"
+    },
+    "benchmark/representative/round24/layerwise_error_baseline.json": {
+      "bytes": 19277,
+      "sha256": "d899d89215d77705ca8fe5a505106e8ec17e96b8e23600c461d8b1e48e69a1e2"
+    },
+    "benchmark/representative/round24/layerwise_error_qat.csv": {
+      "bytes": 2532,
+      "sha256": "2ef7d9b919284b73e83300e6ce8698c8b404002205f8f8a2fff968f51332cbaa"
+    },
+    "benchmark/representative/round24/layerwise_error_qat.json": {
+      "bytes": 19331,
+      "sha256": "87eb41e6eee105006be6277889196a15dec6a222721366d7a8feb55054e1567b"
+    },
+    "benchmark/representative/round24/layerwise_threeway.csv": {
+      "bytes": 3141,
+      "sha256": "73e3c3df18c64895fbd7c8625ca1de1069d7678337a452b124bab2106e46e985"
+    },
+    "benchmark/representative/round24/layerwise_threeway_baseline.csv": {
+      "bytes": 3169,
+      "sha256": "8bb3a98cf8dd35b10b50e9f988e25c4dcd899ae8bc9c8b518abfcd75f1601733"
+    },
+    "benchmark/representative/round24/logs/baseline_layerwise_analysis.log": {
+      "bytes": 554,
+      "sha256": "4b972c62324b94dce96b7fd4dff92c11822fe860333d71a7241cbf911fa48344"
+    },
+    "benchmark/representative/round24/logs/generator.log": {
+      "bytes": 252,
+      "sha256": "7bcf4ed3aca09e2518dae7b2bec871a53a8aff24ca80dc898f01d13a4c42ed82"
+    },
+    "benchmark/representative/round24/logs/qat_layerwise_analysis.log": {
+      "bytes": 599,
+      "sha256": "e44c536d407875bbdfa7ec9501abc002112df760b64c49d4274d0a16b3fe7bea"
+    },
+    "benchmark/representative/round24/logs/top_session.log": {
+      "bytes": 129469,
+      "sha256": "64d51f2bec9eacf0a819a68f5b901accdf1e0b9c0f28f87dc86492ae313fc747"
+    },
+    "benchmark/representative/round24/logs/training_reproduction.log": {
+      "bytes": 796,
+      "sha256": "fe2c9353e9b6e885e9c1964e6865dff72c33da9f95bb9121d4b742a64d717a6a"
+    },
+    "benchmark/representative/round24/logs/vcs_compile.log": {
+      "bytes": 9259,
+      "sha256": "c638906518f4a5acda931c7051b523635e5a3945136dff2d31d6387d301e5907"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_int8_reference.json": {
+      "bytes": 53916,
+      "sha256": "aba728a861f3b63f79032c8b1666ea18486b2e6d900cef47b4067e9571d76da1"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_post_qat_fp32.pt": {
+      "bytes": 14439,
+      "sha256": "f56f4ce74405c41a9dba4a597e7033b6683a4a3ab34d4202903a369beef158c5"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_pre_qat_fp32.pt": {
+      "bytes": 14421,
+      "sha256": "556c89639eda5b76f820d88c287530d2b8db75b482f44a8c9181fbc417365500"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm16_int8.json": {
+      "bytes": 36927,
+      "sha256": "9ed203ef73b8a4480817f07f7f967620c4d55a891086b788b7708f3f8d112cef"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm16_reference.json": {
+      "bytes": 53791,
+      "sha256": "0b3451e058f65636e92ea17709be2bf402ed3f7910ba5e72a039d216802d82e5"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm32_int8.json": {
+      "bytes": 36946,
+      "sha256": "1fa0b6f17a179a376e00abf179000c2e39bc80dbca75c0cee932d8f252588a38"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm32_reference.json": {
+      "bytes": 53846,
+      "sha256": "51de35f7e63bd70b5072f1894536a7c01956e72ca6e276e22b25d86f43f3515f"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm8_int8.json": {
+      "bytes": 36899,
+      "sha256": "982c4e0fd4977d21fb148ba18b151ce3dae5106146678d4834bf42176e9779c1"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_ptq_norm8_reference.json": {
+      "bytes": 53709,
+      "sha256": "6d212e69a0ffd4c6dcf922e128591aeb49a3a1d541babc142ab642862d2177a4"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_qat40_int8.json": {
+      "bytes": 37217,
+      "sha256": "7284146e518882986cfb3d392e300fa6b6ebec85284436742a24082469891a72"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_qat40_reference.json": {
+      "bytes": 53744,
+      "sha256": "a3a5b8e45de6a473e9751e8a42de580bb041d5599e7ed2b3758823f0221ec078"
+    },
+    "benchmark/representative/round24/models/tiny_gpt2_h16_qat_int8.json": {
+      "bytes": 37721,
+      "sha256": "530471bee248a3271325c00f6b635f9cab3b445f5c370eb1785905beed338b44"
+    },
+    "benchmark/representative/round24/opcode_profile.csv": {
+      "bytes": 15908,
+      "sha256": "edee51d034b31a2f535aef0959f5f4a06fbfecddd0575667a1cfcc67615a2370"
+    },
+    "benchmark/representative/round24/opcode_profile.json": {
+      "bytes": 1691,
+      "sha256": "e4696107509ab38774ea6897445bef143db5211b15bc8a4f0214251a4fae279b"
+    },
+    "benchmark/representative/round24/persistent_decode.csv": {
+      "bytes": 4416,
+      "sha256": "c8b1c521b9d2fcd77c11d521b24cb95d0c4f92b87fd816297e2c2079d24b280b"
+    },
+    "benchmark/representative/round24/persistent_decode.json": {
+      "bytes": 14244,
+      "sha256": "5e1ebedcb1b24595578722d4cdf1ef1ab2807e25fbcac0c11cbedbb190d3ef6f"
+    },
+    "benchmark/representative/round24/quantization_sweep.json": {
+      "bytes": 5014,
+      "sha256": "93d5656fa7dba6ca856c95452b689f7025b2cc1875c58fdb94548d5104ae82f7"
+    },
+    "benchmark/representative/round24/top_session_manifest.json": {
+      "bytes": 328898,
+      "sha256": "571c23a0eeec600ab5183d44c79416cbcbb0cf165ba120cccf127933a8be7ff0"
+    },
+    "benchmark/representative/round24/top_workload/initial_memory.memh": {
+      "bytes": 224649,
+      "sha256": "3d6dce4b955a740e23be0c52bdf98ffe4e34d3c4c2b2217c4dcbafef7054ddd1"
+    },
+    "benchmark/representative/round24/top_workload/manifest.json": {
+      "bytes": 328898,
+      "sha256": "571c23a0eeec600ab5183d44c79416cbcbb0cf165ba120cccf127933a8be7ff0"
+    },
+    "benchmark/representative/round24/top_workload/stage_0_prefill_kv_0_3_desc.memh": {
+      "bytes": 5787,
+      "sha256": "d071df7f7e268d520435f10d244e0d6203f0824ba26038a42c6d7fa09c79bde4"
+    },
+    "benchmark/representative/round24/top_workload/stage_0_prefill_kv_0_3_golden.memh": {
+      "bytes": 6633,
+      "sha256": "73209e1d48e1684e20fbafe486a0d3f1239a718a4949fb39df8b0c0ef15e4aa6"
+    },
+    "benchmark/representative/round24/top_workload/stage_0_prefill_kv_0_3_observed.memh": {
+      "bytes": 6633,
+      "sha256": "73209e1d48e1684e20fbafe486a0d3f1239a718a4949fb39df8b0c0ef15e4aa6"
+    },
+    "benchmark/representative/round24/top_workload/stage_0_prefill_kv_0_3_poison.memh": {
+      "bytes": 5481,
+      "sha256": "23121dd83baa6bf38bcebf753c70cc73993fce2d3151926e0e3366dfbb9a831b"
+    },
+    "benchmark/representative/round24/top_workload/stage_1_decode_t4_desc.memh": {
+      "bytes": 7659,
+      "sha256": "094703145dc49912c68d54e7bb3865eec529ed28356b86d84910fb776ec96ebb"
+    },
+    "benchmark/representative/round24/top_workload/stage_1_decode_t4_golden.memh": {
+      "bytes": 24489,
+      "sha256": "5e24d8aa1a5faa0354c23577863d0b78a62c12534e695590c2ec164d611a7b3c"
+    },
+    "benchmark/representative/round24/top_workload/stage_1_decode_t4_observed.memh": {
+      "bytes": 24489,
+      "sha256": "5e24d8aa1a5faa0354c23577863d0b78a62c12534e695590c2ec164d611a7b3c"
+    },
+    "benchmark/representative/round24/top_workload/stage_1_decode_t4_poison.memh": {
+      "bytes": 23337,
+      "sha256": "a7bdbc3f3bc844603d9cbd45bc3108dc7cc923389eec90d725fa254e1127d0fa"
+    },
+    "benchmark/representative/round24/top_workload/stage_2_decode_t5_desc.memh": {
+      "bytes": 7659,
+      "sha256": "873bceea6feb10107ae54b1eabcacb13025b8622ab6471a31802de51fe8ef9cc"
+    },
+    "benchmark/representative/round24/top_workload/stage_2_decode_t5_golden.memh": {
+      "bytes": 24489,
+      "sha256": "8c190cdc94f0d8a7d5752a24441008e125bce012ff4190cf159d0ab2af6031e3"
+    },
+    "benchmark/representative/round24/top_workload/stage_2_decode_t5_observed.memh": {
+      "bytes": 24489,
+      "sha256": "8c190cdc94f0d8a7d5752a24441008e125bce012ff4190cf159d0ab2af6031e3"
+    },
+    "benchmark/representative/round24/top_workload/stage_2_decode_t5_poison.memh": {
+      "bytes": 23337,
+      "sha256": "a045fb0c1f948b7658f62e9eb9972c804bc233aff48214af211cc26734a35db0"
+    },
+    "benchmark/representative/round24/top_workload/stage_3_decode_t6_desc.memh": {
+      "bytes": 7659,
+      "sha256": "6c54633abe2b5d1679e79d03b903cb6864c9cf9f86b975a587b391c9f9f6a4e4"
+    },
+    "benchmark/representative/round24/top_workload/stage_3_decode_t6_golden.memh": {
+      "bytes": 24489,
+      "sha256": "01d8c373381bc462d165a5ff21d19d189cb1bd69d433da9f976e8da5b22c9852"
+    },
+    "benchmark/representative/round24/top_workload/stage_3_decode_t6_observed.memh": {
+      "bytes": 24489,
+      "sha256": "01d8c373381bc462d165a5ff21d19d189cb1bd69d433da9f976e8da5b22c9852"
+    },
+    "benchmark/representative/round24/top_workload/stage_3_decode_t6_poison.memh": {
+      "bytes": 23337,
+      "sha256": "6941d9954a308d22717d8f5e8fb2a37bfbc528f21fa0007dad92686b26598215"
+    },
+    "benchmark/representative/round24/top_workload/stage_4_decode_t7_desc.memh": {
+      "bytes": 7659,
+      "sha256": "756f7fa0662d677ae4212f62e6f4185044b3e6d5c2b56414f97341b38332fe18"
+    },
+    "benchmark/representative/round24/top_workload/stage_4_decode_t7_golden.memh": {
+      "bytes": 24489,
+      "sha256": "49030b0e0621be013b7e725488bbffc2301338c246a2e7366d2a2e6d9da40154"
+    },
+    "benchmark/representative/round24/top_workload/stage_4_decode_t7_observed.memh": {
+      "bytes": 24489,
+      "sha256": "49030b0e0621be013b7e725488bbffc2301338c246a2e7366d2a2e6d9da40154"
+    },
+    "benchmark/representative/round24/top_workload/stage_4_decode_t7_poison.memh": {
+      "bytes": 23337,
+      "sha256": "963d82444f22a52a06d295813b84af46611385dc784ee4937a14130df79a5fe6"
+    },
+    "benchmark/representative/round24/top_workload/stage_5_decode_t8_desc.memh": {
+      "bytes": 7659,
+      "sha256": "43760020b41eba0c24d1adf1e93d643611cdcd9ef0bba601cedfa10cf08101f7"
+    },
+    "benchmark/representative/round24/top_workload/stage_5_decode_t8_golden.memh": {
+      "bytes": 24489,
+      "sha256": "2bd01d8c5b0956f1f834b1ee6c6a4d5022310732ff0c18a0a3af0f7caca2ae5f"
+    },
+    "benchmark/representative/round24/top_workload/stage_5_decode_t8_observed.memh": {
+      "bytes": 24489,
+      "sha256": "2bd01d8c5b0956f1f834b1ee6c6a4d5022310732ff0c18a0a3af0f7caca2ae5f"
+    },
+    "benchmark/representative/round24/top_workload/stage_5_decode_t8_poison.memh": {
+      "bytes": 23337,
+      "sha256": "ac6a9d2c170c1d9db29d71f3e8a4309ab500f162946c6659974a0462ad347035"
+    },
+    "benchmark/representative/round24/top_workload/stage_6_decode_t9_desc.memh": {
+      "bytes": 7659,
+      "sha256": "27744339f47530379750d6a4aedb6b326a5def7b36351858798239ff4f573d53"
+    },
+    "benchmark/representative/round24/top_workload/stage_6_decode_t9_golden.memh": {
+      "bytes": 24489,
+      "sha256": "42db6503624f1e294e751a2d158854bbab7ea544faacc9cd332e5bed5c6be978"
+    },
+    "benchmark/representative/round24/top_workload/stage_6_decode_t9_observed.memh": {
+      "bytes": 24489,
+      "sha256": "42db6503624f1e294e751a2d158854bbab7ea544faacc9cd332e5bed5c6be978"
+    },
+    "benchmark/representative/round24/top_workload/stage_6_decode_t9_poison.memh": {
+      "bytes": 23337,
+      "sha256": "597a1f9d84a46bbdc22bc9a45aaea2c70437b4ba3617450a36c04e54cd0a6407"
+    },
+    "benchmark/representative/round24/top_workload/stage_7_decode_t10_desc.memh": {
+      "bytes": 7659,
+      "sha256": "0e9a0c56618122a667c036907b1469b486848054e8e9d3313ead97283b1b7977"
+    },
+    "benchmark/representative/round24/top_workload/stage_7_decode_t10_golden.memh": {
+      "bytes": 24489,
+      "sha256": "2b61a28464397cf7d46c8a1688c6fe0b4957538bf78d1e3e9832d9422d9a13cd"
+    },
+    "benchmark/representative/round24/top_workload/stage_7_decode_t10_observed.memh": {
+      "bytes": 24489,
+      "sha256": "2b61a28464397cf7d46c8a1688c6fe0b4957538bf78d1e3e9832d9422d9a13cd"
+    },
+    "benchmark/representative/round24/top_workload/stage_7_decode_t10_poison.memh": {
+      "bytes": 23337,
+      "sha256": "404cfab02a98a094b3aac7372120f3bcdf640e7f0e8fff001530c5a566dce2a7"
+    },
+    "benchmark/representative/round24/top_workload/stage_8_decode_t11_desc.memh": {
+      "bytes": 7659,
+      "sha256": "42907ef0ac8350f42a8fc763c1b5278790bd75f051422744170a13e052185f6f"
+    },
+    "benchmark/representative/round24/top_workload/stage_8_decode_t11_golden.memh": {
+      "bytes": 24489,
+      "sha256": "4194912c65b9f682cdfcf147c3fff992a2bd1e442aa8ec0e17fbb1721cfa9d1d"
+    },
+    "benchmark/representative/round24/top_workload/stage_8_decode_t11_observed.memh": {
+      "bytes": 24489,
+      "sha256": "4194912c65b9f682cdfcf147c3fff992a2bd1e442aa8ec0e17fbb1721cfa9d1d"
+    },
+    "benchmark/representative/round24/top_workload/stage_8_decode_t11_poison.memh": {
+      "bytes": 23337,
+      "sha256": "acd2f72d96be9a8abd8e6f53fd1ed9001ef98b9d80c4bb76552dd95955d0eb52"
+    }
+  },
+  "disposition": "PARTIAL",
+  "environment": {
+    "cxx": "g++ (GCC) 8.5.0 20210514 (Red Hat 8.5.0-28)",
+    "numpy": "2.4.6",
+    "os": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.28",
+    "python": {
+      "path": "/tmp/nmaforge_round23_torch/bin/python",
+      "version": "3.12.13"
+    },
+    "pytorch": "PyTorch 2.7.1+cpu CPU",
+    "vcs": {
+      "license_status": "compile and simulation succeeded; no license endpoint/credential recorded",
+      "path": "/usr/local/bin/vcs",
+      "version": "V-2023.12-SP1_Full64"
+    }
+  },
+  "round": 24,
+  "runs": [
+    {
+      "analysis_tool_sha256": "81f1aed1fc3bf5ad56816f04ada99c8973c603cb8873aea4fd843ef2798212fc",
+      "baseline_float_decode_positions_4_to_7": {
+        "cross_entropy_nats": 0.5852722525596619,
+        "next_token_accuracy": 0.8212890625,
+        "perplexity": 1.795479743060021
+      },
+      "baseline_initial_independent_int8": {
+        "cross_entropy_nats": 30.39912959599184,
+        "next_token_accuracy": 0.087158203125,
+        "perplexity": 15928476466190.965
+      },
+      "command": "/tmp/nmaforge_round23_torch/bin/python sw/tools/train_tiny_gpt2.py --out benchmark/representative/round24/models/tiny_gpt2_h16_qat_int8.json --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024 --norm-output-scale 16 --gelu-output-scale 64 --wdown-weight-scale 16 --qat-epochs 120 --qat-lr 0.0002 --float-checkpoint-dir benchmark/representative/round24/models",
+      "final_qat_fake_quant_metrics": {
+        "decode_accuracy": 0.362548828125,
+        "decode_cross_entropy_nats": 2.3455755710601807,
+        "decode_perplexity": 10.439279545903439
+      },
+      "final_qat_float_metrics": {
+        "decode_accuracy": 0.21435546875,
+        "decode_cross_entropy_nats": 6.406151294708252,
+        "decode_perplexity": 605.5585738864266
+      },
+      "final_qat_independent_int8_metrics": {
+        "cross_entropy_nats": 2.387595182704557,
+        "next_token_accuracy": 0.380615234375,
+        "perplexity": 10.887280515938475
+      },
+      "heldout_scope": "1024 fixed synthetic sequences; positions 4..7, 4096 predictions; not natural-language pretraining",
+      "heldout_seed": 20261125,
+      "model_sha256": "530471bee248a3271325c00f6b635f9cab3b445f5c370eb1785905beed338b44",
+      "post_qat_fp32_checkpoint_sha256": "f56f4ce74405c41a9dba4a597e7033b6683a4a3ab34d4202903a369beef158c5",
+      "pre_qat_fp32_checkpoint_sha256": "556c89639eda5b76f820d88c287530d2b8db75b482f44a8c9181fbc417365500",
+      "reproduction_log": "benchmark/representative/round24/logs/training_reproduction.log",
+      "run_id": "R24-TRAIN-H16-QAT120-S20261123",
+      "scale_sweep": "benchmark/representative/round24/quantization_sweep.json",
+      "seed": 20261123,
+      "status": "PASS_REPRODUCED_ARTIFACT",
+      "trainer_sha256_at_top_model_creation": "f3811c7be379df1534bd1ce7e636ae8e321af135bd6fbdea3f38c0fd64bdbf6a",
+      "trainer_sha256_reproduction": "96f98a7dd100baa6282bcb9697266c70626963fbc9250391f237b9d87d4f24d2"
+    },
+    {
+      "analysis_tool_sha256": "81f1aed1fc3bf5ad56816f04ada99c8973c603cb8873aea4fd843ef2798212fc",
+      "command": "/tmp/nmaforge_round23_torch/bin/python sw/tools/analyze_tiny_gpt2_quantization.py --model benchmark/representative/round23/tiny_gpt2_h16_model.json --out <fresh-output-dir> --seed 20261123 --epochs 120 --train-sequences 4096 --test-sequences 1024",
+      "csv": "benchmark/representative/round24/layerwise_error_baseline.csv",
+      "json": "benchmark/representative/round24/layerwise_error_baseline.json",
+      "log": "benchmark/representative/round24/logs/baseline_layerwise_analysis.log",
+      "model_sha256": "e557225f55db9699ba2c5b5e60c904fc1adbda7043437ea2b17909127f5b1c36",
+      "run_id": "R24-BASELINE-LAYERWISE-S20261123",
+      "status": "PASS_DIAGNOSTIC",
+      "threeway_csv": "benchmark/representative/round24/layerwise_threeway_baseline.csv",
+      "trainer_sha256": "96f98a7dd100baa6282bcb9697266c70626963fbc9250391f237b9d87d4f24d2"
+    },
+    {
+      "analysis_tool_sha256": "81f1aed1fc3bf5ad56816f04ada99c8973c603cb8873aea4fd843ef2798212fc",
+      "command": "/tmp/nmaforge_round23_torch/bin/python sw/tools/analyze_tiny_gpt2_quantization.py --model benchmark/representative/round24/models/tiny_gpt2_h16_qat_int8.json --float-checkpoint benchmark/representative/round24/models/tiny_gpt2_h16_post_qat_fp32.pt --out <fresh-output-dir> --seed 20261123 --test-sequences 1024",
+      "csv": "benchmark/representative/round24/layerwise_error_qat.csv",
+      "float_checkpoint_sha256": "f56f4ce74405c41a9dba4a597e7033b6683a4a3ab34d4202903a369beef158c5",
+      "json": "benchmark/representative/round24/layerwise_error_qat.json",
+      "log": "benchmark/representative/round24/logs/qat_layerwise_analysis.log",
+      "model_sha256": "530471bee248a3271325c00f6b635f9cab3b445f5c370eb1785905beed338b44",
+      "run_id": "R24-QAT-LAYERWISE-S20261123",
+      "status": "PASS_DIAGNOSTIC",
+      "threeway_csv": "benchmark/representative/round24/layerwise_threeway.csv",
+      "trainer_sha256": "96f98a7dd100baa6282bcb9697266c70626963fbc9250391f237b9d87d4f24d2"
+    },
+    {
+      "actual_sim_command": [
+        "/tmp/nmaforge_round24_final_build/simv",
+        "+ntb_random_seed=20261123",
+        "+AI_RANDOM_CASES=0",
+        "+AI_SEED=20261123",
+        "+ACLK_PERIOD_NS=4",
+        "+AI_H16_INCREMENTAL_DECODE",
+        "+AI_H16_DECODE_STEPS=8",
+        "+AI_H16_USEFUL_MACS_EXTRA=512",
+        "+AI_H16_INCREMENTAL_DIR=/tmp/nmaforge_round24_checkpoint/top_session_final/workload"
+      ],
+      "compile_command": "vcs -full64 -full64 -sverilog -debug_access+all -kdb -timescale=1ns/1ps \\",
+      "compile_log": "benchmark/representative/round24/logs/vcs_compile.log",
+      "decode_mean_cycles_per_token": 9039.0,
+      "decode_spad_read_bytes": 72448,
+      "decode_spad_write_bytes": 42112,
+      "decode_steps": [
+        {
+          "cycles": 8887,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 4,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2208
+        },
+        {
+          "cycles": 8991,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 5,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2240
+        },
+        {
+          "cycles": 9130,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 6,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2272
+        },
+        {
+          "cycles": 8876,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 7,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2304
+        },
+        {
+          "cycles": 9260,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 8,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2304
+        },
+        {
+          "cycles": 9208,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 9,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2304
+        },
+        {
+          "cycles": 9006,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 10,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2304
+        },
+        {
+          "cycles": 8954,
+          "descriptors": 53,
+          "golden_words": 1360,
+          "kv_hash_match": true,
+          "logits_bit_exact": "True",
+          "position": 11,
+          "spad_read_bytes": 9056,
+          "spad_write_bytes": 5264,
+          "useful_macs": 2304
+        }
+      ],
+      "decode_total_cycles": 72312,
+      "decode_total_descriptors": 424,
+      "decode_total_golden_words": 10880,
+      "decode_total_useful_macs": 18240,
+      "decode_useful_macs_per_cycle": 0.2522402920677066,
+      "excluded_from_latency": [
+        "model/weight load",
+        "initial SPAD population",
+        "host embedding/position preparation",
+        "descriptor programming",
+        "final output readback",
+        "token selection/tokenizer",
+        "host-side time"
+      ],
+      "exclusive_interval_cycle_closure": true,
+      "feedback": "host-supplied teacher forcing; logits checked but not fed to a live token selector",
+      "generator_command": [
+        "/tmp/nmaforge_round23_torch/bin/python",
+        "/tmp/nmaforge-round24/sw/tools/generate_h16_incremental_decode.py",
+        "--model",
+        "/tmp/nmaforge_round24_checkpoint/model.json",
+        "--out",
+        "/tmp/nmaforge_round24_checkpoint/top_session_final/workload",
+        "--prefill-tokens",
+        "0,14,20,29",
+        "--decode-tokens",
+        "13,28,18,11,7,6,8,13"
+      ],
+      "generator_log": "benchmark/representative/round24/logs/generator.log",
+      "opcode_profile": {
+        "GELU": {
+          "cycles": 3184,
+          "descriptors": 8
+        },
+        "GEMM": {
+          "cycles": 8688,
+          "descriptors": 128
+        },
+        "KV_Read": {
+          "cycles": 2624,
+          "descriptors": 32
+        },
+        "KV_Write": {
+          "cycles": 2528,
+          "descriptors": 48
+        },
+        "LayerNorm": {
+          "cycles": 23872,
+          "descriptors": 64
+        },
+        "Requant": {
+          "cycles": 14816,
+          "descriptors": 104
+        },
+        "Residual": {
+          "cycles": 12720,
+          "descriptors": 24
+        },
+        "Softmax": {
+          "cycles": 3880,
+          "descriptors": 16
+        }
+      },
+      "prefill_cycles": 2734,
+      "prefill_descriptors": 40,
+      "prefill_golden_words": 368,
+      "rtl_tree_sha256": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+      "run_id": "R24-TOP-PERSISTENT-S20261123",
+      "seed": 20261123,
+      "session": "one VCS process, one initial reset/load; Prefill 4 then Decode 8; DUT and KV retained between batches",
+      "sfu_busy_counter_overlaps_exclusive_intervals": true,
+      "sfu_busy_cycles": 56000,
+      "simulation_log": "benchmark/representative/round24/logs/top_session.log",
+      "source_commit": "c48c641ad320a2c56c6e1c3d57a0ccb7c22ec7f5",
+      "status": "PERSISTENT_TOP_DECODE_PASS",
+      "window_policy": "8-entry rolling cache; overwrite oldest after full; position embedding wraps modulo 8",
+      "workload_dir": "benchmark/representative/round24/top_workload",
+      "workload_manifest_sha256": "571c23a0eeec600ab5183d44c79416cbcbb0cf165ba120cccf127933a8be7ff0",
+      "wrapper_command": "python3 sw/tools/run_tiny_gpt2_persistent_session.py --model benchmark/representative/round24/models/tiny_gpt2_h16_qat_int8.json --simv <compiled-simv> --out <fresh-run-dir> --seed 20261123 --steps 8"
+    }
+  ],
+  "source": {
+    "requested_baseline_commit": "1c54ac593808126439a5b46109a674065e5525e4",
+    "round24_product_rtl_changed": false,
+    "tested_top_commit": "c48c641ad320a2c56c6e1c3d57a0ccb7c22ec7f5",
+    "tested_top_rtl_tree_sha256": "fae8778d62c06c324bf5be0b5cbfea6843141e08",
+    "tiny_npu_pinned_sha": "8216c22b762011aa20c05fc2768423fd12dda59d"
+  },
+  "source_artifacts": {
+    "sw/tools/analyze_tiny_gpt2_quantization.py": "81f1aed1fc3bf5ad56816f04ada99c8973c603cb8873aea4fd843ef2798212fc",
+    "sw/tools/generate_h16_incremental_decode.py": "34103c8a3c5977afaffa0f186ca23453cb95a2258c4059d8de0d131f1119875a",
+    "sw/tools/reference_tiny_gpt2_int8.py": "52c00998478b56dc91e7f9b5581b5b4ac6abfdfb79774633cb143ccb06b8f719",
+    "sw/tools/run_tiny_gpt2_persistent_session.py": "8192082bee3429bca6b17a053b9358a8933d41bf9002badf3a75df9cb052a520",
+    "sw/tools/train_tiny_gpt2.py": "96f98a7dd100baa6282bcb9697266c70626963fbc9250391f237b9d87d4f24d2"
+  },
+  "tiny_npu": {
+    "historical_comparison": "prior paired shapes use NMA controller plus behavioral SPAD vs Tiny direct array plus modeled memory; timing endpoints differ",
+    "reference_sha": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "round24_rerun": "NOT_RUN",
+    "same_transformer_endpoint": "NOT_RUN",
+    "system_speedup_claim": "NONE"
+  },
+  "tool_status": {
+    "asic_synthesis": "NOT_RUN",
+    "full_dv_signoff": "NOT_RUN",
+    "persistent_top_functional": "PASS",
+    "python_compile": "PASS",
+    "tiny_npu_transformer": "NOT_RUN",
+    "trainer_hash_reproduction": "PASS",
+    "vcs_compile": "PASS"
+  }
+}

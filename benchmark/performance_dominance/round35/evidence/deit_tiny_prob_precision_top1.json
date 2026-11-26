@@ -1,0 +1,27 @@
+{
+  "model": "facebook/deit-tiny-patch16-224",
+  "images": 500,
+  "calib_images": 20,
+  "configs": {
+    "ln_rnd_q7r_lut8": {
+      "top1": 0.7639999985694885,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "q7r",
+      "gelu": "lut8",
+      "ln_round_bits": 4
+    },
+    "ln_rnd_u8r_lut8": {
+      "top1": 0.765999972820282,
+      "w8": "g16p2",
+      "a8": "p2",
+      "res": true,
+      "ln": true,
+      "sm": "u8r",
+      "gelu": "lut8",
+      "ln_round_bits": 4
+    }
+  }
+}

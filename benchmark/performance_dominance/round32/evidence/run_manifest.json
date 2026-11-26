@@ -1,0 +1,128 @@
+{
+  "round": "NMAForge V1.3 Round 32 - TinyNPU Performance Catch-up Sprint",
+  "overall_status": "CATCH_UP_PARTIAL",
+  "objective": "Reach documented minimum and challenge GEMM/GEMV targets without growing the 256-MAC array or default 128 KiB SPAD.",
+  "repository": {
+    "base_commit": "8f2ed82c7d7a58885bc19f0b263490f7817a5f51",
+    "branch": "research/nmaforge-v1.3-round32-tinynpu-catchup",
+    "candidate_rtl_tree_sha256": "ec5082c7e675e5bfed98b9d5b906bb9f224bcb08f6b51c84b505ca712894a803",
+    "matrix_core_sha256": "d82d83d3dff80c0f27b71aeb03aef487da75b50503505e12ebb52e6e9815339a",
+    "round32_tb_sha256": "eba2a895dfa5dd1029f4351a1551d031edac8c1e0fd16af83b9df206e6307446"
+  },
+  "tiny_npu": {
+    "pinned_head": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "old_historical_csv_head": "38a2498af81f78b9dd8f81144026cf45e2b8328c",
+    "note": "Fresh Round32 direct-array data was rerun at 8216c22; old 3166/790 historical CSV uses 38a2498 and is not mixed into the fresh set."
+  },
+  "environment": {
+    "VCS": "V-2023.12-SP1",
+    "VC Formal": "V-2023.12-SP2",
+    "Verilator": "5.052",
+    "Python": "3.12.13 temporary venv for TinyNPU model tooling",
+    "memory": "behavioral SPAD model; no foundry SRAM model",
+    "PPA": "BLOCKED_ENV: dc_shell unavailable and TSMC28_STDCELL_DB unset"
+  },
+  "targets": [
+    {
+      "metric": "GEMM 64x64x64 fixed",
+      "minimum": "<=3000",
+      "result": 2768,
+      "status": "PASS",
+      "challenge": "<=2600",
+      "challenge_status": "MISS"
+    },
+    {
+      "metric": "GEMM 64x64x64 seeded",
+      "minimum": "<=3800",
+      "results": {
+        "20261122": 3550,
+        "20261124": 3529,
+        "20261125": 3546
+      },
+      "status": "PASS_ALL",
+      "challenge": "<=3200",
+      "challenge_status": "MISS"
+    },
+    {
+      "metric": "GEMV 1x64x64 wide descriptor",
+      "minimum": "<=500",
+      "fixed": 358,
+      "seeds": {
+        "20261122": 433,
+        "20261124": 467,
+        "20261125": 479
+      },
+      "status": "PASS_ALL",
+      "challenge": "<=400",
+      "challenge_status": "FIXED_ONLY"
+    },
+    {
+      "metric": "GEMM SPAD read bytes",
+      "minimum": "<=16384",
+      "challenge": "<=12288",
+      "result": 8192,
+      "status": "PASS_MIN_AND_CHALLENGE"
+    },
+    {
+      "metric": "GEMM fixed array utilization",
+      "minimum": ">=34%",
+      "challenge": ">=39%",
+      "result": 37.0,
+      "status": "PASS_MIN_MISS_CHALLENGE"
+    }
+  ],
+  "files": {
+    "comparison": "evidence/comparison.csv",
+    "cycle_breakdown": "evidence/cycle_breakdown.csv",
+    "ablation": "evidence/ablation.csv",
+    "ppa_guardrail": "evidence/ppa_guardrail.csv"
+  },
+  "verification": {
+    "top_smoke": "PASS",
+    "top_seeded_20": "PASS",
+    "descriptor_validator": "PASS 49 accept / 28 reject",
+    "compute_cluster_UVM": "PASS at SPAD 128/256/512 KiB",
+    "matrix_FSM_formal": "PASS 5/5 assertions and 2/2 covers",
+    "GEMV_request_stability_formal": "TIMEOUT at 360 s; proof unresolved",
+    "GEMM_Golden": "PASS all four shapes, fixed and seeds 20261122/24/25",
+    "wide_GEMV_Golden": "PASS four shapes, fixed and seeds 20261122/24/25",
+    "TinyNPU_compute_engine_regression": "PASS 6/6",
+    "TinyNPU_CNN": "PASS 4/4 bytes",
+    "NMAForge_Product_Top_ONNX": "PASS byte exact",
+    "PPA": "BLOCKED_ENV"
+  },
+  "cnn_hashes": {
+    "model": "1ac385ac18394ac5826a7eb426e99c2199bf6417055f7e3f461c40c1b1811640",
+    "input": "a74587bfcb5b2dfcd9eed1dbbb4fcf657628264c3b0aae7a4c278f0f70705898",
+    "golden": "94642359b0fdf8a4b56f8b17346b0385a477d782b4874bb7d1e979a589eab49c"
+  },
+  "formal_and_ppa_notes": [
+    "FSM proof passed; GEMV request-stability proof did not finish within 360 seconds and remains unresolved.",
+    "PPA is unmeasured because private foundry libraries and dc_shell were unavailable."
+  ],
+  "measurement_policy": [
+    "TinyNPU direct-array cycles and NMAForge Product Top cycles use different endpoints; cross-engine speedup is NOT_COMPARABLE.",
+    "Synthetic Product Top CNN fusion runs are separate from the freshly rerun TinyNPU CNN graph.",
+    "Raw simulation output remains under /tmp and is deliberately not checked in; source log paths are recorded in CSV."
+  ],
+  "commands": [
+    "cd dv/subsystem/top_smoke/sim && make ai_smoke AI_RANDOM_CASES=4 AI_SEED=12345",
+    "cd dv/subsystem/top_smoke/sim && make ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+    "cd dv/block/control/sim && make descriptor-validator-regress DESCRIPTOR_VALIDATOR_OUT=/tmp/nmaforge_round32_descriptor_validator_final",
+    "cd dv/uvm/sim && make uvm_compute_cluster_regress SPAD_KIB=128 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_round32_uvm_128 COMPUTE_CLUSTER_UVM_SEEDS=20261122",
+    "cd dv/uvm/sim && make uvm_compute_cluster_regress SPAD_KIB=256 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_round32_uvm_256 COMPUTE_CLUSTER_UVM_SEEDS=20261122",
+    "cd dv/uvm/sim && make uvm_compute_cluster_regress SPAD_KIB=512 COMPUTE_CLUSTER_UVM_OUT=/tmp/nmaforge_round32_uvm_512 COMPUTE_CLUSTER_UVM_SEEDS=20261122",
+    "cd dv/block/compute/matrix/formal && make fsm-guards OUT=/tmp/nmaforge_round32_formal_fsm gemv-request-stability GEMV_REQUEST_OUT=/tmp/nmaforge_round32_formal_gemv",
+    "cd benchmark/tinynpu && ./run_tinynpu_gemm.sh at pinned TinyNPU SHA 8216c22",
+    "TinyNPU CNN graph: /tmp/nmaforge_round32_tinywork/cnn_v2/run.log",
+    "NMAForge Product Top ONNX graph: /tmp/nmaforge_round32_tinywork/nma_cnn_ai/run.log"
+  ],
+  "benchmark_vcs_compile": {
+    "baseline": "vcs -full64 -full64 -sverilog -timescale=1ns/1ps -debug_access+all -Mdir=/tmp/nmaforge_round32_baseline_ot8/csrc -o /tmp/nmaforge_round32_baseline_ot8/simv +define+MATRIX_ARRAY_SIZE=16 +define+MATRIX_MAX_OUTSTANDING_READS=8 +define+MATRIX_A_TILE_CACHE_ENABLE=1 +define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 +define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=1 +define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=1 /tmp/nmaforge_round32_baseline_ot8/ai_tensor_matrix_array.sv /tmp/nmaforge_round32_baseline_ot8/ai_tensor_matrix_core.v benchmark/performance_dominance/v1_3_gate1_baseline/evidence/source/tb_ai_tensor_matrix_core_random_r27.sv",
+    "round32": "vcs -full64 -full64 -sverilog -timescale=1ns/1ps -debug_access+all -Mdir=/tmp/nmaforge_round32_final/csrc -o /tmp/nmaforge_round32_final/simv +define+MATRIX_ARRAY_SIZE=16 +define+MATRIX_A_TILE_CACHE_ENABLE=1 +define+MATRIX_NEXT_K_PREFETCH_ENABLE=1 +define+MATRIX_GEMV_B_TILE_CACHE_ENABLE=1 +define+MATRIX_GEMM_B_TILE_CACHE_ENABLE=1 +define+MATRIX_ELASTIC_TILE_FORWARDING_ENABLE=1 rtl/compute/matrix/ai_tensor_matrix_array.sv rtl/compute/matrix/ai_tensor_matrix_core.v benchmark/performance_dominance/round32/evidence/source/tb_ai_tensor_matrix_core_round32.sv"
+  },
+  "benchmark_vcs_run_examples": [
+    "/tmp/nmaforge_round32_final/simv -no_save +SEED=20261122 +MATRIX_FIXED_MEMORY +TINY_NPU_MATCH_MULTI -l /tmp/nmaforge_round32_final/gemm_fixed_20261122.log",
+    "/tmp/nmaforge_round32_final/simv -no_save +SEED=20261122 +ROUND32_GEMV_WIDE_DESCRIPTOR +MATRIX_FIXED_MEMORY -l /tmp/nmaforge_round32_final/gemv_suite_fixed_20261122.log"
+  ]
+}

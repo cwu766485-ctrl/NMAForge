@@ -1,3 +1,4 @@
+source [file join [file dirname [info script]] spad_config.tcl]
 # Program the board, run the XSA-matched FSBL, download the NMAForge A53
 # bring-up ELF, and independently check its exit status/register aftermath.
 
@@ -116,7 +117,7 @@ proc run_baremetal {} {
     # rejects PL AXI apertures after force-mem-access is disabled for execution.
     targets -set -nocase -filter {name =~ "PSU"}
     expect32 0xa0000044 0x10000002 "version after ELF"
-    expect32 0xa0000164 0x00080000 "capacity after ELF"
+    expect32 0xa0000164 $SPAD_BYTES "capacity after ELF"
     expect32 0xa000003c 0x00000000 "IRQ cleared by ISR"
     log_line "CIMFORGE_BAREMETAL_PASS"
     configparams force-mem-access 0

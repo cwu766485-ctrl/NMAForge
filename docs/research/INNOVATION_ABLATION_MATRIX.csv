@@ -1,0 +1,13 @@
+innovation,variant,workload,status,measurement_scope,cycles,read_bytes,write_bytes,data_state_bytes,new_rtl_state,limitation
+A,A0_legacy,trained_570164_CNN,MEASURED_STAGE_A,NMA_CMDQ,65429,130624,83200,0,none,internal mapping baseline
+A,A1_first_fused,trained_570164_CNN,MEASURED_STAGE_A,NMA_CMDQ,22983,77376,29952,0,none,mapper/opcode ablation
+A,A1_both_fused_row_major,trained_570164_CNN,MEASURED_STAGE_A,NMA_CMDQ,12351,64064,16640,0,none,no new RTL
+A,A2_forward_off,legal_16x16_chain,MEASURED_STAGE_A,consumer_only,135,512,,512,none,producer147 both variants
+A,A2_forward_on,legal_16x16_chain,MEASURED_STAGE_A,consumer_only,118,256,,512,none,one hit; not whole trained CNN
+A,A2_whole_CNN,trained_570164_CNN,INELIGIBLE_CURRENT_SHAPE,NONE,,,,512,none,208x64 producer outside fixed tag eligibility
+A,A3_adaptive_lifetime,trained_570164_CNN,PROPOSED_DEFERRED,NONE,,,,512,metadata<=256bit estimate,partial sums and live set unresolved; <=13312B read bound
+B,B0_before_schedule,H16_8token,HISTORICAL_SAME_MODEL,NMA_persistent_decode,66931,72448,42112,64,none,existing scheduling archive; not rerun variant
+B,B1_matrix_schedule,H16_8token,HISTORICAL_SAME_MODEL,NMA_persistent_decode,66795,72448,42112,64,none,existing scheduling archive
+B,B1_LN_overlap,H16_8token,MEASURED_STAGE_A,NMA_persistent_decode,65771,72448,42112,64,none,current baseline; includes existing LN cache
+B,B2_Matrix_Requant,H16_8token,PROPOSED_FOR_REVIEW,NONE,,,,128,metadata<=160bit estimate,<=8192B read and <=6144 zero-cost service clock bound; no measured speedup
+B,B3_ephemeral,H16_8token,REJECTED_THIS_STAGE,NONE,,,,,none,required INT32 outputs remain visible

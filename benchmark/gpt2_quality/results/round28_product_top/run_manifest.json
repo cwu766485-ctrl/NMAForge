@@ -1,0 +1,27 @@
+{
+  "run_id": "nmaforge_r28_gpt2_seed20261223_top",
+  "status": "PRODUCT_TOP_PASS",
+  "source_branch": "research/nmaforge-v1.2-dual-final-round28-gpt2",
+  "source_commit": "ae06661c8c2416ad5af011088cbe0eedc5077c5c",
+  "tested_product_package_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+  "model_source": "Round27 clean-split seed_20261223; byte-level Tiny-Shakespeare H64 research model; not pretrained GPT-2",
+  "seed": 20261223,
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "3.12.13; NumPy 2.5.4; PyTorch 2.6.0+cpu; Transformers 4.48.3",
+  "command": "cd dv/subsystem/top_smoke/sim && AI_H64_FOUR_LAYER_MODEL_NPZ=/tmp/nmaforge-v12-dualfinal-r28-gpt2/benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/product_int8.npz AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_r28_gpt2_seed20261223_top AI_H64_FOUR_LAYER_PYTHON=/tmp/nmaforge_deit_round17_venv/bin/python AI_H64_FOUR_LAYER_SEED=20261223 AI_H64_AUTOREGRESSIVE=1 VCS='vcs -licwait 1' make ai_h64_four_layer_top_argmax",
+  "exit_code": 0,
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "reset_events": 0,
+  "host_intermediate_words": 0,
+  "contexts": 4,
+  "generated_tokens": [83, 109, 104, 110],
+  "all_256_logits_per_context_bit_exact": true,
+  "cumulative_descriptor_publications": 4020,
+  "final_context_cycles": 4340790,
+  "vcs_cpu_seconds": 96.180,
+  "raw_logs": {
+    "compile": "compile.log.gz",
+    "run": "run.log.gz",
+    "make": "make.log.gz"
+  }
+}

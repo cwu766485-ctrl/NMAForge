@@ -1,0 +1,4 @@
+context,valid_tokens,generated_token,prefix_cycles,persistent_kv_cycles,cycles_saved,cycle_reduction_pct,prefix_descriptors,persistent_kv_descriptors,descriptors_saved,golden_equivalent_words
+1,5,82,1414260,1379316,34944,2.4708,981,853,128,14768
+2,6,68,1446816,1403136,43680,3.0190,1029,869,160,17312
+3,7,89,1479660,1427244,52416,3.5424,1077,885,192,19856

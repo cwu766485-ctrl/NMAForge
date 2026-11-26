@@ -1,0 +1,63 @@
+{
+  "base_commit": "ad58507fa5052ccec61e05428c4e36e493796b8b",
+  "branch": "research/nmaforge-v1.2-integrated-model-dv",
+  "commands": {
+    "ai_run": "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+    "ai_smoke": "make -C dv/subsystem/top_smoke/sim ai_smoke"
+  },
+  "configuration": {
+    "ai_run_random_cases": 20,
+    "ai_run_seed": 12345,
+    "clock_period_ns": 10.0,
+    "spad_bytes": 131072,
+    "spad_words_per_bank": 8192
+  },
+  "exit_codes": {
+    "ai_run_make": 0,
+    "ai_run_simulator": 0,
+    "ai_smoke_make": 0,
+    "ai_smoke_simulator": 0
+  },
+  "limitations": [
+    "Default top smoke and seeded replay only; does not add new full RTM, formal, mutation, or coverage closure."
+  ],
+  "logs": {
+    "ai_run_20_seed12345.log": {
+      "archive_sha256": "9f8ce07afc09541d25c1a2c2253c9a0cb7d801c73946e9c8e8e3e763d02c88af",
+      "bytes": 125817,
+      "sha256": "7eadec087693811caa9652118a040870edeb057b5c8ae4aedcb07834d238f0dc"
+    },
+    "ai_run_make_driver.log": {
+      "archive_sha256": "53f8b35b54e71058a340f36a16a58e330707fdec0fae7aa3361afa6b0d59356d",
+      "bytes": 126296,
+      "sha256": "73b024617293302d18d97a712c202a8e322ebb01335d5ff8022e007cfb98f90b"
+    },
+    "ai_smoke_compile.log": {
+      "archive_sha256": "b9c420942de3059338a24e9469dc560b7cd23b2c14b7a1d37768f799908e4f72",
+      "bytes": 8327,
+      "sha256": "103b0f6fc152ea94696d9ac8b81512fbf0710814740f2c945c2000dc94f3432b"
+    },
+    "ai_smoke_make_driver.log": {
+      "archive_sha256": "150c56b18095fdfb3385103a8a787fd29fc15452495fdf5ed1d6ce438343502f",
+      "bytes": 126784,
+      "sha256": "97553e35abd5beb7dfe53bf7ea7977d7f35eeb960843f35235692a0057c10e60"
+    },
+    "ai_smoke_run.log": {
+      "archive_sha256": "2d5d8ea352d8c099f33140d012530f9915738799790f7ffb62ddd10c6c5c18ac",
+      "bytes": 116396,
+      "sha256": "627f9084fd8b7183e1c92236593255f87d7c32882fde53dd61f63ef3fc7fa625"
+    }
+  },
+  "markers": {
+    "ai_run": "TEST PASS",
+    "ai_smoke": "TEST PASS"
+  },
+  "product_rtl_changed": false,
+  "product_rtl_tree_sha256": "57bb84647e5bc34fe5a833e7d4895b7ef1b969fc747d462f1f1a53d1ce05bc68",
+  "run_id": "nmaforge-v1.2-current-testbench-default-top-replay-20261124",
+  "source_list_sha256": "8532193381f6a193cdee4b48310c67395bd2133508bf240dfb6afe4d408acc99",
+  "status": "PASS",
+  "testbench_sha256": "9bb30832473463390ec32e0065a0ae28918ab2281cfe44a80d8fde8ca1d0db21",
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64",
+  "top_smoke_makefile_sha256": "00015c894b5dd000d75ef999309eabccd8a3bbf4fa34be87cfe8f3cbb1d3e119"
+}

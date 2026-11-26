@@ -26,7 +26,7 @@ CPU -- AXI-Lite --> axi_lite_reg_if --> ai_accel_regs
                 direct/tile/宏子任务
                            │                         │
 DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
-                                                  │唯一调度入口       │4 bank/512 KiB
+                                                  │唯一调度入口       │4 bank/128 KiB
                                                   ▼                   ▼
                                INT8 / CNM / Matrix / SFU / Conv / KV-cache
 ```
@@ -47,7 +47,7 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
 - Matrix 单行 banked read 与 CNM 四 lane 请求共用 banked 轮询时隙，但 response tag 分别为
   `3` / `5`；`banked_rsp_valid` 只送 Matrix，`cnm_rsp_valid[3:0]` 只送 CNM。该分离避免两个
   Engine 并发时 Matrix 把 CNM 响应误认为自己的读数据，不增加 SPAD 端口或改变 ABI。
-- Matrix controller 按序最多保留 4 笔已接受的 banked read metadata；每个 response 依据 A/B、
+- Matrix controller 默认按序最多保留 8 笔已接受的 banked read metadata；每个 response 依据 A/B、
   K group、4×4 group 和地址回写到对应 operand buffer。无 response ready/ID，故该路径依赖 SPAD
   response 保序；fault 时停止新请求并 drain 已接受响应。
 - `ai_completion_writer` 必须先提交四个 32-bit completion word，才能发布新的 `CPLQ_TAIL`。
@@ -150,7 +150,7 @@ attention 矩阵乘和 FFN；N=1 VDOT/GEMV 仍优先走 A2。
 
 ## 4. 存储和 DMA
 
-当前 profile 使用四个逻辑 bank、总容量 512 KiB 的 scratchpad，提供 host/debug port、一个
+当前 profile 使用四个逻辑 bank、默认总容量 128 KiB（兼容参数化 512 KiB）的 scratchpad，提供 host/debug port、一个
 arbiter-owned scheduler port，以及 scalar/banked/128-bit line 操作。VCS 使用 `+define+VCS`
 行为 RAM；Vivado 使用 XPM；28 nm DC 使用 32 个真实 4K×32 SRAM macro。
 
@@ -176,12 +176,14 @@ Matrix descriptor 仍使用 4×4 tile-major SPAD 布局和原有 ABI；`ai_tenso
 默认实例化 `ai_tensor_matrix_array` 的 `ARRAY_SIZE=16` 配置。controller 从真实 banked SPAD
 接口收集 4×4 子块，组成最多 16×16 的宏 tile，超过宏 tile 尺寸时遍历 M/N tile；16×16 和
 32×16（跨宏 tile）已通过 block-level 独立 Golden。4×4/8×8/16×16 物理 array 参数也有统一
-VCS benchmark。Matrix banked reader 以最多 4 笔有序 metadata FIFO 记录 A/B、tile group、K group
+VCS benchmark。Matrix banked reader 默认以最多 8 笔有序 metadata FIFO 记录 A/B、tile group、K group
 和完整请求地址；fault 时停发并排空响应。Inactive operand buffer 可在当前 K group MAC 期间接收
 下一 K group 的 A/B 预取，只有全部响应收齐才允许切换消费。当前配置还可将 K≤64 的 A tile
 缓存在 Matrix core 内，并在相邻 N macro tile 复用；更长 K 绕过缓存。固定一拍 behavioral SPAD
 的 16×16×K32 从 357 降到 242 cycles（有序读流水）；启用 A-tile cache 后，16×32×K32 为
-417 cycles、32×32×K64 为 1187 cycles。上述是 VCS behavioral memory 数据，不是 macro 时序或 PPA。
+417 cycles、32×32×K64 为 1187 cycles。Round 32 增加 4 KiB command-local GEMM B-tile reuse cache，
+并扩展 `0x52` GEMV 到 N=16..256 的 16 列面板映射；读响应仍按序通过同一 Matrix banked port，
+不改变 scratchpad 仲裁归属。上述是 VCS behavioral memory 数据，不是 macro 时序或 PPA。
 完整 Cluster UVM、FSM/code-coverage closure 和 DC/PPA 仍开放。实现与证据见[Compute Cluster
 升级路线](../verification/COMPUTE_CLUSTER_UPGRADE_ROADMAP_ZH.md)。
 
@@ -224,7 +226,7 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | tile 调度 | `ai_tile_pipeline` | 是，作为命令处理器子模块 | 管理 ping-pong tile 的 load / compute / store 重叠流程。 |
 | DMA | `ai_axi128_dma` | 是 | 128-bit AXI4 主机 DMA；支持 1D、2D、gather、最大 16-beat burst、4 KiB 切分、最多 4 笔 tagged read outstanding。 |
 | 仲裁 | `ai_spad_arbiter` | 是 | scratchpad 的唯一调度入口；descriptor/completion 高优先级，计算/DMA 数据面轮询。 |
-| SRAM | `ai_scratchpad` | 是 | 512 KiB、4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
+| SRAM | `ai_scratchpad` | 是 | 默认 128 KiB、可选 512 KiB 的 4 bank SRAM；支持 32-bit 单字、128-bit line、四 lane banked/CNM 读取。 |
 | 保护 | `ai_spad_protection` | 是，实例化多次 | 检查 host、compute、line、banked、completion 的地址是否越界或权限冲突。 |
 | 标量 INT8 核 | `ai_int8_compute_core` | 是 | 普通 INT8 VDOT、GEMV、GEMM tile、Conv1x1 等标量/基础计算控制。 |
 | CNM 核 | `ai_banked_cnm_core` | 是 | opcode `0x20/0x21` 的四 bank CNM VDOT/GEMV 顶层。 |
@@ -232,8 +234,9 @@ pre-layout 结果见 [TSMC28_SYNTHESIS_REPORT.md](../verification/TSMC28_SYNTHES
 | Local PE | `ai_bank_pe` | 是，CNM/基线核子模块 | 一个 32-bit packed INT8 dot4 乘加单元。 |
 | 混合精度点积核 | `ai_mixed_precision_dot_fp32_core` | 是 | `0x50` BF16 与 `0x51` FP16 共享控制、arbiter-owned 32-bit core SPAD 口和 FP32 顺序累加；按序读 A/B 并写回一个结果 word。 |
 | BF16 兼容包装器 | `ai_bf16_dot_fp32_core` | 否（兼容/独立验证） | 固定选择 BF16 格式的旧接口包装器；顶层产品路径使用混合精度核心。 |
-| 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | ABI/SPAD 仍按 4×4 tile-major；top 默认 16×16 INT8 array；Banked Read 支持最多 4 笔有序 outstanding 和 fault drain，depth 2/4 各三 seed Golden/fault regression；next-K ping-pong prefetch/MAC overlap 已实现；K≤64 时相邻 N tile 可复用 A-tile，K>64 bypass；完整 Cluster UVM、FSM/code coverage 和 PPA 仍开放。 |
+| 矩阵核 | `ai_tensor_matrix_core` + `ai_tensor_matrix_array` | 是 | ABI/SPAD 仍按 4×4 tile-major；top 默认 16×16 INT8 array；Banked Read 默认最多 8 笔有序 outstanding 和 fault drain；next-K ping-pong prefetch/MAC overlap、K≤64 A-tile reuse 和最多四个 16×16 B macro-tile 的 command-local cache；`0x52` GEMV 支持 16 列面板到 N=256；完整 Cluster UVM、FSM/code coverage 和 PPA 仍开放。 |
 | SFU | `ai_tensor_sfu_core` | 是 | Softmax、causal Softmax、RMSNorm、LayerNorm、Residual、GELU、SiLU、requant。 |
+| SFU 流式快速路径 | `ai_tensor_sfu_stream` | 是，SFU 子模块 | Round 34：在同一 32-bit SFU 端口上用多 outstanding 顺序读执行 Residual/GELU/Requant、≤256 元素的 LayerNorm/Softmax（行缓存 + 精确行倒数）；其余配置回退原 FSM；不改 ABI/仲裁器；`+define+AI_SFU_LEGACY_ONLY` 强制原路径。 |
 | 除法器 | `ai_unsigned_divider` | 是，SFU 子模块 | 用于 Softmax 归一化等定点除法。 |
 | 整数开方 | `ai_integer_sqrt` | 是，SFU 子模块 | 用于 RMSNorm/LayerNorm 的均方根或方差相关计算。 |
 | 卷积核 | `ai_conv3x3_linebuffer_core` | 是 | Conv3x3 与 Depthwise Conv3x3 的 line-buffer 路径。 |

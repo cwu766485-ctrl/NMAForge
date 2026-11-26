@@ -1,0 +1,7 @@
+run_id,token_ids,layer,descriptors,measured_stage_cycles,handoff_words,weight_dma_transactions,status
+four_layer_one_token_id4,4,1,189,357582,1024,49,PASS
+four_layer_one_token_id4,4,2,189,357582,1024,49,PASS
+four_layer_one_token_id4,4,3,222,432576,1024,67,PASS
+four_layer_four_token_prompt,"1,7,42,3",1,225,369894,1024,49,PASS
+four_layer_four_token_prompt,"1,7,42,3",2,225,369894,1024,49,PASS
+four_layer_four_token_prompt,"1,7,42,3",3,258,444888,1024,67,PASS

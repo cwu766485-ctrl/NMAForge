@@ -1,5 +1,25 @@
 # NMAForge vs TinyNPU RTL Benchmark
 
+## Round 10 fresh replay addendum — 2026-11-08
+
+Round 10 rebuilt the pinned TinyNPU checkout at
+`8216c22b762011aa20c05fc2768423fd12dda59d` with Verilator 5.052 and reran the
+3-GEMM/4-GEMV fixed matrix plus the shared `conv1x_mini.onnx` graph. All
+outputs matched independent Goldens. New NMAForge measurements are from
+source `1cd1bde4d82c457d445f97a7817fc22d407b528b` and tested product/test code
+`13f94abf59c3dbea833ad4bbe227ef5cab4df503`.
+
+Machine-readable fresh data is in
+[`Round 10 matrix CSV`](../../benchmark/v2_round10_matrix_tinynpu.csv),
+[`Round 10 CNN CSV`](../../benchmark/v2_round10_cnn_ablation.csv), and
+[`Round 10 evidence JSON`](../../benchmark/v2_round10_evidence.json). NMAForge
+controller+behavioral-SPAD cycles, TinyNPU direct-array cycles, and a modeled
+serialized Tiny memory endpoint remain separate. The 4,781-cycle TinyNPU
+CNN graph endpoint and NMAForge Top CMDQ/layout interval also differ; no
+cross-system CNN speedup is asserted. See the
+[Round 10 report](NMAFORGE_V2_ROUND10_ARCHITECTURE_PERFORMANCE.md) for the
+per-shape results, clean rebuild commands, and current limits.
+
 ## Review boundary
 
 This is a functional RTL and cycle-count comparison, not ASIC PPA evidence.
@@ -72,14 +92,18 @@ TinyNPU's estimated service is `ceil((A+B bytes)/16) + 1` read cycles and
 `ceil(C bytes/16)` write cycles, added around the measured array interval and
 two accumulator-clear cycles. Its load, compute, and store are serialized.
 
-The cycle ratio `TinyNPU normalized / NMAForge measured` is 0.883, 0.878, and
-0.937 for the three shapes. This is a model-normalized cycle comparison, not a
-measured TinyNPU end-to-end RTL result or silicon speedup. The upstream
-TinyNPU graph DMA/SRAM path remains a separate smoke measurement. Both sides
-use identical INT8 values, output shapes, independent INT32 Golden checks, and
-the stated 16-byte/cycle timing assumption. The earlier direct-array cycles
-remain in the CSV for audit and are not compared directly to NMAForge's
-controller interval.
+The corrected cycle ratio `NMAForge measured / TinyNPU normalized modeled`
+is 1.1325, 1.1385, and 1.0674 for the three shapes. Values above 1 mean that
+NMAForge used more cycles than TinyNPU's normalized endpoint in this dataset.
+This is not a fair winner/loser result: NMAForge cycles are measured from its
+controller plus behavioral SPAD, while TinyNPU adds a serialized memory model
+to its measured RTL array. It is not a measured TinyNPU end-to-end RTL result
+or silicon speedup. The upstream TinyNPU graph DMA/SRAM path remains a separate
+smoke measurement. Both sides use identical INT8 values, output shapes,
+independent INT32 Golden checks, and the stated 16-byte/cycle timing assumption.
+The earlier direct-array cycles remain in the CSV for audit and are not
+compared directly to NMAForge's controller interval. P1 will rerun the pinned
+pair under an explicit shared-boundary experiment sheet.
 
 The standalone NMAForge 3×3 convolution check also passed on VCS, seed
 `20261029`: 9 useful MACs, 66 cycles, 72 B read, 4 B written, result `-30`.
@@ -229,3 +253,21 @@ different endpoints and no speedup claim.
 The R134 run refreshes the machine-readable CSV/JSON and leaves `REQ-CL-028`
 PARTIAL. The run evidence, exact command, data hashes, and boundary analysis
 are in the [R134 replay report](../verification/COMPUTE_CLUSTER_TINYNPU_REPLAY_R134_2026-10-31.md).
+
+## v2 baseline and experiment-table convention
+
+The historical R134 table above is not a measurement of the v2 candidate. Its
+stored normalized ratio is now explicitly `NMAForge measured cycles / TinyNPU
+normalized modeled cycles`; a value above 1 means more cycles on the NMAForge
+side under that mixed measured/modeled endpoint. Because the reference side
+uses a memory schedule model, these ratios are not a winner claim.
+
+P0 freezes the v2 candidate and verifies the license-restored `0x52` and `0x53`
+records. P1 runs are tracked in the
+[unified v2 experiment sheet](../../benchmark/architecture_v2_experiment_matrix.csv).
+Each future pair must record its source/test SHA, common operands and Golden,
+array resources, memory bandwidth and latency, measurement endpoints, cycles,
+MAC/cycle, utilization, SPAD traffic, bank stalls, writeback stalls, and
+artifact path. If a metric was not instrumented or a memory adapter is modeled,
+the sheet leaves it blank or labels it as modeled instead of inferring a
+measured value.

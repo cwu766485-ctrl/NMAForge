@@ -1,0 +1,14 @@
+{
+  "all_activation_traces_bit_exact": true,
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "csv_sha256": "7420366d34d6d0a8e880822b1d14d2ece5988c2c0c084943723b08128223237e",
+  "package_sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+  "qat_checkpoint_sha256": "1fef5f8f47e5ba6017fe6b38c3dd8fe3fa6165bfbd526a72c7867e9b896b7c83",
+  "qat_seed": 20263023,
+  "scope": "8 fixed held-out windows; INT8 rail occupancy only for physical INT8 tensors; activation scope is sampled, not a full-test estimate",
+  "source_checkpoint_sha256": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+  "status": "PASS_SAMPLED_FAKE_QUANT_VS_INDEPENDENT_INT_TRACE",
+  "trace_tensors": 60,
+  "window_starts_sha256": "220fca87faebbe7577756b1e953e1411959f55fea6e84ab7f913f84c6210beff",
+  "windows": 8
+}

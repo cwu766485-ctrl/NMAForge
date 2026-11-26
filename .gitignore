@@ -4,6 +4,8 @@ mti_lib/
 transcript
 modelsim.ini
 *.log
+!benchmark/gpt2_compat/results/round17/logs/*.log
+!benchmark/deit/round17/results/logs/*.log
 *.jou
 *.wlf
 *.vcd
@@ -115,6 +117,14 @@ dv/spyglass/tsmc28_sram_macro_stub.v
 *.pem
 *.key
 !.gitignore
+
+# Local licensed-tool files and host-specific simulator configuration
+*.lic
+*.license
+*.licence
+license.dat
+novas.conf
+novas.rc
 
 # Local tool UI artefacts and installed Codex skills are not project sources.
 /verdiLog/

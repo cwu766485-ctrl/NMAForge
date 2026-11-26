@@ -1,5 +1,15 @@
 # Compute Cluster Execution RTM — 2026-11-03
 
+**Frontend closeout candidate:** See [integration RTM](frontend_closeout/RTM.csv). Default-128KiB seven-engine replay fails at legacy fixture address 0x7d000. Historical evidence is not promoted to this SHA. Global closure remains HOLD.
+
+## V1.2 integrated research-branch testpoint delta — 2026-11-24
+
+| Requirement | Disposition | Testpoint / checker mapping | Observed result | Run / evidence |
+|---|---|---|---|---|
+| REQ-PC-006 | PARTIAL | `TC-PC-V12-COMPACT-SPAD-CAPACITY-3S`; `CLUSTER_SPAD_MAP_PASS`, `CLUSTER_MEMORY_SCOREBOARD`, and fail-closed AXI-Lite/backdoor range guards | On isolated source `ad58507fa5052ccec61e05428c4e36e493796b8b`, 128/256/512 KiB × seeds 20261025/26/27 pass (9/9); each seed checks 99,747 words, 85,638 writes, zero mismatch/unknown/stale, and UVM severity 0/0/0. `ai_smoke` and 20-case `ai_run` pass. The reproduced first fatal was the VDOT fixture setting reserved ABI flag bit 6 (`0x76`); correcting it to `0xb6` clears the secondary `CLUSTER_MEMORY_EMPTY` symptom. Protection checks were not loosened. | [P0 manifest](../../benchmark/verification/v1_2_integrated_p0/run_manifest.json), compressed logs under `benchmark/verification/v1_2_integrated_p0/` |
+
+This research-branch delta records the capacity/map testpoint only; it does not promote the main-branch RTM disposition or close the remaining production requester, Protection, formal, mutation, coverage, and reset crosses.
+
 **R246 actual RTL mutation replay (2026-11-03):** On exact published `main` SHA `269c2a0de8cf226dd01c3f86c05e180908252b04` / tree `61e365cc5a37998c0bf2688981cbb89f278eace2`, a detached clean-worktree VCS run compiles and injects seven temporary RTL faults. Address, data, response owner, WSTRB, completion error, missing Done, and duplicate Done are caught by their configured production Checker IDs (7/7). No `Warning-`, `Error-`, or `[TFIPC]` compile diagnostics were found. This is targeted checker-sensitivity evidence only; no Requirement status changes and the disposition remains 24 `PASS-SCOPED` / 14 `PARTIAL`, **HOLD**. See [R246 report](COMPUTE_CLUSTER_DUT_MUTATION_R246_2026-11-03.md), logs-only archive SHA-256 `6a1f8f19078135b86b8a695ac1a951fe0b259cdd7acb8ce2d827ce9ed55b6a8b`.
 
 **R245 published-head clean replay (2026-11-03):** Exact GitHub `main` SHA `8078ed55af3b72652e74308483c20bd0d18a6cc9` / tree `4ce6125303d67caaf656770a81357f90f749a77b` passes the three-seed real-top seven-engine UVM regression and Top Smoke from a detached clean worktree. Each seed checks 92,871 Memory Image words without mismatch/unknown/stale and drains the response ledger (5,015 accepted / 4,995 checked / 20 reset-dropped); UVM severity is 0/0/0. URG focused `cluster_cg` is 64/64; mixed group score is 79.18%, with 17/22 assertion successes and zero failure/incomplete. This adds exact-published-commit reproducibility only; requirements remain 24 `PASS-SCOPED` / 14 `PARTIAL`, `CL-DV-v1.0` **HOLD**. See [R245 report](COMPUTE_CLUSTER_PUBLISHED_HEAD_CLEAN_REPLAY_R245_2026-11-03.md); archive SHA-256 `0c3749f6bb326f25158e7c5ad7861521e6d2c5ef7728c4a06cb4d0da0eb2f210`.
@@ -506,6 +516,33 @@ SHA-256 evidence:
 - R32 exact-candidate clean UVM compile/elaboration has zero warnings/errors and no `TFIPC`; engine `busy/done` SVA ports are connected. Its URG has 17/22 assertion properties with successes and zero failures/incomplete; three AR/AW properties are not non-vacuous in this compute-only sequence and two UVM RAL properties have no attempts. R15's AXI/FP E2E URG supplies real successes for the five AXI AR/AW/W payload/bound assertions; stall-to-accept covers match 166/70/107 times. R27 separately replays coordinated R/B reset on the current SHA with UVM severity 0/0/0. None proves every compute requester × fault/backpressure combination.
 - `CLUSTER-S2-TOP-SMOKE-FA2B` retains one `[LOOP-REROLL-ENABLED]` fixture warning; it is not an SVA port warning and is not silently counted as zero-warning.
 - Whole-top URG line/condition/FSM/branch/assertion/group figures include DUT, SVA, testbench and UVM. They are not DUT-only coverage. Do not use them as a cluster closure percentage.
+
+## V1.2 P0 branch addendum — `NMAFORGE-V1.2-P0-C668479-20261124`
+
+This addendum is a separate source-bound run on research branch
+`feat/shape-adaptive-gemv-v2`, source SHA
+`c668479570e182e833146fd4a5f1d15bd06daf6c`; it does not change the inherited
+24 PASS-SCOPED / 14 PARTIAL classification above, which refers to the selected
+candidate source identities recorded in this RTM.
+
+The former 128 KiB `CLUSTER_MEMORY_EMPTY` setup was reproduced at SHA
+`f919bb787dab1a4e3bef44b5308ead56d6e77b72`: fixture address `0x7d000` returned
+SLVERR before an engine transaction. A SPAD_INFO-driven, capacity-checked map
+now allocates 46 disjoint fixture regions through `0x9740`. Compute Cluster
+real-top UVM passed 3 seeds each at 128/256/512 KiB; every seed checked 5,368
+words with no mismatch, unknown, stale or orphan response. Current-branch
+`ai_smoke` and the 20-case seeded top regression also passed. No Product RTL,
+ABI or protection-policy change was made.
+
+The report's [Requirement-to-Testpoint mapping delta](NMAFORGE_V1_2_P0_RUN_REPORT.md#dv-testpoint-mapping-delta-for-this-run)
+maps the new run markers to affected `REQ-CL` and `REQ-PC` rows and records
+coverage limits. Formal (3/3 dispatch/ownership assertions, 7/7 dispatch covers)
+and passive-monitor checker-sensitivity mutation (25/25) remain separate
+evidence classes. Full per-engine protection crosses, independent per-engine
+scoreboard components, full requirement closure, and external-fabric reset
+qualification remain open. Exact commands, exit codes, tool versions, CSV and
+compressed raw-log SHA-256 digests are in the [P0 run report](NMAFORGE_V1_2_P0_RUN_REPORT.md)
+and [`run_manifest.json`](../../benchmark/representative/v1_2/p0/run_manifest.json).
 
 ## Sign-off interpretation
 

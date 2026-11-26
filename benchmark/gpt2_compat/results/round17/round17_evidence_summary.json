@@ -1,0 +1,193 @@
+{
+  "branch": "research/nmaforge-v1.2-round17",
+  "deit_tiny": {
+    "commands": [
+      "/tmp/nmaforge_deit_round17_venv/bin/python benchmark/deit/round17/run_deit_tiny_reference.py --model-dir /tmp/nmaforge_deit_round17 --out-dir /tmp/nmaforge_deit_round17/reference",
+      "make -C dv/subsystem/top_smoke/sim ai_deit_patch_projection_top AI_DEIT_PATCH_RUN=/tmp/nmaforge_deit_patch_round17_v1 AI_DEIT_MODEL_DIR=/tmp/nmaforge_deit_round17 AI_DEIT_PYTHON=/tmp/nmaforge_deit_round17_venv/bin/python"
+    ],
+    "fp32_reference": "complete software reference generated; no held-out ImageNet accuracy measured; INT8 whole-model reference not complete",
+    "hub_revision": "b3428f18dcc7b543470d07f14b4a4157815d1880",
+    "input": {
+      "seed": 20261117,
+      "sha256_uint8": "d2029eee4ae0be2479a662a7ed549836200929b41987d23caa68d924f0c89f0a",
+      "type": "seeded synthetic RGB pattern, no quality claim"
+    },
+    "model_id": "facebook/deit-tiny-patch16-224",
+    "official_checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c",
+    "parameters": 5717416,
+    "shape": "224x224 RGB; 197 tokens; H192; 3 heads; 12 layers; FFN768; 1000 classes",
+    "spad_static_estimate": {
+      "128KiB_fits": false,
+      "128KiB_live_bytes": 255872,
+      "128KiB_over_by_bytes": 124800,
+      "256KiB_fits_static_plan": true,
+      "256KiB_headroom_bytes": 6272,
+      "256KiB_live_bytes": 255872,
+      "warning": "not a Product Top capacity configuration or proof"
+    },
+    "status": {
+      "B0_model_import_fp32_reference": "PASS_SOFTWARE_ONLY",
+      "B1_product_top_patch_projection_tile": "PASS_PARTIAL",
+      "B2_full_patch_embedding_and_single_encoder": "NOT_RUN",
+      "B3_spad_capacity": "PARTIAL_STATIC_ESTIMATE_ONLY"
+    },
+    "top_tile": {
+      "command_cycles": 2442,
+      "golden": "independent int64 GEMM Golden, bit exact",
+      "golden_words": 256,
+      "limitation": "single tile only; no full 196 patch embedding, position/class token fusion, requant or encoder",
+      "run_id": "nmaforge_deit_patch_round17_v1",
+      "shape": "one patch, K768 to first 16/192 output channels",
+      "spad_read_bytes": 24576,
+      "spad_write_bytes": 1024,
+      "tb_axil_preload_cycles": 38519,
+      "tb_preloaded_spad_bytes": 25680,
+      "useful_mac_per_cycle": 5.0319,
+      "useful_macs": 12288,
+      "useful_utilization_pct": 6.25
+    },
+    "variant": "non-distilled ViTForImageClassification"
+  },
+  "environment": {
+    "deit_numpy": "2.5.4",
+    "deit_python": "3.12.13",
+    "gpt_numpy": "2.4.6",
+    "gpt_python": "3.12.13",
+    "torch": "2.6.0+cpu",
+    "transformers": "4.48.3",
+    "vcs": "V-2023.12-SP1_Full64",
+    "vcs_cli": "V-2023.12"
+  },
+  "evidence_sha256": {
+    "benchmark/deit/round17/deit_tiny_spad_estimate.json": "c735efd251cc6d2324ff82e1404b77fc1e0fb1d82c3113440cadd17a1324ca76",
+    "benchmark/deit/round17/results/deit_tiny_manifest.json": "2bba92fbbbb070559c4b6b121e0fda827c3bcb49539abb825a9ed95deb209d31",
+    "benchmark/deit/round17/results/deit_tiny_reference.npz": "cc0d0f74639a7c101476ad7a4742ff9a80b715f8b00a9dda35fbd889cc5b3b35",
+    "benchmark/deit/round17/results/logs/compile.log": "b9d6510cb9648f292fca47cf623f3371d0226ae3234d22be270a92140eea75be",
+    "benchmark/deit/round17/results/logs/run.log": "de2b42aa744059c49aa3fac6bd934c369676947ddd954900fff14f9814256d14",
+    "benchmark/deit/round17/results/patch_workload/manifest.json": "a4f391f9c18506a8ceae8efaafe12242b6f9d29392269e09fe23b5f1fdd780bf",
+    "benchmark/deit/round17/results/patch_workload/model_golden.memh": "382ff370d296cff4b404503cdfdbef7720abf983d13cb5df0fdcbdc5a9da534a",
+    "benchmark/deit/round17/results/patch_workload/model_memory.memh": "83ce1bc94be3b6ce6e5099fd06f053b589c8c5a183af3d195c801f74e60b5126",
+    "benchmark/gpt2_compat/results/round17/autoregressive_plan.json": "c945d371e0e93062b78435c5eef9094d88bb27eaee6359f312c7c6af533384e8",
+    "benchmark/gpt2_compat/results/round17/autoregressive_result.json": "30b1f6a80313fd4a45b4cb024d1bfa9b1b52fddef94db7977d5d9e609c2a2d62",
+    "benchmark/gpt2_compat/results/round17/canonical_h64_synthetic_model.npz": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+    "benchmark/gpt2_compat/results/round17/four_layer_context_cycles.csv": "cc7c49a5e14d6907a4b7e52ff544cce910870437ebf380e912a1b7766b6a41c0",
+    "benchmark/gpt2_compat/results/round17/four_layer_context_cycles.json": "0a5837abefbad7b4f9021585fcd917e5a9053d6f36aa34344ced2dcc2af44728",
+    "benchmark/gpt2_compat/results/round17/four_layer_manifest.json": "6bc78a1f376dab1d613bf8a37dc19387f9ba63c1854d194f601791544f1d4755",
+    "benchmark/gpt2_compat/results/round17/logs/ai_run_seed12345.log": "96a54abb1cae810fd9727161f878ea6e91fcb1cb9961ed1684929ef588483870",
+    "benchmark/gpt2_compat/results/round17/logs/ai_run_seed12345_console.log": "ad730f96b0b87c48a7964421c6a14179a7382c0f94513cd1a704f00c78b17779",
+    "benchmark/gpt2_compat/results/round17/logs/ai_smoke_compile.log": "9c90993612df673b09df1d9beb3e9287c568e5b83bb52d77b8549fe6ab748870",
+    "benchmark/gpt2_compat/results/round17/logs/ai_smoke_console.log": "867f130f1434184ffe8f8a4d2b8c4fbce35483fa8c0fad0b80944e5829bd6cfa",
+    "benchmark/gpt2_compat/results/round17/logs/autoregressive_python_verify.log": "96342f6e46b7234fdb454d376650ee79d1df2a2e61188f9a8d3344cd02b58d9d",
+    "benchmark/gpt2_compat/results/round17/logs/h64_autoregressive_compile.log": "7f4c183f33dffbeb4c230fef73aa9d56465193da95ac7dd73934480c672b21ec",
+    "benchmark/gpt2_compat/results/round17/logs/h64_autoregressive_run.log": "c77c585fe1f92dcf1adc31facc318f33a6237f6b855648c4e7e58857cc7bcbf2",
+    "benchmark/gpt2_compat/results/round17/rtl_logits_context0.csv": "93e681ebba92e49575f844b004f770ae0101146fc5adc59a7c201e01388ae39c",
+    "benchmark/gpt2_compat/results/round17/rtl_logits_context1.csv": "1b24814a23a6ddaeef552b521e65aaa4b6455bf7770a4f672bc9a933bc84fba4",
+    "benchmark/gpt2_compat/results/round17/rtl_logits_context2.csv": "8276ca2a6e7a75cae2fa65e829d71f738f1c1bcec5642d05905678292773f91f",
+    "benchmark/gpt2_compat/results/round17/rtl_logits_context3.csv": "532abd10a4a44d94ea53e5b4ebcbf2fb1f44176788691d0450d44785b17dabdc",
+    "benchmark/gpt2_compat/results/round17/spad_allocation.csv": "bc0d786597fa2c02db04fb078e0f2a3fab995f32ff90986e1cc5b60298fa682e"
+  },
+  "gpt2_h64": {
+    "run_id": "nmaforge_r17_ar_final12",
+    "argmax": "signed INT32; lowest token ID wins ties",
+    "commands": [
+      "make -C dv/subsystem/top_smoke/sim ai_h64_four_layer_top_argmax AI_H64_AUTOREGRESSIVE=1 AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_r17_ar_final12 AI_H64_FOUR_LAYER_PYTHON=/tmp/nmaforge_round10_venv/bin/python",
+      "/tmp/nmaforge_round10_venv/bin/python benchmark/gpt2_compat/verify_h64_autoregressive.py --run /tmp/nmaforge_r17_ar_final12",
+      "make -C dv/subsystem/top_smoke/sim ai_smoke",
+      "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345"
+    ],
+    "generated_tokens": [
+      114,
+      162,
+      193,
+      193
+    ],
+    "memory": {
+      "allocation_proof": "benchmark/gpt2_compat/results/round17/spad_allocation.csv; four layer K/V ranges are distinct and session-lifetime",
+      "banks": 4,
+      "descriptor_completion_queue_entries": 512,
+      "persistent_kv_bytes": 8192,
+      "spad_capacity_bytes": 131072,
+      "static_data_high_water_bytes": 82944,
+      "static_peak_live_bytes": 78848
+    },
+    "model": {
+      "seed": 20261116,
+      "sha256": "67a89c411254039bab22a7dffc49c64b69233575368503f544ee9f3ec4ab00fc",
+      "shape": "H64 / 4 heads / head_dim 16 / FFN 256 / 4 layers / vocab 256 / context window <=16",
+      "weight_kind": "deterministic synthetic functional model; no language-model quality claim"
+    },
+    "prompt_tokens": [
+      1,
+      7,
+      42,
+      3
+    ],
+    "runtime_evidence": {
+      "cumulative_descriptor_publications": 4020,
+      "golden": "all logits bit-exact; four Top SPAD dumps checked",
+      "host_intermediate_tensor_words": 0,
+      "host_kv_words": 0,
+      "logits_per_context": 256,
+      "reset_events": 0
+    },
+    "runtime_mode": "four_layer_prefix_recompute_same_top_instance",
+    "status": {
+      "A0_actual_logits": "PASS",
+      "A1_same_top_argmax_feedback": "PASS_PREFIX_RECOMPUTE",
+      "A2_full_session_end_to_end": "PARTIAL_NOT_MEASURED",
+      "A3_trained_model_quality": "PARTIAL_SYNTHETIC_WEIGHTS_ONLY"
+    },
+    "timing": {
+      "aggregate_command_window_cycles": 5655337,
+      "aggregate_descriptor_count": 4020,
+      "contexts": [
+        {
+          "command_window_cycles": 1312333,
+          "context": 0,
+          "descriptors": 933,
+          "input_tokens": 4,
+          "output_token": 114
+        },
+        {
+          "command_window_cycles": 1414584,
+          "context": 1,
+          "descriptors": 981,
+          "input_tokens": 5,
+          "output_token": 162
+        },
+        {
+          "command_window_cycles": 1447518,
+          "context": 2,
+          "descriptors": 1029,
+          "input_tokens": 6,
+          "output_token": 193
+        },
+        {
+          "command_window_cycles": 1480902,
+          "context": 3,
+          "descriptors": 1077,
+          "input_tokens": 7,
+          "output_token": 193
+        }
+      ],
+      "full_session_end_to_end": "NOT_MEASURED",
+      "mean_command_window_cycles_per_emitted_token": 1413834.25,
+      "scope": "command/runtime windows only; full host/input/weight setup/output readback session E2E not measured"
+    }
+  },
+  "lineage": {
+    "round15_commit": "995ba340e914d2264b24e1928bcfef09bd675ea3",
+    "round16_base_commit": "c85baa17f457610b7d7de4d6363ad064ae04a8d5",
+    "round17_tested_code_commit": "03a15c18f3bd7c3a83fb2d1a63f7eeaa13b321c0"
+  },
+  "overall_disposition": "PARTIAL",
+  "regressions": {
+    "ai_run_seed_12345_20_cases": "PASS",
+    "ai_smoke": "PASS",
+    "json_parse": "PASS",
+    "python_ast": "PASS",
+    "source_diff_check": "PASS; raw captured simulator logs and raw CSV retain tool-generated trailing whitespace/CRLF"
+  },
+  "round": 17,
+  "rtl_changes": false
+}

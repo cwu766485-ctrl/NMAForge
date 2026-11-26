@@ -210,12 +210,12 @@ int main(void)
     int rc;
 
     xil_printf("CIMForge XCZU15EG bring-up\r\n");
-    if (cimforge_read(CIMFORGE_REG_VERSION) != CIMFORGE_VERSION_512K) {
+    if (cimforge_read(CIMFORGE_REG_VERSION) != CIMFORGE_VERSION_A10) {
         xil_printf("FAIL: VERSION=%08lx\r\n",
                    (unsigned long)cimforge_read(CIMFORGE_REG_VERSION));
         return finish_validation(1);
     }
-    if (cimforge_read(CIMFORGE_REG_SPAD_INFO) != CIMFORGE_SPAD_BYTES_DEFAULT) {
+    if (cimforge_read(CIMFORGE_REG_SPAD_INFO) != CIMFORGE_SPAD_BYTES_EXPECTED) {
         xil_printf("FAIL: SPAD_INFO=%08lx\r\n",
                    (unsigned long)cimforge_read(CIMFORGE_REG_SPAD_INFO));
         return finish_validation(8);

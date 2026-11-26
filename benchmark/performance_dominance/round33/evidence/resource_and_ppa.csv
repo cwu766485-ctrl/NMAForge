@@ -1,0 +1,19 @@
+design,resource,quantity,boundary,status,evidence,notes
+NMAForge,INT8 Matrix Array,16x16 = 256 MACs,Product Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_array.sv,No second array or additional MACs added.
+NMAForge,Scratchpad,128 KiB default,Product Top,retained,rtl/top/ai_accel_top.v,Default configuration unchanged.
+NMAForge,GEMM command-local B macro-tile cache,4 KiB,Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_core.v,Four 1 KiB B panels; already present in Round32.
+NMAForge,A tile K-group cache,1 KiB,Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_core.v,16 K words x 16 lanes x 4 bytes; command-local.
+NMAForge,A/B operand ping-pong words,256 B total,Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_core.v,Two 16-lane x 32-bit banks for A and two for B.
+NMAForge,Output writeback ownership buffer,1 KiB,Matrix Core,new,rtl/compute/matrix/ai_tensor_matrix_core.v,256 x 32-bit INT32 results; enables next-tile MAC work during SPAD line writeback. Register/memory mapping not synthesized.
+NMAForge,Tile-forwarding cache,512 B,Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_core.v,Two banks x 16 lines x 128 bits; already present before Round33.
+NMAForge,Fused output line buffers,32 B,Matrix Core,retained,rtl/compute/matrix/ai_tensor_matrix_core.v,Two x 128-bit lines; already present.
+NMAForge,Array accumulator state,2 KiB,Matrix Array,retained,rtl/compute/matrix/ai_tensor_matrix_array.sv,256 x 64-bit accumulator values; implementation mapping not synthesized.
+NMAForge,Maximum outstanding bank reads,8 transactions,Matrix Core,unchanged,MAX_OUTSTANDING_READS=8,No depth increase; observed high-water 2 fixed-memory and 4-5 seeded cases.
+TinyNPU,INT8 Systolic Array,16x16 = 256 MACs,native gemm_ctrl + systolic_array,retained,8216c22b762011aa20c05fc2768423fd12dda59d,Source-pinned native array/controller path.
+TinyNPU,Banked SRAM physical capacity,4 banks x 4 KiB x 2 ping-pong = 32 KiB,native banked_sram,retained,rtl/mem/banked_sram.sv,Round33 L1 adapter maps controller address bit 14 to ping-pong select to use both physical 16 KiB planes.
+TinyNPU,L1 addressable SRAM,32 KiB,Round33 native-controller harness,measured endpoint,benchmark/performance_dominance/round33/evidence/source/tb_tinynpu_native_gemm_l1_round33.sv,Uses actual banked_sram module; single read and write request per cycle with one-cycle registered read.
+TinyNPU,Accumulator SRAM model,1 KiB,Round33 native-controller harness,behavioral model,benchmark/performance_dominance/round33/evidence/source/tb_tinynpu_native_gemm_l1_round33.sv,256 x 32-bit ACC entries required by gemm_ctrl interface; not counted as physical Tiny SRAM evidence.
+PPA guardrail,dc_shell,unavailable,TSMC28 synthesis,BLOCKED_ENV,dc_shell not found on PATH,No DC area/timing run.
+PPA guardrail,TSMC28 standard-cell library,TSMC28_STDCELL_DB unset,TSMC28 synthesis,BLOCKED_ENV,private compatible .db/.lib not configured,"No area, critical-path, or Fmax claim."
+PPA guardrail,Area growth,target <=10% over Round32,Matrix Core,NOT_MEASURED,No compatible configured synthesis environment,The added 1 KiB output buffer is disclosed; area delta unknown.
+PPA guardrail,Clock timing,target 4.0 ns,Matrix Core,NOT_MEASURED,No mapped synthesis/timing report,No actual-frequency or PPA superiority claim.

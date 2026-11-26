@@ -1,0 +1,57 @@
+{
+  "decode": {
+    "matrix_initial_fetch": 1152,
+    "matrix_prepare_execute": 2080,
+    "matrix_writeback": 1696,
+    "matrix_prefetch_wait": 1416,
+    "matrix_lifecycle": 256,
+    "sfu_fetch_states": 34888,
+    "sfu_writeback": 4232,
+    "sfu_arithmetic_cache_control": 10259,
+    "sfu_lifecycle": 216,
+    "kv_busy": 3152,
+    "other_engine": 0,
+    "completion_request_no_engine": 1824,
+    "descriptor_request_no_engine": 592,
+    "no_engine_control_response_dispatch": 4008
+  },
+  "prefill": {
+    "matrix_initial_fetch": 48,
+    "matrix_prepare_execute": 120,
+    "matrix_writeback": 60,
+    "matrix_prefetch_wait": 72,
+    "matrix_lifecycle": 12,
+    "sfu_fetch_states": 588,
+    "sfu_writeback": 48,
+    "sfu_arithmetic_cache_control": 0,
+    "sfu_lifecycle": 6,
+    "kv_busy": 718,
+    "other_engine": 0,
+    "completion_request_no_engine": 192,
+    "descriptor_request_no_engine": 216,
+    "no_engine_control_response_dispatch": 648
+  },
+  "trace_validation": "PASS exclusive rows close to existing timing; accepted bytes close to existing counters",
+  "decode_forwarding_bounds": {
+    "LN_to_Requant": {
+      "accepted_reads": 1024,
+      "accepted_read_bytes": 4096,
+      "optimistic_removed_read_service_cycles": 3072
+    },
+    "Matrix_to_Requant": {
+      "accepted_reads": 2048,
+      "accepted_read_bytes": 8192,
+      "optimistic_removed_read_service_cycles": 6144
+    },
+    "Residual_to_LN": {
+      "accepted_reads": 1024,
+      "accepted_read_bytes": 4096,
+      "optimistic_removed_read_service_cycles": 3072
+    },
+    "SFU_to_Requant": {
+      "accepted_reads": 512,
+      "accepted_read_bytes": 2048,
+      "optimistic_removed_read_service_cycles": 1536
+    }
+  }
+}

@@ -1,0 +1,50 @@
+{
+  "all_logits_bit_exact": true,
+  "artifact_sha256": {
+    "autoregressive_plan.json": "baf9dd4af02c911dcdf4dc64ea4dbc3f83945fbac1ff8522c4ef8731a06b07e6",
+    "autoregressive_result.json": "73b7a1b6d31afc79a3770602a60878c9524e0561c306409e07b2a71887a21d67",
+    "compile.log.gz": "cfa6b7d246d80b3914cceeb839cf45a62ea542426c4b0d05fb79777068316a3e",
+    "four_layer_manifest.json.gz": "c652705998357af3eb44b3c1322cabad689a9edfdfdddc75e031b2fa7c8009e9",
+    "rtl_logits_context0.csv": "dd035e5936ececc92906e3d474192ffa57b1bb46fdee2cbea59a25b113411695",
+    "rtl_logits_context1.csv": "eebdd2507fd2ecfe363119e0d766fcd1456bd8f43914115a7dba1eed61995560",
+    "rtl_logits_context2.csv": "220bb6fa28c55c902cff63dab7a2e58e339853ae33e9631f216f1519cc4f9809",
+    "rtl_logits_context3.csv": "fb6f5b33745756b008c08a4185eb881c5a1f24e324a64107e8b123ead26ab0ed",
+    "run.log.gz": "8d9bfde29a7185295c82a1ae58b9ff02b32a39079ae4b74f8eda207273c176fe",
+    "spad_allocation.csv.gz": "f2e7e6c664cd6bd486d2d8738a05b78a199a5266ed7825d70cb2536e84da85cb"
+  },
+  "command": "cd dv/subsystem/top_smoke/sim && make ai_h64_four_layer_top_argmax AI_H64_FOUR_LAYER_RUN=/tmp/nmaforge_round30_gpt2_fixed_source_top AI_H64_FOUR_LAYER_MODEL_NPZ=/tmp/nmaforge-v12-round30-gpt2/benchmark/gpt2_quality/results/round30_qat_fixed_source/source_20261221_qat_20263032/product_int8.npz AI_H64_NUMERIC_PROFILE=round21_residual_gelu_aligned AI_H64_AUTOREGRESSIVE=1",
+  "compile_exit": 0,
+  "contexts_checked": 4,
+  "descriptor_publications": 4020,
+  "extension_cycles": 4339530,
+  "generated_tokens": [
+    129,
+    68,
+    82,
+    68
+  ],
+  "host_intermediate_tensor_words": 0,
+  "logits_per_context": 256,
+  "mode": "four_layer_prefix_recompute_same_top_instance",
+  "model_package_sha256": "22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2",
+  "prompt_tokens": [
+    1,
+    7,
+    42,
+    3
+  ],
+  "qat_checkpoint_sha256": "ef43f58a66af89669c661d3a4c881451e8fdad7d43cfac636f9e98c1df7a1b56",
+  "qat_seed": 20263032,
+  "resets": 0,
+  "run_exit": 0,
+  "selection_rule": "highest validation Product-aligned INT8 accuracy; CE tie-break; test excluded",
+  "sim_time_ps": 61219960000,
+  "source_checkpoint_sha256": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+  "source_seed": 20261221,
+  "source_sha": "c45e307f12d05542f16068aeeb87bd8877176ed6",
+  "spad_capacity_bytes": 131072,
+  "spad_words_per_bank": 8192,
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "validation_selected": true,
+  "vcs": "V-2023.12-SP1_Full64"
+}

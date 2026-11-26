@@ -1,0 +1,24 @@
+{
+  "files": [
+    {
+      "file": "manifest.json",
+      "sha256": "3333f3148217e83c25f034c5548d73c79990b55f88ad56aa85a92124964117d1",
+      "bytes": 4420
+    },
+    {
+      "file": "product_int8.npz",
+      "sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+      "bytes": 125382
+    },
+    {
+      "file": "qat_float.pt",
+      "sha256": "1fef5f8f47e5ba6017fe6b38c3dd8fe3fa6165bfbd526a72c7867e9b896b7c83",
+      "bytes": 875506
+    },
+    {
+      "file": "train_curve.csv",
+      "sha256": "93fdc0c477f7cdb09a4d07e03f11072f59567bbf2a22d938f8ee9e49e00946f0",
+      "bytes": 198
+    }
+  ]
+}

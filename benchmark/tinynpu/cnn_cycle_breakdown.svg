@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="600" viewBox="0 0 1000 600">
+<rect width="100%" height="100%" fill="#ffffff"/>
+<style>text{font-family:Arial,sans-serif;fill:#17212b}.muted{fill:#52606d}.axis{stroke:#83919c;stroke-width:1}.grid{stroke:#dce2e7;stroke-width:1}</style>
+<text x="68" y="46" font-size="27" font-weight="700">ONNX mini CNN cycle breakdown</text>
+<text x="68" y="75" font-size="15" class="muted">Same graph, inputs, and Golden; timing windows differ, so no cross-design speedup is reported</text>
+<line x1="120" y1="455.0" x2="880" y2="455.0" class="grid"/>
+<text x="108" y="459.0" text-anchor="end" font-size="13" class="muted">0</text>
+<line x1="120" y1="387.0" x2="880" y2="387.0" class="grid"/>
+<text x="108" y="391.0" text-anchor="end" font-size="13" class="muted">1000</text>
+<line x1="120" y1="319.0" x2="880" y2="319.0" class="grid"/>
+<text x="108" y="323.0" text-anchor="end" font-size="13" class="muted">2000</text>
+<line x1="120" y1="251.0" x2="880" y2="251.0" class="grid"/>
+<text x="108" y="255.0" text-anchor="end" font-size="13" class="muted">3000</text>
+<line x1="120" y1="183.0" x2="880" y2="183.0" class="grid"/>
+<text x="108" y="187.0" text-anchor="end" font-size="13" class="muted">4000</text>
+<line x1="120" y1="115.0" x2="880" y2="115.0" class="grid"/>
+<text x="108" y="119.0" text-anchor="end" font-size="13" class="muted">5000</text>
+<line x1="120" y1="115" x2="120" y2="455" class="axis"/>
+<text x="30" y="300" transform="rotate(-90 30 300)" font-size="14" class="muted">Cycles</text>
+<rect x="300" y="320.0" width="120" height="135.0" fill="#168f83"/>
+<rect x="300" y="246.6" width="120" height="73.4" fill="#89c8bf"/>
+<text x="360" y="238.6" text-anchor="middle" font-size="14" font-weight="700">3065 total</text>
+<rect x="620" y="129.9" width="120" height="325.1" fill="#516170"/>
+<text x="680" y="121.9" text-anchor="middle" font-size="14" font-weight="700">4781</text>
+<text x="360" y="483" text-anchor="middle" font-size="16" font-weight="700">NMAForge</text>
+<text x="680" y="483" text-anchor="middle" font-size="16" font-weight="700">TinyNPU</text>
+<rect x="215" y="510" width="16" height="16" fill="#168f83"/><text x="239" y="523" font-size="14">Compute CMDQ windows: 1985 cycles</text>
+<rect x="520" y="510" width="16" height="16" fill="#89c8bf"/><text x="544" y="523" font-size="14">Host layout: 1080 cycles</text>
+<text x="68" y="566" font-size="13" class="muted">NMAForge excludes preload and final host read; TinyNPU measures graph-dispatch execution with testbench DMA/SRAM shim.</text>
+</svg>

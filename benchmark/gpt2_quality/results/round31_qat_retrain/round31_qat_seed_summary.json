@@ -1,0 +1,515 @@
+{
+  "aggregate_population_statistics": {
+    "test.product_int8_aligned": {
+      "accuracy_pct": {
+        "mean": 20.625813802083332,
+        "population_std": 0.08933308268269917
+      },
+      "cross_entropy_nats": {
+        "mean": 3.2741131794323763,
+        "population_std": 0.014300154763022132
+      },
+      "perplexity": {
+        "mean": 26.42248098290173,
+        "population_std": 0.3765882211569174
+      }
+    },
+    "test.qat_float": {
+      "accuracy_pct": {
+        "mean": 35.347493489583336,
+        "population_std": 0.06407884012053883
+      },
+      "cross_entropy_nats": {
+        "mean": 2.2261726642790975,
+        "population_std": 0.0009418895275779645
+      },
+      "perplexity": {
+        "mean": 9.26434450633281,
+        "population_std": 0.008723806024694997
+      }
+    },
+    "validation.product_int8_aligned": {
+      "accuracy_pct": {
+        "mean": 21.451822916666668,
+        "population_std": 0.17977475613911556
+      },
+      "cross_entropy_nats": {
+        "mean": 3.283878779458606,
+        "population_std": 0.02009650047872965
+      },
+      "perplexity": {
+        "mean": 26.684463474723092,
+        "population_std": 0.5393997917543766
+      }
+    },
+    "validation.qat_float": {
+      "accuracy_pct": {
+        "mean": 35.302734375,
+        "population_std": 0.0
+      },
+      "cross_entropy_nats": {
+        "mean": 2.238764127890757,
+        "population_std": 0.001116078072169621
+      },
+      "perplexity": {
+        "mean": 9.381735343990217,
+        "population_std": 0.010467994340402626
+      }
+    }
+  },
+  "candidate_count": 3,
+  "candidates": [
+    {
+      "package_sha256": "6d3d49c902a70b0d2cfe66c7bb17624659029d5013ad0a3941fae0b111c49664",
+      "product_top_status": "NOT_RUN",
+      "qat_checkpoint_sha256": "6522019df2dda83ef85ae9d36abba15ea32e223c6fb3805805f2e43c35b242d1",
+      "qat_seed": 20263111,
+      "source_seed": 20261221,
+      "test_evaluated_after_validation_selection": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.3824462890625,
+          "qat_float_vs_fp32_top1": 0.85107421875
+        },
+        "bigram": {
+          "accuracy": 0.26513671875,
+          "cross_entropy_nats": 2.5197758200455835,
+          "perplexity": 12.425810733630534
+        },
+        "fake_quant": {
+          "accuracy": 0.20556640625,
+          "cross_entropy_nats": 3.2788357184545265,
+          "perplexity": 26.544849023588824
+        },
+        "fp32": {
+          "accuracy": 0.3546142578125,
+          "cross_entropy_nats": 2.204319258737734,
+          "perplexity": 9.064079174494822
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.20556640625,
+          "cross_entropy_nats": 3.2788357184545265,
+          "perplexity": 26.544849023588824
+        },
+        "product_int8_legacy_contract": {
+          "accuracy": 0.1058349609375,
+          "cross_entropy_nats": 5.186049272982637,
+          "perplexity": 178.76092042284156
+        },
+        "qat_float": {
+          "accuracy": 0.3529052734375,
+          "cross_entropy_nats": 2.22709434972412,
+          "perplexity": 9.272883141518959
+        },
+        "trace_all_exact": true,
+        "trace_sample_windows": 8,
+        "trace_window_node_mismatch_counts": {
+          "final_ln": 0,
+          "l0.attention": 0,
+          "l0.down": 0,
+          "l0.gelu": 0,
+          "l0.gelu_i8": 0,
+          "l0.k": 0,
+          "l0.ln1": 0,
+          "l0.ln2": 0,
+          "l0.probabilities_q7": 0,
+          "l0.projection": 0,
+          "l0.q": 0,
+          "l0.residual1": 0,
+          "l0.residual2": 0,
+          "l0.scores": 0,
+          "l0.up": 0,
+          "l0.v": 0,
+          "l1.attention": 0,
+          "l1.down": 0,
+          "l1.gelu": 0,
+          "l1.gelu_i8": 0,
+          "l1.k": 0,
+          "l1.ln1": 0,
+          "l1.ln2": 0,
+          "l1.probabilities_q7": 0,
+          "l1.projection": 0,
+          "l1.q": 0,
+          "l1.residual1": 0,
+          "l1.residual2": 0,
+          "l1.scores": 0,
+          "l1.up": 0,
+          "l1.v": 0,
+          "l2.attention": 0,
+          "l2.down": 0,
+          "l2.gelu": 0,
+          "l2.gelu_i8": 0,
+          "l2.k": 0,
+          "l2.ln1": 0,
+          "l2.ln2": 0,
+          "l2.probabilities_q7": 0,
+          "l2.projection": 0,
+          "l2.q": 0,
+          "l2.residual1": 0,
+          "l2.residual2": 0,
+          "l2.scores": 0,
+          "l2.up": 0,
+          "l2.v": 0,
+          "l3.attention": 0,
+          "l3.down": 0,
+          "l3.gelu": 0,
+          "l3.gelu_i8": 0,
+          "l3.k": 0,
+          "l3.ln1": 0,
+          "l3.ln2": 0,
+          "l3.probabilities_q7": 0,
+          "l3.projection": 0,
+          "l3.q": 0,
+          "l3.residual1": 0,
+          "l3.residual2": 0,
+          "l3.scores": 0,
+          "l3.up": 0,
+          "l3.v": 0,
+          "logits": 0
+        }
+      },
+      "test_targets": 8192,
+      "test_windows": 512,
+      "trace_all_exact": true,
+      "trace_sample_windows": 8,
+      "validation": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.38916015625,
+          "qat_float_vs_fp32_top1": 0.84619140625
+        },
+        "bigram": {
+          "accuracy": 0.2666015625,
+          "cross_entropy_nats": 2.5371619445887617,
+          "perplexity": 12.64373637832451
+        },
+        "fake_quant": {
+          "accuracy": 0.21240234375,
+          "cross_entropy_nats": 3.265201548849718,
+          "perplexity": 26.185388093857803
+        },
+        "fp32": {
+          "accuracy": 0.37060546875,
+          "cross_entropy_nats": 2.205286848735783,
+          "perplexity": 9.072853731247681
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.21240234375,
+          "cross_entropy_nats": 3.265201548849718,
+          "perplexity": 26.185388093857803
+        },
+        "qat_float": {
+          "accuracy": 0.35302734375,
+          "cross_entropy_nats": 2.2399010204631224,
+          "perplexity": 9.392401585873689
+        }
+      },
+      "validation_targets": 2048,
+      "validation_windows": 128
+    },
+    {
+      "package_sha256": "0fa44f5f883cecf548e7e5aaec2c7120736dd00bda3f7a7547ecae71a0d765d4",
+      "product_top_status": "NOT_RUN",
+      "qat_checkpoint_sha256": "ff0f327c057a82192fd5ce1a8ff8e318b53d37ab3fb876d329560aa7d0ff499e",
+      "qat_seed": 20263112,
+      "source_seed": 20261221,
+      "test_evaluated_after_validation_selection": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.3707275390625,
+          "qat_float_vs_fp32_top1": 0.8514404296875
+        },
+        "bigram": {
+          "accuracy": 0.26513671875,
+          "cross_entropy_nats": 2.5197758200455835,
+          "perplexity": 12.425810733630534
+        },
+        "fake_quant": {
+          "accuracy": 0.2056884765625,
+          "cross_entropy_nats": 3.2887817325351096,
+          "perplexity": 26.81018178011721
+        },
+        "fp32": {
+          "accuracy": 0.3546142578125,
+          "cross_entropy_nats": 2.204319258737734,
+          "perplexity": 9.064079174494822
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.2056884765625,
+          "cross_entropy_nats": 3.2887817325351096,
+          "perplexity": 26.81018178011721
+        },
+        "product_int8_legacy_contract": {
+          "accuracy": 0.106201171875,
+          "cross_entropy_nats": 5.209902867435925,
+          "perplexity": 183.076274662073
+        },
+        "qat_float": {
+          "accuracy": 0.3531494140625,
+          "cross_entropy_nats": 2.2248789915747973,
+          "perplexity": 9.252363122271975
+        },
+        "trace_all_exact": true,
+        "trace_sample_windows": 8,
+        "trace_window_node_mismatch_counts": {
+          "final_ln": 0,
+          "l0.attention": 0,
+          "l0.down": 0,
+          "l0.gelu": 0,
+          "l0.gelu_i8": 0,
+          "l0.k": 0,
+          "l0.ln1": 0,
+          "l0.ln2": 0,
+          "l0.probabilities_q7": 0,
+          "l0.projection": 0,
+          "l0.q": 0,
+          "l0.residual1": 0,
+          "l0.residual2": 0,
+          "l0.scores": 0,
+          "l0.up": 0,
+          "l0.v": 0,
+          "l1.attention": 0,
+          "l1.down": 0,
+          "l1.gelu": 0,
+          "l1.gelu_i8": 0,
+          "l1.k": 0,
+          "l1.ln1": 0,
+          "l1.ln2": 0,
+          "l1.probabilities_q7": 0,
+          "l1.projection": 0,
+          "l1.q": 0,
+          "l1.residual1": 0,
+          "l1.residual2": 0,
+          "l1.scores": 0,
+          "l1.up": 0,
+          "l1.v": 0,
+          "l2.attention": 0,
+          "l2.down": 0,
+          "l2.gelu": 0,
+          "l2.gelu_i8": 0,
+          "l2.k": 0,
+          "l2.ln1": 0,
+          "l2.ln2": 0,
+          "l2.probabilities_q7": 0,
+          "l2.projection": 0,
+          "l2.q": 0,
+          "l2.residual1": 0,
+          "l2.residual2": 0,
+          "l2.scores": 0,
+          "l2.up": 0,
+          "l2.v": 0,
+          "l3.attention": 0,
+          "l3.down": 0,
+          "l3.gelu": 0,
+          "l3.gelu_i8": 0,
+          "l3.k": 0,
+          "l3.ln1": 0,
+          "l3.ln2": 0,
+          "l3.probabilities_q7": 0,
+          "l3.projection": 0,
+          "l3.q": 0,
+          "l3.residual1": 0,
+          "l3.residual2": 0,
+          "l3.scores": 0,
+          "l3.up": 0,
+          "l3.v": 0,
+          "logits": 0
+        }
+      },
+      "test_targets": 8192,
+      "test_windows": 512,
+      "trace_all_exact": true,
+      "trace_sample_windows": 8,
+      "validation": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.39111328125,
+          "qat_float_vs_fp32_top1": 0.849609375
+        },
+        "bigram": {
+          "accuracy": 0.2666015625,
+          "cross_entropy_nats": 2.5371619445887617,
+          "perplexity": 12.64373637832451
+        },
+        "fake_quant": {
+          "accuracy": 0.21435546875,
+          "cross_entropy_nats": 3.311769343173505,
+          "perplexity": 27.43362204760324
+        },
+        "fp32": {
+          "accuracy": 0.37060546875,
+          "cross_entropy_nats": 2.205286848735783,
+          "perplexity": 9.072853731247681
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.21435546875,
+          "cross_entropy_nats": 3.311769343173505,
+          "perplexity": 27.43362204760324
+        },
+        "qat_float": {
+          "accuracy": 0.35302734375,
+          "cross_entropy_nats": 2.237247498155055,
+          "perplexity": 9.36751167630891
+        }
+      },
+      "validation_targets": 2048,
+      "validation_windows": 128
+    },
+    {
+      "package_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+      "product_top_status": "BLOCKED_ENV",
+      "qat_checkpoint_sha256": "a5e42d806859bd702194054b053cd5a3a1e48004c053f67012ed6f4470d8f5c7",
+      "qat_seed": 20263113,
+      "source_seed": 20261221,
+      "test_evaluated_after_validation_selection": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.382080078125,
+          "qat_float_vs_fp32_top1": 0.853515625
+        },
+        "bigram": {
+          "accuracy": 0.26513671875,
+          "cross_entropy_nats": 2.5197758200455835,
+          "perplexity": 12.425810733630534
+        },
+        "fake_quant": {
+          "accuracy": 0.20751953125,
+          "cross_entropy_nats": 3.254722087307493,
+          "perplexity": 25.912412144999163
+        },
+        "fp32": {
+          "accuracy": 0.3546142578125,
+          "cross_entropy_nats": 2.204319258737734,
+          "perplexity": 9.064079174494822
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.20751953125,
+          "cross_entropy_nats": 3.254722087307493,
+          "perplexity": 25.912412144999163
+        },
+        "product_int8_legacy_contract": {
+          "accuracy": 0.105712890625,
+          "cross_entropy_nats": 5.186718041087865,
+          "perplexity": 178.88051000927484
+        },
+        "qat_float": {
+          "accuracy": 0.3543701171875,
+          "cross_entropy_nats": 2.2265446515383758,
+          "perplexity": 9.267787255207494
+        },
+        "trace_all_exact": true,
+        "trace_sample_windows": 8,
+        "trace_window_node_mismatch_counts": {
+          "final_ln": 0,
+          "l0.attention": 0,
+          "l0.down": 0,
+          "l0.gelu": 0,
+          "l0.gelu_i8": 0,
+          "l0.k": 0,
+          "l0.ln1": 0,
+          "l0.ln2": 0,
+          "l0.probabilities_q7": 0,
+          "l0.projection": 0,
+          "l0.q": 0,
+          "l0.residual1": 0,
+          "l0.residual2": 0,
+          "l0.scores": 0,
+          "l0.up": 0,
+          "l0.v": 0,
+          "l1.attention": 0,
+          "l1.down": 0,
+          "l1.gelu": 0,
+          "l1.gelu_i8": 0,
+          "l1.k": 0,
+          "l1.ln1": 0,
+          "l1.ln2": 0,
+          "l1.probabilities_q7": 0,
+          "l1.projection": 0,
+          "l1.q": 0,
+          "l1.residual1": 0,
+          "l1.residual2": 0,
+          "l1.scores": 0,
+          "l1.up": 0,
+          "l1.v": 0,
+          "l2.attention": 0,
+          "l2.down": 0,
+          "l2.gelu": 0,
+          "l2.gelu_i8": 0,
+          "l2.k": 0,
+          "l2.ln1": 0,
+          "l2.ln2": 0,
+          "l2.probabilities_q7": 0,
+          "l2.projection": 0,
+          "l2.q": 0,
+          "l2.residual1": 0,
+          "l2.residual2": 0,
+          "l2.scores": 0,
+          "l2.up": 0,
+          "l2.v": 0,
+          "l3.attention": 0,
+          "l3.down": 0,
+          "l3.gelu": 0,
+          "l3.gelu_i8": 0,
+          "l3.k": 0,
+          "l3.ln1": 0,
+          "l3.ln2": 0,
+          "l3.probabilities_q7": 0,
+          "l3.projection": 0,
+          "l3.q": 0,
+          "l3.residual1": 0,
+          "l3.residual2": 0,
+          "l3.scores": 0,
+          "l3.up": 0,
+          "l3.v": 0,
+          "logits": 0
+        }
+      },
+      "test_targets": 8192,
+      "test_windows": 512,
+      "trace_all_exact": true,
+      "trace_sample_windows": 8,
+      "validation": {
+        "agreement": {
+          "fake_quant_vs_int8_top1": 1.0,
+          "int8_vs_fp32_top1": 0.38623046875,
+          "qat_float_vs_fp32_top1": 0.84814453125
+        },
+        "bigram": {
+          "accuracy": 0.2666015625,
+          "cross_entropy_nats": 2.5371619445887617,
+          "perplexity": 12.64373637832451
+        },
+        "fake_quant": {
+          "accuracy": 0.216796875,
+          "cross_entropy_nats": 3.2746654463525955,
+          "perplexity": 26.434380282708233
+        },
+        "fp32": {
+          "accuracy": 0.37060546875,
+          "cross_entropy_nats": 2.205286848735783,
+          "perplexity": 9.072853731247681
+        },
+        "product_int8_aligned": {
+          "accuracy": 0.216796875,
+          "cross_entropy_nats": 3.2746654463525955,
+          "perplexity": 26.434380282708233
+        },
+        "qat_float": {
+          "accuracy": 0.35302734375,
+          "cross_entropy_nats": 2.2391438650540927,
+          "perplexity": 9.385292769788053
+        }
+      },
+      "validation_targets": 2048,
+      "validation_windows": 128
+    }
+  ],
+  "selected_qat_seed": 20263113,
+  "selection_rule": "highest product-int8 validation accuracy; CE tie-break",
+  "status": "SOFTWARE_QAT_ONLY_PRODUCT_TOP_BLOCKED_ENV",
+  "summary_csv": "round31_qat_seed_summary.csv",
+  "test_note": "All three candidates were evaluated on the held-out test after validation selection; do not treat this as an untouched future test.",
+  "test_pristine_for_future_confirmation": false,
+  "test_used_for_selection": false,
+  "validation_used_for_selection": true
+}

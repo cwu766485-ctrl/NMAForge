@@ -1,0 +1,6 @@
+property_scope,result,run_id,source_sha,proofs,covers,tool,log_sha256
+Matrix FSM guards,PASS_SCOPED,R21-MATRIX-FSM-FORMAL-9FB7224,9fb722447f9f249ce7909451fc893c11ec9c3e58,5 proven / 5 non-vacuous,2 reachability covers hit at depths 5 and 11,VC Formal V-2023.12-SP2,d4d5ec3d10858a8eb6f6df06d48c0cc70c308e03cfd4f4753eaa89728fadd998
+Completion ownership/lifecycle,PASS_SCOPED,R21-CP-COMPLETION-FORMAL-9FB7224-HARNESS-ADAPT,9fb722447f9f249ce7909451fc893c11ec9c3e58,7 proven / 7 non-vacuous,"3 covers hit; free dependency-event inputs were added to the harness interface, not constrained",VC Formal V-2023.12-SP2,2e2eab73c093497b5b7de2f3e859e7169c6368fa7fbbf2d8130f1b526440ff9e
+KV append interruption/invariants,NOT_RUN,NONE,9fb722447f9f249ce7909451fc893c11ec9c3e58,No dedicated property proof,Reset/Abort/partial append invalid-token rule not formally proven,NOT_RUN,N/A
+Fused output layout mapping,NOT_RUN,NONE,9fb722447f9f249ce7909451fc893c11ec9c3e58,No dedicated address/word mapping proof,No formal row-major/native output property closure,NOT_RUN,N/A
+Whole-design equivalence,NOT_RUN,NONE,9fb722447f9f249ce7909451fc893c11ec9c3e58,No full design LEC,Not required for this bounded review,NOT_RUN,N/A

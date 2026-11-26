@@ -1,0 +1,7 @@
+Current-commit VCS compile attempt (2026-11-24 UTC). The terminal output reported:
+Cannot connect to the license server.
+The connect() system call failed.
+Make sure that SNPSLMD_LICENSE_FILE is pointing to the right location and that the license server is up.
+Retrying request.....
+Failed to obtain license ...
+No compile or simulation result was produced by this attempt. Native exit code was not captured.

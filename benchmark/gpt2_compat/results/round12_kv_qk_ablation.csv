@@ -1,0 +1,5 @@
+variant,status,descriptors,total_cycles,spad_read_bytes,spad_write_bytes,dma_payload_bytes,useful_macs,executed_macs,padding_macs,checkpoint_result,notes
+matrix_a_tile,PASS,229,338050,346496,222208,49152,297600,819200,521600,31_of_31,Round 11 legal reference layout; full Product Top and DMA preload included
+qk_compatible_append,PASS,249,340602,345856,221568,49152,297600,819200,521600,31_of_31,Research flags=0x02; four-head cache-backed attention and FFN
+matrix_b_token_append,FAIL_AT_QK,249,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,49152,297600,819200,521600,46_of_47,Descriptor 47 address 0x4100 expected 0xfffffdc7 actual 0x00000187
+matrix_a_word,NOT_RUN_QUEUE_CAPACITY,321,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,297600,819200,521600,NOT_RUN,Static descriptor batch exceeds 256-entry CMDQ; Round 12 does not implement ring streaming

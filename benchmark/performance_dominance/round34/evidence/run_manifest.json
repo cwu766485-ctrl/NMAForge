@@ -1,0 +1,61 @@
+{
+  "run_id": "NMAFORGE-V1.3-ROUND34-TRANSFORMER-SFU-20261125",
+  "branch": "research/nmaforge-v1.3-round34-transformer-sfu",
+  "base_commit": "492216425b90bcf216c67ae026706761c8c388a2",
+  "source_state": "uncommitted working tree on base commit",
+  "source_delta_sha256": "329bc7f947cf32de7b00138acab11a4d2b7b38bbf060c85e438bb2dc4a4711b7",
+  "new_files": [
+    "benchmark/transformer_ops/gen_vectors.py",
+    "benchmark/transformer_ops/run_transformer_ops.sh",
+    "benchmark/transformer_ops/summarize.py",
+    "benchmark/transformer_ops/tb_nma_sfu_ops_perf.sv",
+    "benchmark/transformer_ops/tb_tiny_ops_perf.sv",
+    "docs/benchmark/NMAFORGE_V1_3_ROUND34_TRANSFORMER_SFU.md",
+    "dv/block/compute/sfu/model/generate_stream_equiv_vectors.py",
+    "dv/block/compute/sfu/tb/tb_sfu_stream_equiv.sv",
+    "rtl/compute/sfu/ai_tensor_sfu_stream.v"
+  ],
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python_vectors": "3.11.13",
+    "python_gpt2": "3.12.13 / numpy 2.5.5"
+  },
+  "tinynpu": {
+    "commit": "8216c22b762011aa20c05fc2768423fd12dda59d",
+    "vcs_adaptations": [
+      "Round33 sram_dp always/always_ff adapter",
+      "softmax_engine fp16_assembled declaration hoist (generated copy)"
+    ]
+  },
+  "model": {
+    "gpt2_package": "benchmark/gpt2_quality/results/round31_qat_retrain/source_20261221_qat_20263113/product_int8.npz",
+    "gpt2_package_sha256": "d9ff47c56a4ddc335a34d601d2083cfa2967d179b6aa617fdb25e484a9af3bb4",
+    "deit_checkpoint_sha256": "e1a51b0c81ff812e079d2189352747947879fee56429e4480064a6695cb34b2c"
+  },
+  "commands": {
+    "sfu_equivalence": "make -C dv/block/compute/sfu/sim stream-equiv-regress [EQUIV_STALL=0]",
+    "sfu_legacy_random": "make -C dv/block/compute/sfu/sim random-latency-regress",
+    "transformer_ops": "TINY_NPU_ROOT=<pinned tiny-NPU> benchmark/transformer_ops/run_transformer_ops.sh <out>",
+    "gpt2": "make -C dv/subsystem/top_smoke/sim ai_h64_four_layer_top_argmax AI_H64_FOUR_LAYER_RUN=<short path> AI_H64_FOUR_LAYER_PYTHON=python3.12 AI_H64_FOUR_LAYER_MODEL_NPZ=<package> AI_H64_NUMERIC_PROFILE=round21_residual_gelu_aligned AI_H64_AUTOREGRESSIVE=1 AI_H64_AUTOREGRESSIVE_KV_MODE=persistent_incremental [AI_H64_ACTIVE_ROWS=1] [AI_H64_BATCH_PUBLISH=1]",
+    "deit": "make -C dv/subsystem/top_smoke/sim ai_deit_round31_attention_output_projection_256k AI_DEIT_R31_WO_RUN=<dir> AI_DEIT_R31_WO_PYTHON=<python with torch> [VCS=\"vcs -licwait 1 +define+AI_SFU_LEGACY_ONLY\"]",
+    "smoke": "make -C dv/subsystem/top_smoke/sim ai_smoke AI_RANDOM_CASES=4 AI_SEED=20261122",
+    "seeded": "make -C dv/subsystem/top_smoke/sim ai_run AI_RANDOM_CASES=20 AI_SEED=12345",
+    "cluster_uvm": "make -C dv/uvm/sim uvm_compute_cluster_regress SPAD_KIB={128,256,512} COMPUTE_CLUSTER_UVM_SEEDS='20261025 20261026 20261027'"
+  },
+  "results": {
+    "smoke": "PASS",
+    "seeded_20": "PASS",
+    "cluster_uvm": "PASS 128/256/512 KiB x 3 seeds, UVM_ERROR=0 UVM_FATAL=0",
+    "sfu_legacy_random": "PASS 3 seeds",
+    "sfu_equivalence": "PASS 6 runs x 491 cases",
+    "gpt2": "PASS all logits bit-exact for 5 configurations",
+    "deit": "PASS 72384 Golden words both SFU builds"
+  },
+  "not_run": [
+    "DC/PPA (deferred by request)",
+    "SpyGlass lint/CDC on the new module",
+    "formal for the stream unit"
+  ],
+  "raw_logs": "/tmp/nmaf34 (not archived)",
+  "source_delta_scope": "git diff HEAD (excluding this evidence directory) plus untracked files, after documentation update; RTL/TB identical to the tested state"
+}

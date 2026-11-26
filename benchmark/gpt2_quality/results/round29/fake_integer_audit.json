@@ -1,0 +1,367 @@
+{
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "fake_vs_independent_integer_first_mismatch": null,
+  "heldout_metrics_same_qat_state": {
+    "fake_quant": {
+      "accuracy": 0.279052734375,
+      "cross_entropy_nats": 2.6042659816500757,
+      "perplexity": 13.521296779383416,
+      "targets": 8192
+    },
+    "independent_product_integer": {
+      "accuracy": 0.279052734375,
+      "cross_entropy_nats": 2.6042659816500757,
+      "perplexity": 13.521296779383416,
+      "targets": 8192
+    }
+  },
+  "interpretation": [
+    "Round 28's 7.69% fake-quant number used the pre-QAT FP32 checkpoint while the compared Product INT8 package came from the QAT-updated checkpoint; those were different model states.",
+    "The fake-quant forward also lacked Product INT8 saturation after Q15 probability >> 8. This audit includes that saturation and compares a single frozen QAT checkpoint against its matching package.",
+    "Passing this numerical audit establishes fake-forward/reference agreement only; it does not close model quality or replace Product Top qualification."
+  ],
+  "logits_mismatches": 0,
+  "package_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+  "product_probability_saturation_negative_control": {
+    "first": {
+      "index": [
+        0,
+        0,
+        0
+      ],
+      "pre_saturation_q7": 128,
+      "product_q7": 127,
+      "q15": 32768,
+      "stage": "l0.probabilities_q15",
+      "window": 0
+    },
+    "omitted_saturation_out_of_range_values": 11289
+  },
+  "qat_checkpoint_sha256": "8674782e974cdbb1f43743b00762d854d37e3808b3a2426d3180b36bd99d3130",
+  "seed_manifest_sha256": "c4c4ed38ec1ae4307dfc91a856c5b8b07e4bed9b25ab102da9a7746a738dc181",
+  "source_fp32_checkpoint_sha256": "6d71d0a4649f276a74d42834f94f01812c4cf1e6d64bc6562f1ab017361c0021",
+  "source_head": "745e8c0643e55d1ec5a6a5df46b6cd8da8f49532",
+  "split_manifest_sha256": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+  "stage_comparison": {
+    "embedding_position": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "final_ln": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.attention": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.down": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.gelu": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.gelu_i8": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.k": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.ln1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.ln2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.probabilities_q7": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.projection": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.q": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.residual1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.residual2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.scores": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.up": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l0.v": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.attention": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.down": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.gelu": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.gelu_i8": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.k": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.ln1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.ln2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.probabilities_q7": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.projection": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.q": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.residual1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.residual2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.scores": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.up": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l1.v": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.attention": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.down": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.gelu": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.gelu_i8": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.k": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.ln1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.ln2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.probabilities_q7": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.projection": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.q": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.residual1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.residual2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.scores": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.up": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l2.v": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.attention": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.down": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.gelu": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.gelu_i8": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.k": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.ln1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.ln2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.probabilities_q7": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.projection": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.q": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.residual1": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.residual2": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.scores": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.up": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "l3.v": {
+      "elements": 524288,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    },
+    "logits": {
+      "elements": 2097152,
+      "max_abs_delta_codes": 0,
+      "mismatches": 0
+    }
+  },
+  "status": "PASS",
+  "targets_per_window": 16,
+  "test_start_seed": 20261211,
+  "test_start_sha256": "36c21c93a1c98515c4f8a6209fe016688babe19d991a3d0ad7af4573419376a2",
+  "test_windows": 512
+}

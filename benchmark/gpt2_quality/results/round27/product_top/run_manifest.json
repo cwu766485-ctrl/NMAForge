@@ -1,0 +1,33 @@
+{
+  "run_id": "round27_gpt2_h64_four_layer_ar_20261118",
+  "source_sha": "901dd1d287413a4b8c51bd4f99c403842d6c30db",
+  "product_rtl_tree_sha": "8798decc60fe257ef685a0b1c7e8814816e1d4de",
+  "branch": "research/nmaforge-v1.2-dual-final-gpt2",
+  "model_package": "benchmark/gpt2_quality/results/round25/seed_20261125/round24_integer_qat_model.npz",
+  "model_package_sha256": "fa66d2ecd6709c0a49e5c23d6346de22adfbf2f0809f182e581fa63cbcb9a54b",
+  "canonical_integer_model_sha256": "4f9bf1070ed14827ef99510d47eccde6f6dc218c2f7b9b677394f41437adf8fd",
+  "seed": 20261116,
+  "prompt_tokens": [1, 7, 42, 3],
+  "generated_tokens": [73, 73, 115, 111],
+  "status": "FOUR_LAYER_TOP_AUTOREGRESSIVE_GOLDEN_PASS",
+  "mode": "prefix_recompute_same_top_no_reset",
+  "host_intermediate_tensor_writes": 0,
+  "contexts": [
+    {"index": 0, "cycles": 1049190, "golden_bit_exact": true, "logits": 256, "logits_sha256": "7143fe6a08599e02cd8c70349b24c5cec8b48354c5410a659efb5aa8e638eaec"},
+    {"index": 1, "cycles": 1414188, "golden_bit_exact": true, "logits": 256, "logits_sha256": "098de298678dcf47751aa0b66355ae8eae5cf4de52624815c84428b056eea4ce"},
+    {"index": 2, "cycles": 1446780, "golden_bit_exact": true, "logits": 256, "logits_sha256": "3d62a03bc31e3a605d4f7eff959e1bf4e43332c60c6a45d3a1e78ca09072d3cb"},
+    {"index": 3, "cycles": 1479804, "golden_bit_exact": true, "logits": 256, "logits_sha256": "86eec45220f6afbc0b49a90e82356ccd05271434ed154c776b27d6054e348d73"}
+  ],
+  "summed_context_cycles": 5389962,
+  "vcs_sim_time_cycles_including_testbench_setup": 6123246,
+  "clock_period_ns": 10.0,
+  "tool": "Synopsys VCS V-2023.12-SP1_Full64",
+  "make_target": "ai_h64_four_layer_top_argmax",
+  "make_exit_status": 0,
+  "raw_log_sha256": {
+    "compile.log": "1409c63b580f0f3c3fc394f82ffad53dcfc79c8e296e0f5150a0dc109298c204",
+    "run.log": "c2b7373d0faeb9e6de5c8201571945992f46e5b192e23d86e3b81f496dfbcb71"
+  },
+  "quality_status": "PARTIAL",
+  "quality_note": "Round 26 same-window software evaluation: Product-contract INT8 mean 29.362% over three seeds vs Bigram 27.539%; source FP32 23.242%, QAT Float 22.721%. Small sample and validation overlap prevent quality closure."
+}

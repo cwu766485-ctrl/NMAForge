@@ -1,0 +1,5 @@
+tool=vcs V-2023.12-SP1_Full64
+smoke_command=cd dv/subsystem/top_smoke/sim && make ai_smoke
+smoke_exit=0
+seeded_command=cd dv/subsystem/top_smoke/sim && make ai_run AI_RANDOM_CASES=20 AI_SEED=290029
+seeded_exit=0

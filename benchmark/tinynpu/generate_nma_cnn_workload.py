@@ -7,20 +7,20 @@ import json
 from pathlib import Path
 
 import numpy as np
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "sw/tools"))
+from spad_memory_planner import SpadMemoryPlanner
 import onnx
 from onnx import numpy_helper
 
 
-ADDR = {
-    "im2col": 0x10000, "conv_weight": 0x11000, "conv_round_bias": 0x11100,
-    "conv_raw": 0x12000, "conv_i8": 0x13000, "identity_b": 0x14000,
-    "conv_bias": 0x14100, "conv_bias_relu": 0x15000,
-    "conv_relu_i8": 0x16000, "fc_a": 0x18000, "fc_b": 0x19000,
-    "fc_round_bias": 0x1A000, "fc_raw": 0x1B000, "fc_i8": 0x1C000,
-    "fc_bias": 0x1C100, "fc_biased": 0x1D000, "final_i8": 0x1E000,
-}
-DESC_BASE = 0x20000
-CPL_BASE = 0x21000
+# Reserved maxima cover the existing four/ten-class fixtures, including packing
+# and intermediates; a single allocator generates the TB layout image as well.
+REGION_BYTES = {"im2col":576,"conv_weight":48,"conv_round_bias":16,
+    "conv_raw":576,"conv_i8":144,"identity_b":16,"conv_bias":16,
+    "conv_bias_relu":576,"conv_relu_i8":144,"fc_a":576,"fc_b":1728,
+    "fc_round_bias":16,"fc_raw":192,"fc_i8":48,"fc_bias":48,
+    "fc_biased":192,"final_i8":64,"descriptor":8192,"completion":2048}
 
 
 def quantize_int8(values):
@@ -56,18 +56,41 @@ def rounded_requant(acc, shift):
     return (np.asarray(acc, dtype=np.int64) + bump) >> shift
 
 
-def build(model_path):
-    model = onnx.load(str(model_path))
-    initializers = {item.name: numpy_helper.to_array(item)
-                    for item in model.graph.initializer}
+def build(model_path, input_npz=None, spad_base_shift=0, spad_bytes=131072):
+    if spad_base_shift != 0:
+        raise ValueError("Manual base shifts are obsolete; use capacity-aware allocation")
+    planner = SpadMemoryPlanner(spad_bytes)
+    addr = {name:planner.reserve(name,size,256) for name,size in REGION_BYTES.items()}
+    desc_base = addr["descriptor"]
+    cpl_base = addr["completion"]
+    if model_path.suffix == ".npz":
+        with np.load(model_path) as weights:
+            initializers = {name: weights[name] for name in
+                            ("conv_w", "conv_b", "fc_w", "fc_b")}
+            model_kind = str(weights["model_kind"].item()) if "model_kind" in weights else "quantized_weight_package"
+    else:
+        model = onnx.load(str(model_path))
+        initializers = {item.name: numpy_helper.to_array(item)
+                        for item in model.graph.initializer}
+        model_kind = "onnx_reference_graph"
     conv_w, _ = quantize_int8(initializers["conv_w"])
     conv_b, _ = quantize_int8(initializers["conv_b"])
     fc_w, _ = quantize_int8(initializers["fc_w"])
     fc_b, _ = quantize_int8(initializers["fc_b"])
 
-    np.random.seed(99)
-    input_fp = np.random.randn(1, 1, 8, 8).astype(np.float32) * 0.5
-    input_i8, input_scale = quantize_int8(input_fp)
+    input_label = None
+    if input_npz is not None:
+        with np.load(input_npz) as input_data:
+            input_i8 = np.asarray(input_data["input_int8"])
+            if input_i8.shape != (1, 1, 8, 8) or input_i8.dtype != np.int8:
+                raise ValueError("input_npz input_int8 must be int8 with shape (1,1,8,8)")
+            input_scale = float(input_data["input_scale"].item())
+            input_label = int(input_data["label"].item())
+        input_fp = input_i8.astype(np.float32)
+    else:
+        np.random.seed(99)
+        input_fp = np.random.randn(1, 1, 8, 8).astype(np.float32) * 0.5
+        input_i8, input_scale = quantize_int8(input_fp)
     source = input_i8[0, 0]
     im2col = np.asarray([
         [source[row + rr, col + cc] for rr in range(3) for cc in range(3)]
@@ -88,13 +111,24 @@ def build(model_path):
     conv_relu = np.clip(conv_bias_relu_i32, 0, 127).astype(np.int8)
     conv_relu_flat = conv_relu.reshape(6, 6, 4).reshape(-1)
 
-    fc_weights = fc_w.reshape(4, 144)
+    fc_weights = fc_w.reshape(-1, 144)
+    num_classes = int(fc_weights.shape[0])
+    if num_classes not in (4, 10):
+        raise ValueError("CNN output classes must be 4 or 10")
+    padded_classes = ((num_classes + 3) // 4) * 4
+    fc_bias = fc_b.reshape(-1)
     fc_acc = conv_relu_flat.astype(np.int64) @ fc_weights.astype(np.int64).T
     fc_rounded = rounded_requant(fc_acc, 8)
     fc_pre_bias_i8 = np.clip(fc_rounded, -128, 127).astype(np.int8)
     final_logits = np.clip(fc_pre_bias_i8.astype(np.int16) +
-                           fc_b.astype(np.int16), -128, 127).astype(np.int8)
+                           fc_bias.astype(np.int16), -128, 127).astype(np.int8)
     golden_bytes = final_logits.astype(np.int8).tobytes()
+    fc_weights_padded = np.zeros((padded_classes, 144), dtype=np.int8)
+    fc_weights_padded[:num_classes] = fc_weights
+    fc_bias_padded = np.zeros(padded_classes, dtype=np.int8)
+    fc_bias_padded[:num_classes] = fc_bias
+    fc_rounded_padded = np.zeros(padded_classes, dtype=np.int64)
+    fc_rounded_padded[:num_classes] = fc_rounded
 
     memory = {}
     # The matrix controller fetches each 16-row tile as four row groups. Each
@@ -109,7 +143,7 @@ def build(model_path):
                     lanes = list(im2col[row, k0:k0 + 4]) if row < 36 else []
                     lanes += [0] * (4 - len(lanes))
                     im2col_words.append(pack_i8(lanes))
-    add_words(memory, ADDR["im2col"], im2col_words)
+    add_words(memory, addr["im2col"], im2col_words)
 
     # B stores one packed K-word per output column in each 16-byte line.
     conv_b_words = []
@@ -118,26 +152,30 @@ def build(model_path):
             lanes = list(conv_weights[channel, k0:k0 + 4])
             lanes += [0] * (4 - len(lanes))
             conv_b_words.append(pack_i8(lanes))
-    add_words(memory, ADDR["conv_weight"], conv_b_words)
-    add_words(memory, ADDR["conv_round_bias"], [8] * 4)
-    add_words(memory, ADDR["identity_b"], [
+    add_words(memory, addr["conv_weight"], conv_b_words)
+    add_words(memory, addr["conv_round_bias"], [8] * 4)
+    add_words(memory, addr["identity_b"], [
         pack_i8([1 if k == n else 0 for k in range(4)]) for n in range(4)
     ])
-    add_words(memory, ADDR["conv_bias"], conv_b)
-    add_words(memory, ADDR["fc_a"], [0] * (4 * 36))
+    add_words(memory, addr["conv_bias"], conv_b)
+    add_words(memory, addr["fc_a"], [0] * (4 * 36))
 
-    fc_b_words = []
-    for k0 in range(0, 144, 4):
-        for n in range(4):
-            fc_b_words.append(pack_i8(fc_weights[n, k0:k0 + 4]))
-    add_words(memory, ADDR["fc_b"], fc_b_words)
-    add_words(memory, ADDR["fc_round_bias"], [128] * 4)
-    add_words(memory, ADDR["fc_bias"], fc_b)
+    fc_b_group_bytes = 4 * 36 * 4
+    for group in range(padded_classes // 4):
+        fc_b_words = []
+        for k0 in range(0, 144, 4):
+            for n in range(4):
+                fc_b_words.append(pack_i8(
+                    fc_weights_padded[group * 4 + n, k0:k0 + 4]))
+        add_words(memory, addr["fc_b"] + group * fc_b_group_bytes, fc_b_words)
+        add_words(memory, addr["fc_bias"] + group * 16,
+                  fc_bias_padded[group * 4:group * 4 + 4])
+    add_words(memory, addr["fc_round_bias"], [128] * 4)
     for key, count in (("conv_raw", 144), ("conv_i8", 36),
                        ("conv_bias_relu", 144), ("conv_relu_i8", 36),
                        ("fc_raw", 16), ("fc_i8", 4),
-                       ("fc_biased", 16), ("final_i8", 4)):
-        add_words(memory, ADDR[key], [0xA55AA55A] * count)
+                       ("fc_biased", 16), ("final_i8", padded_classes)):
+        add_words(memory, addr[key], [0xA55AA55A] * count)
 
     image_words = [len(memory)]
     for address, value in sorted(memory.items()):
@@ -147,39 +185,65 @@ def build(model_path):
     conv_i8_words = [pack_i8(conv_pre_bias_i8.reshape(36, 4)[r]) for r in range(36)]
     conv_relu_flat_i32 = flatten_words(conv_bias_relu_i32.reshape(36, 4))
     conv_relu_words = [pack_i8(conv_relu.reshape(36, 4)[r]) for r in range(36)]
-    fc_round_padded = np.zeros((4, 4), dtype=np.int64)
-    fc_round_padded[0] = fc_rounded
-    fc_round_words = flatten_words(fc_round_padded)
-    fc_i8_words = [pack_i8(np.clip(fc_round_padded[r], -128, 127))
-                   for r in range(4)]
-    fc_biased_padded = np.tile(fc_b.astype(np.int32), (4, 1))
-    fc_biased_padded[0] += np.clip(fc_rounded, -128, 127).astype(np.int32)
-    fc_biased_flat = flatten_words(fc_biased_padded)
-    fc_final_words = [pack_i8(np.clip(fc_biased_padded[r], -128, 127))
-                      for r in range(4)]
-
-    expected_arrays = [
-        conv_round_flat, conv_i8_words, conv_relu_flat_i32, conv_relu_words,
-        fc_round_words, fc_i8_words, fc_biased_flat, fc_final_words,
-    ]
+    expected_arrays = [conv_round_flat, conv_i8_words,
+                       conv_relu_flat_i32, conv_relu_words]
+    fc_group_expected = []
+    for group in range(padded_classes // 4):
+        lo = group * 4
+        hi = lo + 4
+        rounded_group = fc_rounded_padded[lo:hi]
+        bias_group = fc_bias_padded[lo:hi].astype(np.int32)
+        round_matrix = np.zeros((4, 4), dtype=np.int64)
+        round_matrix[0] = rounded_group
+        round_words = flatten_words(round_matrix)
+        i8_words = [pack_i8(np.clip(round_matrix[row], -128, 127))
+                    for row in range(4)]
+        biased_matrix = np.tile(bias_group, (4, 1))
+        biased_matrix[0] += np.clip(rounded_group, -128, 127).astype(np.int32)
+        biased_words = flatten_words(biased_matrix)
+        final_words = [pack_i8(np.clip(biased_matrix[row], -128, 127))
+                       for row in range(4)]
+        fc_group_expected.append([round_words, i8_words, biased_words, final_words])
+        expected_arrays.extend(fc_group_expected[-1])
     expected_words = [sum(len(values) for values in expected_arrays)]
     for values in expected_arrays:
         expected_words.extend([len(values)])
         expected_words.extend(values)
 
+    descriptor_count = 4 + 4 * (padded_classes // 4)
+    allocated_high_water = max(
+        max(memory) + 4,
+        desc_base + descriptor_count * 64,
+        cpl_base + descriptor_count * 16,
+    )
     manifest = {
         "model": model_path.name,
+        "model_kind": model_kind,
         "model_sha256": hashlib.sha256(model_path.read_bytes()).hexdigest(),
-        "input_seed": 99,
+        "input_seed": 99 if input_npz is None else None,
+        "input_label": input_label,
+        "input_npz_sha256": hashlib.sha256(input_npz.read_bytes()).hexdigest() if input_npz is not None else None,
         "input_scale": input_scale,
+        "spad_base_shift_bytes": spad_base_shift,
+        "spad_capacity_bytes": spad_bytes,
+        "spad_reserved_high_water": planner.next_addr,
+        "spad_allocations": planner.regions,
+        "spad_address_map": addr,
+        "spad_descriptor_base": desc_base,
+        "spad_completion_base": cpl_base,
+        "spad_descriptor_count": descriptor_count,
+        "spad_max_allocated_exclusive": allocated_high_water,
         "input_int8_sha256": hashlib.sha256(input_i8.tobytes()).hexdigest(),
         "conv_weight_scale": float(np.max(np.abs(initializers["conv_w"]))) / 127.0,
         "fc_weight_scale": float(np.max(np.abs(initializers["fc_w"]))) / 127.0,
         "conv_shape": "8x8x1 -> 6x6x4, im2col GEMM K=9",
-        "fc_shape": "1x144 x 144x4; padded hardware M=4",
+        "num_classes": num_classes,
+        "padded_classes": padded_classes,
+        "fc_shape": "1x144 x 144x%d; output groups of four on padded M=4 matrix" % num_classes,
         "golden_int8": [int(value) for value in final_logits],
-        "golden_packed_word": pack_i8(final_logits),
+        "golden_class_count": num_classes,
         "golden_sha256": hashlib.sha256(golden_bytes).hexdigest(),
+        "fc_output_group_count": padded_classes // 4,
         "stage_order": ["Conv GEMM + round", "INT8 clamp", "Conv bias + ReLU",
                         "flatten/layout pack", "FC GEMM + round", "INT8 clamp",
                         "FC bias", "INT8 output"],
@@ -195,10 +259,17 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--tiny-golden", required=True, type=Path)
+    parser.add_argument("--input-npz", type=Path)
     parser.add_argument("--out-dir", required=True, type=Path)
+    parser.add_argument("--spad-base-shift", type=lambda value: int(value, 0), default=0,
+                        help="deprecated; nonzero shifts are rejected; use --spad-bytes")
+    parser.add_argument("--spad-bytes", type=int, default=131072)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
-    image_words, expected_words, manifest, golden_bytes = build(args.model)
+    image_words, expected_words, manifest, golden_bytes = build(
+        args.model, args.input_npz, args.spad_base_shift, args.spad_bytes)
+    (args.out_dir / "nma_cnn_layout.memh").write_text("".join(
+        "%08x\n" % manifest["spad_address_map"][name] for name in REGION_BYTES))
     tiny_golden = args.tiny_golden.read_bytes()
     if tiny_golden != golden_bytes:
         raise SystemExit("independent CNN Golden differs from pinned TinyNPU golden.bin")

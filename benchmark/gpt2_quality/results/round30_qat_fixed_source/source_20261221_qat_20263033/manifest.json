@@ -1,0 +1,155 @@
+{
+  "contract_ablation": {
+    "frozen": "not selected on validation; evaluate frozen contract separately",
+    "residual_gelu_aligned": {
+      "accuracy": 0.20947265625,
+      "cross_entropy_nats": 3.2997493497374215,
+      "perplexity": 27.105843982205357
+    }
+  },
+  "package_sha256": "e4cf158fdb979cc739e4e8570e01d3ee1e33dab2bbb16062a33fc35a26b9883c",
+  "product_top_status": "NOT_RUN",
+  "qat_checkpoint_sha256": "4ed8340a495ce61610d99d00164c3bdfa0ad04f0fa5468854d8d80aaf68d40f0",
+  "qat_seed": 20263033,
+  "source_checkpoint": "/tmp/nmaforge-v12-round30-gpt2/benchmark/gpt2_quality/results/round27_extended_train/seed_20261221/fp32_before_qat.pt",
+  "source_checkpoint_sha256": "00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0",
+  "source_seed": 20261221,
+  "test_metrics_once_frozen": {
+    "agreement": {
+      "fake_quant_vs_int8_top1": 1.0,
+      "int8_vs_fp32_top1": 0.382080078125,
+      "qat_float_vs_fp32_top1": 0.8524169921875
+    },
+    "bigram": {
+      "accuracy": 0.26513671875,
+      "cross_entropy_nats": 2.5197758200455835,
+      "perplexity": 12.425810733630534
+    },
+    "fake_quant": {
+      "accuracy": 0.2064208984375,
+      "cross_entropy_nats": 3.289938835075292,
+      "perplexity": 26.84122186437464
+    },
+    "fp32": {
+      "accuracy": 0.3546142578125,
+      "cross_entropy_nats": 2.204319258737734,
+      "perplexity": 9.064079174494822
+    },
+    "product_int8_aligned": {
+      "accuracy": 0.2064208984375,
+      "cross_entropy_nats": 3.289938835075292,
+      "perplexity": 26.84122186437464
+    },
+    "product_int8_legacy_contract": {
+      "accuracy": 0.10498046875,
+      "cross_entropy_nats": 5.222387498059644,
+      "perplexity": 185.37624157204465
+    },
+    "qat_float": {
+      "accuracy": 0.35400390625,
+      "cross_entropy_nats": 2.2260406183793386,
+      "perplexity": 9.263117160160219
+    },
+    "trace_all_exact": true,
+    "trace_sample_windows": 8,
+    "trace_window_node_mismatch_counts": {
+      "final_ln": 0,
+      "l0.attention": 0,
+      "l0.down": 0,
+      "l0.gelu": 0,
+      "l0.gelu_i8": 0,
+      "l0.k": 0,
+      "l0.ln1": 0,
+      "l0.ln2": 0,
+      "l0.probabilities_q7": 0,
+      "l0.projection": 0,
+      "l0.q": 0,
+      "l0.residual1": 0,
+      "l0.residual2": 0,
+      "l0.scores": 0,
+      "l0.up": 0,
+      "l0.v": 0,
+      "l1.attention": 0,
+      "l1.down": 0,
+      "l1.gelu": 0,
+      "l1.gelu_i8": 0,
+      "l1.k": 0,
+      "l1.ln1": 0,
+      "l1.ln2": 0,
+      "l1.probabilities_q7": 0,
+      "l1.projection": 0,
+      "l1.q": 0,
+      "l1.residual1": 0,
+      "l1.residual2": 0,
+      "l1.scores": 0,
+      "l1.up": 0,
+      "l1.v": 0,
+      "l2.attention": 0,
+      "l2.down": 0,
+      "l2.gelu": 0,
+      "l2.gelu_i8": 0,
+      "l2.k": 0,
+      "l2.ln1": 0,
+      "l2.ln2": 0,
+      "l2.probabilities_q7": 0,
+      "l2.projection": 0,
+      "l2.q": 0,
+      "l2.residual1": 0,
+      "l2.residual2": 0,
+      "l2.scores": 0,
+      "l2.up": 0,
+      "l2.v": 0,
+      "l3.attention": 0,
+      "l3.down": 0,
+      "l3.gelu": 0,
+      "l3.gelu_i8": 0,
+      "l3.k": 0,
+      "l3.ln1": 0,
+      "l3.ln2": 0,
+      "l3.probabilities_q7": 0,
+      "l3.projection": 0,
+      "l3.q": 0,
+      "l3.residual1": 0,
+      "l3.residual2": 0,
+      "l3.scores": 0,
+      "l3.up": 0,
+      "l3.v": 0,
+      "logits": 0
+    }
+  },
+  "test_starts_sha256": "c45940574e2c014f319bada52b16e13021fe5f17088486ed29b153734981fbec",
+  "train_curve_sha256": "db5d1c4fc32ec8313a2994539886ddeb04f496e2b307126c97bff3ba42c6d656",
+  "training_steps": 200,
+  "validation_metrics": {
+    "agreement": {
+      "fake_quant_vs_int8_top1": 1.0,
+      "int8_vs_fp32_top1": 0.4091796875,
+      "qat_float_vs_fp32_top1": 0.8515625
+    },
+    "bigram": {
+      "accuracy": 0.2666015625,
+      "cross_entropy_nats": 2.5371619445887617,
+      "perplexity": 12.64373637832451
+    },
+    "fake_quant": {
+      "accuracy": 0.20947265625,
+      "cross_entropy_nats": 3.2997493497374215,
+      "perplexity": 27.105843982205357
+    },
+    "fp32": {
+      "accuracy": 0.37060546875,
+      "cross_entropy_nats": 2.205286848735783,
+      "perplexity": 9.072853731247681
+    },
+    "product_int8_aligned": {
+      "accuracy": 0.20947265625,
+      "cross_entropy_nats": 3.2997493497374215,
+      "perplexity": 27.105843982205357
+    },
+    "qat_float": {
+      "accuracy": 0.35400390625,
+      "cross_entropy_nats": 2.239750424302101,
+      "perplexity": 9.390987232752831
+    }
+  }
+}

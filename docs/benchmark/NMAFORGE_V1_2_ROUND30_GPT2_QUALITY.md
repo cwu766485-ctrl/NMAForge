@@ -1,0 +1,89 @@
+# NMAForge-V1.2 Round 30 — GPT-2 QAT and Product Top Evidence
+
+## Disposition
+
+**QAT numerical contract: PASS on sampled traces. Selected package Product Top functional replay: PASS. Language-model quality: PARTIAL. Context 128 upgrade: NOT JUSTIFIED by the software pilot.**
+
+The INT8 candidate remains below the same-window Bigram baseline. This is not a quality closure.
+
+## Frozen data and training contract
+
+- Corpus SHA-256: `86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed`.
+- Disjoint split manifest SHA-256: `78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00`.
+- Half-open corpus ranges: Train `[0,780758)`, Validation `[780792,948067)`, Test `[948101,1115394)`; 17 guard bytes at boundaries.
+- Context 16; each QAT evaluation uses 128 validation windows and 512 test windows (8,192 test targets per seed). Test starts SHA-256: `c45940574e2c014f319bada52b16e13021fe5f17088486ed29b153734981fbec`.
+- QAT used 200 steps, batch 8, AdamW learning rate `1e-5`; fixed source/QAT seed pairs: `20261221/20263021`, `20261222/20263022`, `20261223/20263023`.
+- Reproduction: `python benchmark/gpt2_quality/round30_fixed_checkpoint_qat.py --steps 200 --out benchmark/gpt2_quality/results/round30_qat` (Python 3.12.13, NumPy 2.5.4, PyTorch 2.6.0+cpu). Source FP32 checkpoints are the already tracked Round 27 files; their SHA-256 values are recorded in per-candidate manifests.
+
+The new aligned forward preserves the Product integer arithmetic contract through Fake Quant. The sampled trace audit compares 60 activation/logit nodes across 8 held-out windows and reports exact values against the independent integer implementation. This validates the sampled arithmetic path, not full-test activation saturation statistics.
+
+## Held-out model results
+
+All rows below use the same frozen 8,192-target test set. Accuracy is next-byte top-1. Values are means across three fixed source/QAT seed pairs; standard deviation is across the three runs.
+
+| Metric | FP32 | QAT Float | Product-aligned INT8 | Legacy-contract INT8 | Bigram |
+|---|---:|---:|---:|---:|---:|
+| Accuracy mean | 35.55% | 35.28% | 22.43% | 10.30% | 26.51% |
+| Accuracy SD | 0.14 pp | 0.07 pp | 1.38 pp | 2.03 pp | 0.00 pp |
+| Cross entropy (nats) mean | 2.1996 | 2.2208 | 3.1595 | 5.1307 | 2.5198 |
+| Perplexity mean | 9.02 | 9.22 | 23.66 | 170.45 | 12.43 |
+
+The aligned contract improves mean INT8 accuracy by **12.13 percentage points** over the old contract and substantially reduces CE/PPL, but remains **4.08 points below Bigram**. The selected validation candidate is source seed 20261223 / QAT seed 20263023; its product INT8 test accuracy is 23.62%, CE 3.067, PPL 21.48. Selection used validation only. Its package SHA-256 is `58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd`; QAT checkpoint SHA-256 is `1fef5f8f47e5ba6017fe6b38c3dd8fe3fa6165bfbd526a72c7867e9b896b7c83`.
+
+The three runs use distinct fixed FP32 source checkpoints as well as distinct QAT seeds; the reported spread therefore captures both sources of variation. The selected INT8 Fake Quant trace and Independent INT outputs were bit-exact in the 8-window/60-node audit (`round30_saturation_audit.json`, `round30_saturation_by_tensor.csv`). Do not generalize that sampled result to a full-test saturation rate.
+
+## Product Top replay
+
+- Tested RTL/Test source commit: `efa37a949976d5ef9347fb42698f1de8adad757c` (no RTL changes in this experiment).
+- VCS: `V-2023.12-SP1_Full64`; compile and run exit status 0.
+- Exact command is preserved in `benchmark/gpt2_quality/results/round30_product_top/run_manifest.json`.
+- Four-layer Product Top generated and read 256 INT32 logits at each of four contexts; each context matched its independent integer Golden bit-exact.
+- Prompt `[1,7,42,3]`; generated tokens `[73,78,111,114]`; zero reset events and zero host-written intermediate tensor words.
+- Simulation reported 933 descriptors, 1,048,920 post-layer cycles and 4,338,018 autoregressive extension cycles over 4,020 publications.
+
+This mode is **prefix recompute in the same Top instance**, not incremental persistent-KV decode. The run used 128 KiB SPAD (`AI_SPAD_WORDS_PER_BANK=8192`; 4 banks × 8,192 32-bit words/bank = 131,072 bytes), so it does not qualify the package at the 256 KiB configuration. The cycle count is a Product Top simulation measurement; it is not complete host-to-host application latency.
+
+Full compile/run logs, all four RTL logits dumps, autoregressive result/plan, stage-3 descriptor and Golden payloads, allocation map and four-layer manifest are archived under `benchmark/gpt2_quality/results/round30_product_top/`; large text artifacts are gzip-compressed. `sha256.json` lists hashes.
+
+## Context-128 pilot
+
+A software-only 100-step fine-tune from the fixed H64 checkpoint, with 128-position embeddings initialized by interpolation, produced checkpoint SHA-256 `dc1acaee44017dcbd84c473e8106e2150bfa0b15afb95653c61c27f86af04a95`. It has 222,336 parameters, estimated INT8 weights 225,792 bytes, and theoretical INT8 KV bytes 65,536 at context 128. Product RTL execution, descriptor support, live-SPAD allocation and latency were **not run/estimated**.
+
+On the pilot validation subset, context 128 scored 27.83% vs context 16 at 37.89%; on the once-frozen test subset (2,048 targets), context 128 scored 29.10% vs 37.21% for context 16 and 27.59% Bigram. This is exploratory and much smaller than the QAT evaluation; it does not support RTL context expansion.
+
+## Reproduction evidence
+
+Machine-readable results, checkpoint/package hashes, commands, and raw VCS logs are under `benchmark/gpt2_quality/results/round30_qat/`, `round30_context128/`, and `round30_product_top/`. Failed first-attempt logger output is intentionally excluded; no source/test result is derived from it.
+
+## Controlled fixed-source QAT follow-up and selected-package Top replay
+
+A second experiment held the FP32 source checkpoint fixed (source seed `20261221`, SHA-256 `00f73c2eaf14e2c2ea170ae6bdbdbc570d6850bb2f3a77b61f68596e5019cca0`) and varied only QAT seed (`20263031`, `20263032`, `20263033`), 200 steps each. It used the same disjoint split, 128 validation windows, and 512 held-out test windows (8,192 targets). Validation selected QAT seed `20263032`; the test set was not used for selection.
+
+| Test metric (mean across three QAT seeds) | Value |
+|---|---:|
+| FP32 accuracy | 35.46% |
+| QAT Float accuracy | 35.36% |
+| Product-aligned INT8 / Fake Quant accuracy | 20.91% |
+| Bigram accuracy | 26.51% |
+| Product-aligned INT8 cross entropy / perplexity | 3.2893 / 26.82 |
+| INT8 vs FP32 top-1 agreement (selected seed 20263032) | 37.76% |
+
+The fixed-source run confirms that Product-aligned Fake Quant and the independent INT reference match on the sampled trace, but does not recover model quality: test INT8 is about 5.60 percentage points below Bigram. Across the three QAT seeds, test INT8 accuracy is 21.31%, 20.79%, and 20.64%; validation-selected seed 20263032 is not a quality closure. This is a controlled-seed stability check, not evidence that source-checkpoint variation has been eliminated from the earlier three-source aggregate.
+
+The validation-selected package (`22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2`) was then run on Product Top at the tested source SHA. VCS compile/run both exited 0 (`V-2023.12-SP1_Full64`). All four contexts produced 256 INT32 logits matching the independent integer Golden bit-exact; host Argmax generated `[129, 68, 82, 68]`. The same Top instance had zero reset events and zero host-written intermediate tensor words. Execution is explicitly **prefix recompute**, uses the 128 KiB smoke configuration (4 × 8,192 × 4 bytes), and is not persistent incremental-KV or host-to-host latency evidence. The VCS simulation reported 4,020 descriptor publications and 4,339,530 autoregressive extension cycles.
+
+Reproduction command and compressed raw logs, all four logits dumps, allocation/descriptor manifests, and hashes are archived under `benchmark/gpt2_quality/results/round30_product_top_fixed_source/`. Fixed-source training outputs and per-seed metrics are under `benchmark/gpt2_quality/results/round30_qat_fixed_source/`.
+
+
+## Second fixed-package prompt replay
+
+The validation-selected fixed-source package (`source seed 20261221`, QAT seed `20263032`, package SHA-256 `22ffc2103efd765817599b5ceb4ae3d839956b6523e91f0fa4fec759ab159af2`) was replayed on a second prompt `[2,19,71,5]`, seed `20261116`. The 4-layer Product Top returned four 256-element INT32 logit vectors; all 1,024 values matched the independent INT Golden bit-exact. Host Argmax (signed INT32, lowest token ID on ties) generated `[79,77,69,68]`.
+
+VCS `V-2023.12-SP1_Full64`, compile/run/Make all exited 0. The run published 4,020 descriptors and reported 4,338,648 extension cycles. It used one Top simulation session with zero resets and zero Host intermediate-tensor writes, in prefix-recompute mode. This adds a second prompt to functional qualification; it does not establish persistent query-only KV decoding or improve the model-quality result. The selected INT8 model remains below the Bigram mean (20.91% across the fixed-source seeds versus 26.51%). Context-128 remains a software-only pilot and is not justified for Product RTL.
+
+Raw artifacts, generated Golden inputs, the four RTL logit dumps, command, tool version and SHA-256 manifest are archived in `benchmark/gpt2_quality/results/round30_product_top_fixed_source/prompt2/`. Make log SHA-256: `b52fcec5d8c110f5a6083fdcd5f6a828dbc306cee171edfb232a014ab4ca8376`; simulator run log SHA-256: `aec8d022bb8aff5798eba60d069de6dee64a6f91351f2a5caf15bd33edc8f6d4`.
+
+
+## Capacity metadata correction
+
+The archived Top runs define `AI_SPAD_WORDS_PER_BANK=8192`. With four banks and 32-bit words this is 131,072 bytes (128 KiB), not 524,288 bytes (512 KiB). The three `run_manifest.json` files in `round30_product_top/`, `round30_product_top_fixed_source/`, and `round30_product_top_fixed_source/prompt2/` have been corrected to 131,072 bytes. The original compile logs and generated allocation manifests are unchanged; the latter already record 131,072 bytes. This correction does not change any simulation result or promote prefix-recompute into persistent-KV decoding.

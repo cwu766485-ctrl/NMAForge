@@ -136,8 +136,10 @@ module ai_axi128_dma #(
     // IDs; MAX_OUTSTANDING controls admission and is clamped to that range.
     reg [3:0]  rd_slot_valid_r;
     reg [3:0]  rd_slot_complete_r;
-    reg [4:0]  rd_slot_expected_r [0:3];
-    reg [4:0]  rd_slot_received_r [0:3];
+    // Beat counters are sized from MAX_BURST_BEATS (5 bits at the default 16).
+    localparam integer BEAT_W = $clog2(MAX_BURST_BEATS+1);
+    reg [BEAT_W-1:0] rd_slot_expected_r [0:3];
+    reg [BEAT_W-1:0] rd_slot_received_r [0:3];
     reg [15:0] rd_slot_words_r [0:3];
     reg [15:0] rd_slot_word_index_r [0:3];
     reg [31:0] rd_slot_spad_r [0:3];
@@ -149,9 +151,9 @@ module ai_axi128_dma #(
     // Up to four previously transmitted bursts may independently await B.
     reg [127:0] wr_data_r [0:MAX_BURST_BEATS-1];
     reg [15:0] wr_burst_words_r;
-    reg [4:0]  wr_burst_beats_r;
+    reg [BEAT_W-1:0] wr_burst_beats_r;
     reg [15:0] wr_word_index_r;
-    reg [4:0]  wr_beat_index_r;
+    reg [BEAT_W-1:0] wr_beat_index_r;
     reg        wr_read_pending_r;
     reg        wr_read_line_r;
     reg [3:0]  wr_pending_b_r;
@@ -167,10 +169,10 @@ module ai_axi128_dma #(
     wire [1:0] wr_bid_index_comb, wr_free_tag_comb;
     wire bid_is_dma_comb, wr_free_found_comb;
     wire        plan_wide_comb;
-    wire [4:0]  plan_beats_comb;
+    wire [BEAT_W-1:0] plan_beats_comb;
     wire [15:0] plan_words_comb;
     wire [31:0] plan_bytes_comb;
-    wire [4:0]  rd_drain_beat_comb;
+    wire [BEAT_W-1:0] rd_drain_beat_comb;
     wire [127:0] rd_drain_data_comb;
     reg [15:0] final_write_strobe_comb;
     wire rd_drain_line_comb;
@@ -218,7 +220,7 @@ module ai_axi128_dma #(
     // lifecycle FSM so line/scalar transfer eligibility is locally visible.
     assign rd_drain_data_comb = rd_data_r[
         (rd_drain_slot_comb * MAX_BURST_BEATS) + rd_drain_beat_comb];
-    ai_dma_spad_transfer_adapter spad_transfer_adapter_u(
+    ai_dma_spad_transfer_adapter #(.MAX_BURST_BEATS(MAX_BURST_BEATS)) spad_transfer_adapter_u(
         .read_active(state_r == ST_READ), .rd_drain_found(rd_drain_found_comb),
         .rd_word_index(rd_slot_word_index_r[rd_drain_slot_comb]),
         .rd_words(rd_slot_words_r[rd_drain_slot_comb]),
@@ -388,7 +390,10 @@ module ai_axi128_dma #(
             end
             state_r <= ST_ABORT_READ;
           end else begin
-            state_r <= ST_ERROR;
+            // A later store gather may fail while an earlier accepted
+            // write burst still awaits B. Preserve ERR_SPAD and drain its
+            // response before publishing terminal done.
+            state_r <= (wr_pending_count_r != 0) ? ST_WRITE_DRAIN : ST_ERROR;
           end
         end else begin
           case (state_r)
@@ -727,7 +732,7 @@ module ai_axi128_dma #(
                         plan_remaining_r - wr_burst_words_r;
                     plan_ext_r <= plan_ext_r +
                                   ((m_axi_awsize == AXI_SIZE_128) ?
-                                   ({27'd0, wr_burst_beats_r} << 4) :
+                                   ({{(32-BEAT_W){1'b0}}, wr_burst_beats_r} << 4) :
                                    ({16'd0, wr_burst_words_r} << 2));
                     plan_spad_r <= plan_spad_r +
                                    ({16'd0, wr_burst_words_r} << 2);
@@ -746,7 +751,7 @@ module ai_axi128_dma #(
 
             ST_WRITE_DRAIN: begin
               if (wr_pending_count_r == 0)
-                state_r <= (abort || abort_pending_r) ? ST_ERROR : ST_DONE;
+                state_r <= (error || abort || abort_pending_r) ? ST_ERROR : ST_DONE;
             end
 
             ST_DONE: begin

@@ -341,7 +341,7 @@ def main() -> None:
             "tinynpu_modeled_read_service_cycles": (tiny_read+15)//16+1,
             "tinynpu_modeled_write_service_cycles": (tiny_write+15)//16,
             "tinynpu_normalized_cycles": tiny_cycles,
-            "nmaforge_over_tinynpu_normalized_ratio": round(tiny_cycles/nma_cycles, 4),
+            "nmaforge_over_tinynpu_normalized_ratio": round(nma_cycles/tiny_cycles, 4),
             "golden": "PASS on both designs",
             "boundary_note": "NMAForge endpoint is real Matrix controller + behavioral SPAD; TinyNPU endpoint adds a serialized bandwidth/latency model around the measured RTL array because upstream exposes no SPAD port",
         })
@@ -384,6 +384,7 @@ def main() -> None:
                 "endpoint": "command acceptance to final output commit",
                 "nmaforge": "measured Matrix controller and behavioral SPAD; actual measured traffic",
                 "tinynpu": "measured RTL array cycles plus modeled input read and output write service; load, compute, and store are serialized; two accumulator-clear cycles included",
+                "ratio_definition": "NMAForge measured cycles / TinyNPU normalized modeled cycles; >1 means NMAForge used more cycles under this mixed measured/modeled endpoint",
                 "ratio_is_asic_speedup": False,
             },
             "normalized_cases": common_pairs,

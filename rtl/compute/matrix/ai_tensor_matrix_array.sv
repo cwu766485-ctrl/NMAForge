@@ -20,9 +20,11 @@ module ai_tensor_matrix_array #(
     input  wire                                  buffer_write_bank,
     input  wire [ARRAY_SIZE*8-1:0]               buffer_write_a,
     input  wire [ARRAY_SIZE*8-1:0]               buffer_write_b,
+    input  wire [ARRAY_SIZE*ARRAY_SIZE*8-1:0]     buffer_write_b_matrix,
 
     input  wire                                  mac_enable,
     input  wire                                  mac_bank,
+    input  wire                                  gemv_kfold_mode,
 
     input  wire [RESULT_INDEX_WIDTH-1:0]         result_index,
     input  wire signed [31:0]                    result_bias,
@@ -39,6 +41,10 @@ module ai_tensor_matrix_array #(
 
     reg [ARRAY_SIZE*8-1:0] operand_a_buffer [0:1];
     reg [ARRAY_SIZE*8-1:0] operand_b_buffer [0:1];
+    // GEMV maps physical rows to (output row, K-fold lane), which requires
+    // one B value per PE rather than the GEMM column-broadcast vector. This
+    // second view shares the same multipliers and accumulator bank.
+    reg [ARRAY_SIZE*ARRAY_SIZE*8-1:0] operand_b_matrix_buffer [0:1];
     reg signed [63:0] accumulator [0:RESULT_COUNT-1];
     wire signed [15:0] product [0:RESULT_COUNT-1];
     integer index;
@@ -53,6 +59,8 @@ module ai_tensor_matrix_array #(
                 wire signed [7:0] a_value =
                     operand_a_buffer[mac_bank][row*8 +: 8];
                 wire signed [7:0] b_value =
+                    gemv_kfold_mode ?
+                    operand_b_matrix_buffer[mac_bank][PRODUCT_INDEX*8 +: 8] :
                     operand_b_buffer[mac_bank][col*8 +: 8];
                 (* use_dsp = "yes" *)
                 assign product[PRODUCT_INDEX] = a_value * b_value;
@@ -69,12 +77,18 @@ module ai_tensor_matrix_array #(
             operand_a_buffer[1] <= {ARRAY_SIZE*8{1'b0}};
             operand_b_buffer[0] <= {ARRAY_SIZE*8{1'b0}};
             operand_b_buffer[1] <= {ARRAY_SIZE*8{1'b0}};
+            operand_b_matrix_buffer[0] <=
+                {ARRAY_SIZE*ARRAY_SIZE*8{1'b0}};
+            operand_b_matrix_buffer[1] <=
+                {ARRAY_SIZE*ARRAY_SIZE*8{1'b0}};
             for (index = 0; index < RESULT_COUNT; index = index + 1)
                 accumulator[index] <= 64'sd0;
         end else begin
             if (buffer_write_valid) begin
                 operand_a_buffer[buffer_write_bank] <= buffer_write_a;
                 operand_b_buffer[buffer_write_bank] <= buffer_write_b;
+                operand_b_matrix_buffer[buffer_write_bank] <=
+                    buffer_write_b_matrix;
             end
 
             if (clear_accumulators) begin

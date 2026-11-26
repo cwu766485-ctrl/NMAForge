@@ -1,0 +1,11 @@
+variant,token_index,token_id,rtl_status,total_cycles,end_to_end_cycles,kv_logical_write_bytes,kv_read_bytes,descriptor_count,useful_macs,executed_macs,padding_macs,kv_cache_status,notes
+matrix_a_tile_cache,ALL,1|7|42|3|5|8,PASS,266858,338050,1408,2048,229,297600,819200,521600,READBACK_PASS,Product Top batch cache-backed causal attention plus FFN; no per-token retirement
+matrix_b_token_append,ALL,1|7|42|3|5|8,FAIL_AT_QK,NOT_MEASURED,NOT_MEASURED,768,2048,249,297600,819200,521600,READBACK_PASS,first mismatch desc47 addr0x4100 expected0xfffffdc7 actual0x00000187
+matrix_a_word_writes,ALL,1|7|42|3|5|8,NOT_RUN_QUEUE_CAPACITY,NOT_MEASURED,NOT_MEASURED,1408,2048,321,297600,819200,521600,NOT_RUN,96 one-word K writes plus existing workload exceeds 256-slot CMDQ
+full_recompute_golden,ALL,1|7|42|3|5|8,REFERENCE_PASS,NOT_MEASURED,NOT_MEASURED,NOT_APPLICABLE,NOT_APPLICABLE,197,297600,819200,521600,NOT_APPLICABLE,independent integer reference compared at 16 tensor boundaries
+token_decode,0,1,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate
+token_decode,1,7,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate
+token_decode,2,42,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate
+token_decode,3,3,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate
+token_decode,4,5,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate
+token_decode,5,8,NOT_RUN,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_MEASURED,NOT_RUN,No online per-token planner/retirement in this candidate

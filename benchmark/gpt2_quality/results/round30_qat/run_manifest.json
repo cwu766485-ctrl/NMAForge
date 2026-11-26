@@ -1,0 +1,80 @@
+{
+  "base_source_sha": "efa37a949976d5ef9347fb42698f1de8adad757c",
+  "batch": 8,
+  "candidates": [
+    {
+      "package_sha256": "55af34cc3652ac3668a297caed274708034bc9c42ac36a80366bdadfb90f0504",
+      "qat_seed": 20263021,
+      "source_seed": 20261221,
+      "test_int8_accuracy": 0.209228515625,
+      "validation_int8_accuracy": 0.22509765625
+    },
+    {
+      "package_sha256": "84039c63ad7db057e5a9383c087f0cb8a2305e1959d7a452159baf60caa909dc",
+      "qat_seed": 20263022,
+      "source_seed": 20261222,
+      "test_int8_accuracy": 0.2275390625,
+      "validation_int8_accuracy": 0.2138671875
+    },
+    {
+      "package_sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+      "qat_seed": 20263023,
+      "source_seed": 20261223,
+      "test_int8_accuracy": 0.2362060546875,
+      "validation_int8_accuracy": 0.228515625
+    }
+  ],
+  "context": 16,
+  "corpus_sha256": "86c4e6aa9db7c042ec79f339dcb96d42b0075e16b8fc2e86bf0ca57e2dc565ed",
+  "elapsed_seconds": 145.00164461135864,
+  "guard_bytes": 17,
+  "learning_rate": 1e-05,
+  "qat_steps_per_seed": 200,
+  "seeds": [
+    {
+      "qat_seed": 20263021,
+      "source_seed": 20261221
+    },
+    {
+      "qat_seed": 20263022,
+      "source_seed": 20261222
+    },
+    {
+      "qat_seed": 20263023,
+      "source_seed": 20261223
+    }
+  ],
+  "split_manifest_sha256": "78c4a0b3c3f67e693725bcc7e30caedca8d6b24cec7a6c685365c1ff04a6cd00",
+  "split_ranges_half_open": {
+    "test": [
+      948101,
+      1115394
+    ],
+    "train": [
+      0,
+      780758
+    ],
+    "validation": [
+      780792,
+      948067
+    ]
+  },
+  "status": "SOFTWARE_QAT_EXPERIMENT_PRODUCT_TOP_NOT_RUN",
+  "test_starts_sha256": "c45940574e2c014f319bada52b16e13021fe5f17088486ed29b153734981fbec",
+  "test_used_for_selection": false,
+  "test_windows": 512,
+  "tool_versions": {
+    "numpy": "2.5.4",
+    "python": "3.12.13",
+    "torch": "2.6.0+cpu"
+  },
+  "train_target_bytes": 780742,
+  "validation_selected_candidate": {
+    "package_sha256": "58263935f5da626c53d5ba4c373396eee9f0f556a6f305a5b820c066625c2bcd",
+    "qat_seed": 20263023,
+    "rule": "highest validation product-int8 accuracy; CE tie-break",
+    "source_seed": 20261223
+  },
+  "validation_starts_sha256": "f95dae1d5b1a2e9b55aad0ea0be6173640d93e93acee3bf422a9ed0880571c4a",
+  "validation_windows": 128
+}

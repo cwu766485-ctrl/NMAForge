@@ -1,0 +1,10 @@
+{
+  "iid_unique_train": 112,
+  "iid_unique_test": 101,
+  "iid_shared_initial_states": 101,
+  "iid_quality_status": "INVALID_AS_INDEPENDENT_GENERALIZATION",
+  "final_split": "84 train trajectories/28 disjoint test trajectories, mode-stratified",
+  "final_train_test_overlap": 0,
+  "final_model": "h32_l2_int8.json",
+  "stop_rule": "Two directed model fixes: export scale; disjoint trajectory split. No third training tuning round."
+}

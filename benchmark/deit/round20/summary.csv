@@ -1,0 +1,5 @@
+round,gate,status,evidence_scope,descriptors,golden_words,notes
+20,D0,PASS_REUSED_R19,Product Top configuration and queue geometry,,,Four-bank 256 KiB profile; D0/D1 are inherited Round 19 evidence
+20,D1,PASS_REUSED_R19,Full patch embedding Product Top,468,9984,196x192 patches plus CLS and position
+20,D2,BLOCKED_NOT_RUN,Full 197-token Encoder Layer 0,,,Packed INT8 tile-major producer to SFU/QKV consumer layout contract missing
+20,D3,NOT_RUN_GATED_ON_D2,12-layer Encoder and classifier,,,Requires D2 Product Top pass

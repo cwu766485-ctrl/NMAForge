@@ -23,9 +23,15 @@
 // ============================================================================
 module ai_accel_top #(
     // Four fixed banks are retained for the bank-local INT8 datapath.  Depth
-    // is configurable; 32768 words/bank gives the XCZU15EG default of 512 KiB.
+    // defaults to 32768 words/bank (512 KiB, the Round 35 standard product
+    // configuration); 8192/16384 select the 128/256 KiB variants.
     parameter integer SPAD_WORDS_PER_BANK = 32768,
-    parameter integer M_AXI_ADDR_WIDTH = 64
+    parameter integer M_AXI_ADDR_WIDTH = 64,
+    // AXI4 read/write burst length in 128-bit beats.  SPEC v7.4 fixes the
+    // product contract at 16; the DMA beat counters are sized from this
+    // parameter so 32/64 can be evaluated (Round 35 bandwidth sweep: 32 beats
+    // with four outstanding reads reach ~98% of peak at 50-cycle latency).
+    parameter integer DMA_MAX_BURST_BEATS = 16
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ACLK CLK" *)
     (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME ACLK, ASSOCIATED_BUSIF S_AXI:M_AXI, ASSOCIATED_RESET aresetn" *)
@@ -155,6 +161,10 @@ module ai_accel_top #(
     // AXI-Lite 地址空间划分：
     //   0x0000_0000 ~ 0x0000_00ff  -> 寄存器窗口，由 ai_accel_regs 响应
     //   0x0001_0000 ~ SPAD_LIMIT-1 -> 参数化 scratchpad host window
+    generate if ((SPAD_WORDS_PER_BANK < 2) || (SPAD_WORDS_PER_BANK > 32768) || ((SPAD_WORDS_PER_BANK & (SPAD_WORDS_PER_BANK-1)) != 0)) begin : invalid_spad_geometry
+        initial $fatal(1, "Unsupported top SPAD geometry: power-of-two depth in [2, 32768] required");
+    end endgenerate
+
     localparam [31:0] SPAD_BASE = 32'h0001_0000;
     localparam integer SPAD_BANKS = 4;
     localparam integer SPAD_ROW_BITS = $clog2(SPAD_WORDS_PER_BANK);
@@ -1259,7 +1269,7 @@ module ai_accel_top #(
     //   store=0: DDR -> scratchpad for inputs and weights;
     //   store=1: scratchpad -> DDR for results.
     // Direct, 2D, gather, and tile requests share this 128-bit tagged backend.
-    ai_axi128_dma #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH)) dma_u(
+    ai_axi128_dma #(.AXI_ADDR_WIDTH(M_AXI_ADDR_WIDTH), .MAX_BURST_BEATS(DMA_MAX_BURST_BEATS)) dma_u(
         .clk(aclk), .resetn(aresetn), .start(dma_start_mux),
         .abort(core_abort), .store(dma_store_mux), .ext_addr(dma_ext_addr_mux),
         .spad_addr(dma_spad_addr_mux), .length_words(dma_length_words_mux),

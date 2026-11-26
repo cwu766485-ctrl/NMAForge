@@ -1,0 +1,4 @@
+scope,descriptors,batches,golden_words,cycles,dma_events,dma_bytes,dma_cycles,valid_queries,notes
+verified_QKV_prefix,468,prefix,29952,402889,144,112896,35058,n/a,Product top command window; late DMA not included in command_cycles
+attention_plus_AV_requant_plus_Wo_projection,864,64,72384,821466,48,37632,11670,16,"16 of 197 valid queries; includes descriptor publication/retirement, Product execution, passive SPAD Golden checks; no host activation transfer"
+final_Wo_INT8_output,12,12,768,included above,0,0,0,16,192 channels x 16 queries; Golden compared batch-wise

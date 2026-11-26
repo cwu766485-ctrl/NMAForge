@@ -1,0 +1,100 @@
+{
+  "comparison_id": "V2-DIGITS-360-R250-vs-0x53-S20261029",
+  "status": "PASS_MATCHED_NMAFORGE_RTL_REPLAY",
+  "baseline_sha": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+  "baseline_tree_sha": "eb5a2dcff49cc6286641e0311e4bac16ac4799e8",
+  "v2_candidate_sha": "33e85287fbf37187fccb76e97be6effe888670e9",
+  "v2_candidate_tree_sha": "560dc1cbfc1bb13003670354d77271e3708ec0a7",
+  "model": {
+    "name": "sklearn_digits_int8",
+    "architecture": "64-64-ReLU-10 logits; hardware computes padded tile outputs checked by the workload Golden",
+    "seed": 20261029,
+    "test_samples": 360,
+    "model_sha256": "e0351dbfa9198937fef05b3adcfc0e5a7f705524eaaede0dcb89892cde9e2c3b",
+    "independent_integer_golden": "PASS",
+    "golden_logit_sha256": "8a9606b5c31ff4f203731726f89d7caf5f73b59d0cbddf0945a1ac454d855afc"
+  },
+  "paired_validation": {
+    "baseline_correct": 352,
+    "v2_correct": 352,
+    "accuracy_percent": 97.77777777777777,
+    "baseline_rtl_logits_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+    "v2_rtl_logits_sha256": "7980fb678505ae0590d13c2f590b9523a98bedee7c3037936ccacb9b10360e9c",
+    "rtl_logits_byte_identical": true
+  },
+  "runs": [
+    {
+      "role": "baseline",
+      "run_id": "V2-R250-DIGITS-360",
+      "sha": "3041355528dffe856e2d5384027c6ee5df5d1b42",
+      "seed": 20261029,
+      "cmdq_descriptors": 69,
+      "doorbell_to_completion_tail_cycles": 110155,
+      "macs": 1884160,
+      "mac_per_cycle": 17.1046,
+      "array_utilization_percent": 6.68,
+      "layout_counter": {
+        "class": "SFU tile-pack busy cycles",
+        "cycles": 76613,
+        "traffic_class": "accepted SPAD conversion traffic",
+        "bytes": 117760
+      },
+      "spad_initialization_bytes": 58064,
+      "raw_log": "/tmp/nmaforge_v2_digits_r250_20261104/run.log"
+    },
+    {
+      "role": "optimized",
+      "run_id": "V2-DIGITS-0x53-360",
+      "sha": "33e85287fbf37187fccb76e97be6effe888670e9",
+      "tree_sha": "560dc1cbfc1bb13003670354d77271e3708ec0a7",
+      "seed": 20261029,
+      "cmdq_descriptors": 46,
+      "doorbell_to_completion_tail_cycles": 34761,
+      "macs": 1884160,
+      "mac_per_cycle": 54.2033,
+      "array_utilization_percent": 21.17,
+      "layout_counter": {
+        "class": "fused Matrix output busy cycles",
+        "cycles": 26444,
+        "traffic_class": "fused native tile write bytes",
+        "bytes": 23552
+      },
+      "spad_initialization_bytes": 56224,
+      "raw_log": "/tmp/nmaforge_v2_digits_33e8528_replay/run.log",
+      "golden_comparison": "/tmp/nmaforge_v2_digits_33e8528_replay/golden_comparison.json"
+    }
+  ],
+  "derived_comparison": {
+    "cycle_reduction_percent": 68.44355680631837,
+    "throughput_ratio_mac_per_cycle": 3.168924944621846,
+    "layout_counter_comparable": false,
+    "layout_byte_fields_comparable": false
+  },
+  "timing_boundary": {
+    "start": "testbench measurement flag asserted immediately before CMDQ doorbell write",
+    "stop": "hardware completion tail reaches the submitted descriptor count",
+    "includes": ["top-level command execution", "completion commit and retirement"],
+    "excludes": ["testbench SPAD preload", "post-run SPAD output reads and Golden comparison"],
+    "clock_period_ns": 10.0,
+    "clock_period_is_asic_fmax_evidence": false
+  },
+  "tools": {
+    "vcs": "V-2023.12-SP1_Full64",
+    "python": "3.12.13",
+    "numpy": "2.4.6",
+    "scikit_learn": "1.9.1"
+  },
+  "limitations": [
+    "Simulation metrics are not ASIC PPA or measured silicon latency.",
+    "Separate host, DMA, compute, writeback, and graph-orchestration phase cycles were not captured.",
+    "SPAD initialization bytes are setup traffic rather than full model SPAD traffic.",
+    "The v2 fused layout counter and R250 SFU tile-pack counter have different event definitions.",
+    "No current-v2 TinyNPU, trained CNN, or trained Transformer comparison is included."
+  ],
+  "evidence": {
+    "comparison_report": "docs/benchmark/NMAFORGE_V2_MODEL_BENCHMARK.md",
+    "baseline_run_log": "/tmp/nmaforge_v2_digits_r250_20261104/run.log",
+    "v2_run_log": "/tmp/nmaforge_v2_digits_33e8528_replay/run.log",
+    "v2_golden_comparison": "/tmp/nmaforge_v2_digits_33e8528_replay/golden_comparison.json"
+  }
+}

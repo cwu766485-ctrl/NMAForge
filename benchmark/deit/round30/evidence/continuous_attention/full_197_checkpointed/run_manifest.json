@@ -1,0 +1,101 @@
+{
+  "status": "DEIT_R30_CONTINUOUS_QKV_REPACK_3HEAD_ATTENTION_PASS",
+  "branch": "research/nmaforge-v1.2-round30-deit",
+  "tested_base_commit": "864ba16aa052fbb0f2bb8948133a54586cec6b26",
+  "tested_worktree_tracked_diff_sha256": "4bbd4b8836c0bc2ba5440368a591b8f68308b70baf647629ecee781b72fca4a2",
+  "generator_sha256": "bb99f89ff5bdd1e5696b2ede8c5092cc477a261910caedb6c25cf59c111431a6",
+  "vcs": "V-2023.12-SP1_Full64",
+  "python": "Python 3.12.13; NumPy 2.5.4",
+  "command": "make -C dv/subsystem/top_smoke/sim ai_deit_round30_full_attention_256k AI_DEIT_R30_FULL_RUN=/tmp/nmaforge_deit_round30_full_attention_qkv_checkpoint_run AI_DEIT_R30_CONT_SOURCE=/tmp/nmaforge_deit_round26_qkv197_rerun/workload",
+  "make_exit": 0,
+  "seed": 300030,
+  "spad_bytes": 262144,
+  "spad_banks": 4,
+  "queue_entries": 512,
+  "qkv_projection_checkpoints": [
+    {
+      "address_range": [
+        90112,
+        122880
+      ],
+      "chunk": 0,
+      "descriptor_index": 155,
+      "tensor": "query",
+      "words": 8192
+    },
+    {
+      "address_range": [
+        122880,
+        130048
+      ],
+      "chunk": 1,
+      "descriptor_index": 155,
+      "tensor": "query",
+      "words": 1792
+    },
+    {
+      "address_range": [
+        131072,
+        163840
+      ],
+      "chunk": 0,
+      "descriptor_index": 311,
+      "tensor": "key",
+      "words": 8192
+    },
+    {
+      "address_range": [
+        163840,
+        171008
+      ],
+      "chunk": 1,
+      "descriptor_index": 311,
+      "tensor": "key",
+      "words": 1792
+    },
+    {
+      "address_range": [
+        172032,
+        204800
+      ],
+      "chunk": 0,
+      "descriptor_index": 467,
+      "tensor": "value",
+      "words": 8192
+    },
+    {
+      "address_range": [
+        204800,
+        211968
+      ],
+      "chunk": 1,
+      "descriptor_index": 467,
+      "tensor": "value",
+      "words": 1792
+    }
+  ],
+  "qkv_checkpoint_words": 29952,
+  "query_blocks": 13,
+  "valid_queries": 197,
+  "valid_keys_per_row": 197,
+  "heads": 3,
+  "descriptor_count": 10032,
+  "stream_batches": 159,
+  "ring_wraps": 19,
+  "attention_golden_words": 361920,
+  "runtime_cycles": 7949430,
+  "reset_events": 0,
+  "host_intermediate_tensor_readback": 0,
+  "host_intermediate_tensor_writeback": 0,
+  "qkv_readback": "AXI-Lite streamed retirement checks, six chunks after Q/K/V producer descriptors retire",
+  "attention_golden_observation": "passive behavioral-SPAD backdoor after each streamed batch",
+  "measurement_scope": "AXI-Lite publication/retirement plus Product execution; excludes image/model preparation; not full Encoder Layer 0",
+  "compile_log_note": "VCS compile/elaboration succeeded. The VCS log contains a LOOP-REROLL-ENABLED message; final KDB elaboration reports 0 errors and 0 warnings.",
+  "known_scope_limit": "Layer merge, output projection, residuals, LN2 and FFN not executed in this run.",
+  "logs": [
+    "compile.log.gz",
+    "generator.log.gz",
+    "run.log.gz",
+    "make.log.gz"
+  ]
+}

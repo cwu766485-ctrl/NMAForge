@@ -1,0 +1,446 @@
+{
+  "status": "PASS",
+  "checkpoint": "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/qat_float.pt",
+  "checkpoint_sha256": "8674782e974cdbb1f43743b00762d854d37e3808b3a2426d3180b36bd99d3130",
+  "package": "benchmark/gpt2_quality/results/round27_extended_train/seed_20261223/product_int8.npz",
+  "package_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+  "reexport": "/tmp/nmaforge_round28_reexport.npz",
+  "reexport_sha256": "9e330e56226d76aaf5c639975b30ae2612a1a965ec4c942cb9f93db86dc5a803",
+  "archive_bytes_equal": true,
+  "tensor_count": 45,
+  "all_tensors_equal": true,
+  "tensors": [
+    {
+      "name": "embedding",
+      "shape": [
+        256,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "final_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "final_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.down",
+      "shape": [
+        256,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.k",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.ln1_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.ln1_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.ln2_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.ln2_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.o",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.q",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.up",
+      "shape": [
+        64,
+        256
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l0.v",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.down",
+      "shape": [
+        256,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.k",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.ln1_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.ln1_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.ln2_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.ln2_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.o",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.q",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.up",
+      "shape": [
+        64,
+        256
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l1.v",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.down",
+      "shape": [
+        256,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.k",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.ln1_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.ln1_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.ln2_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.ln2_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.o",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.q",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.up",
+      "shape": [
+        64,
+        256
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l2.v",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.down",
+      "shape": [
+        256,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.k",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.ln1_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.ln1_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.ln2_beta",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.ln2_gamma",
+      "shape": [
+        64
+      ],
+      "dtype": "int32",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.o",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.q",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.up",
+      "shape": [
+        64,
+        256
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "l3.v",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "lm_head",
+      "shape": [
+        64,
+        256
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    },
+    {
+      "name": "position",
+      "shape": [
+        16,
+        64
+      ],
+      "dtype": "int8",
+      "equal": true,
+      "mismatch_count": 0
+    }
+  ]
+}
