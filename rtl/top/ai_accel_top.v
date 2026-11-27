@@ -31,7 +31,11 @@ module ai_accel_top #(
     // product contract at 16; the DMA beat counters are sized from this
     // parameter so 32/64 can be evaluated (Round 35 bandwidth sweep: 32 beats
     // with four outstanding reads reach ~98% of peak at 50-cycle latency).
-    parameter integer DMA_MAX_BURST_BEATS = 16
+    parameter integer DMA_MAX_BURST_BEATS = 16,
+    // 0 builds without the bank-local CNM engine (opcodes 0x20/0x21 then
+    // complete with ERR_OP; CAP2[11] reads 0). Round 40 measured no decode
+    // benefit from it, so a PPA build may drop it.
+    parameter integer ENABLE_CNM = 1
 )(
     (* X_INTERFACE_INFO = "xilinx.com:signal:clock:1.0 ACLK CLK" *)
     (* X_INTERFACE_PARAMETER = "XIL_INTERFACENAME ACLK, ASSOCIATED_BUSIF S_AXI:M_AXI, ASSOCIATED_RESET aresetn" *)
@@ -947,7 +951,7 @@ module ai_accel_top #(
     // 控制/状态寄存器块：
     // 保存 OP/SRC/DST/LENGTH/DMA/CMDQ/CPLQ 配置，接收 core/dma done/error，
     // 产生 core_start、dma_start、doorbell_pulse、IRQ 和 completion 写请求。
-    ai_accel_regs #(.SPAD_BYTES(SPAD_BYTES)) regs_u(
+    ai_accel_regs #(.SPAD_BYTES(SPAD_BYTES), .ENABLE_CNM(ENABLE_CNM)) regs_u(
         .clk                (aclk),
         .resetn             (aresetn),
         .reg_req_valid      (regs_req_valid),
@@ -1454,7 +1458,7 @@ module ai_accel_top #(
     // 执行 VDOT/GEMV/GEMM_TILE，并把结果写回 scratchpad。
     // Compute engines are grouped structurally; this top retains launch
     // decoding, scratchpad arbitration and all external integration.
-    ai_accel_compute_cluster compute_cluster_u(
+    ai_accel_compute_cluster #(.ENABLE_CNM(ENABLE_CNM)) compute_cluster_u(
         .aclk(aclk), .aresetn(aresetn), .core_start(core_start),
         .core_abort(core_abort), .banked_op(banked_op),
         .tensor_matrix_op(tensor_matrix_op), .tensor_sfu_op(tensor_sfu_op),

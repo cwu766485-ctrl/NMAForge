@@ -29,7 +29,11 @@ Top dispatcher keeps 32 in-flight records. `CMD_TAIL` is now writable while
 busy (append-only); if the queue drained before the append, software rings
 `DOORBELL` again. See SPEC_ZH for details.
 
-Round 38 compatible extensions (`CAP2=0x7ff`). INT4 expansion (`CAP2[10]`):
+Round 41: `CAP2[11]` reports the bank-local CNM engine (opcodes `0x20/0x21`). The
+default build reads `CAP2=0xfff`. A build with `ENABLE_CNM=0` omits the engine:
+`CAP2=0x7ff`, and `0x20/0x21` complete with `ERR_OP` instead of hanging.
+
+Round 38 compatible extensions (`CAP2=0x7ff` before Round 41). INT4 expansion (`CAP2[10]`):
 `flags[1]` on a `0x60` load expands 256-byte super-blocks (one beat of 32
 4-bit line shifts plus 15 beats of packed signed INT4) into 30 INT8 SPAD lines
 (480 bytes), byte = `sat8(sext4(n) << min(shift, 4))`; 1D load only, source

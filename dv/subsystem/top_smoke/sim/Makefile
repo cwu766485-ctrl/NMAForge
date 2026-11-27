@@ -38,6 +38,20 @@ ai_run:
 	grep -q '^TEST PASS$$' ai_accel_smoke.log
 	! grep -q 'TEST FAIL' ai_accel_smoke.log
 
+# ENABLE_CNM=0 build (no bank-local CNM): CAP2[11]=0 and opcodes 0x20/0x21
+# complete with ERR_OP. Separate simv so the default smoke build is untouched.
+AI_NO_CNM_RUN ?= ai_no_cnm
+ai_no_cnm_check: ai_transformer_gen
+	mkdir -p $(AI_NO_CNM_RUN)
+	vcs -full64 -sverilog -timescale=1ns/1ps +define+VCS +define+AI_NO_CNM \
+		+define+AI_SPAD_WORDS_PER_BANK=$(AI_SPAD_WORDS_PER_BANK) \
+		+incdir+../../../block/control/agent +incdir+../../../block/dma/agent +incdir+../fixtures \
+		-pvalue+tb_ai_accel_smoke.dut.ENABLE_CNM=0 -Mdir=$(AI_NO_CNM_RUN)/csrc \
+		-top tb_ai_accel_smoke -f ai_accel.f ../../../block/dma/env/axi_memory_model.sv ../tb/tb_ai_accel_smoke.sv \
+		-o $(AI_NO_CNM_RUN)/simv -l $(AI_NO_CNM_RUN)/compile.log
+	$(AI_NO_CNM_RUN)/simv +ntb_random_seed=1 +AI_RANDOM_CASES=0 +AI_SEED=1 +AI_NO_CNM_ONLY -l $(AI_NO_CNM_RUN)/run.log
+	grep -q '^AI_NO_CNM_PASS cap2=0x7ff vdot=ERR_OP gemv=ERR_OP$$' $(AI_NO_CNM_RUN)/run.log
+
 ai_smoke: ai_comp ai_run
 	grep -q '^MATRIX_PRODUCT_GEMV_DESCRIPTOR_PASS opcode=0x52 shape=4x16x32 dense=1 bias=1 shift=1 relu=1 outputs=64 lines=16 golden=bit-exact$$' ai_accel_smoke.log
 	grep -q '^MATRIX_PRODUCT_GEMV_TAIL_DESCRIPTOR_PASS opcode=0x52 shape=1x13x17 valid_outputs=13 line_writes=3 scalar_tail=1 golden=bit-exact$$' ai_accel_smoke.log

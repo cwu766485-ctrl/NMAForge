@@ -89,12 +89,12 @@ module tb_ai_accel_uvm;
     assign compute_obs.matrix_request_valid = dut.banked_read_valid;
     assign compute_obs.matrix_response_fault =
         dut.compute_cluster_u.tensor_matrix_u.banked_response_fault;
-    assign compute_obs.cnm_core_state = dut.compute_cluster_u.banked_core_u.state_r;
+    assign compute_obs.cnm_core_state = dut.compute_cluster_u.g_cnm.banked_core_u.state_r;
     assign compute_obs.cnm_lane_state = {
-        dut.compute_cluster_u.banked_core_u.lc3.state_r,
-        dut.compute_cluster_u.banked_core_u.lc2.state_r,
-        dut.compute_cluster_u.banked_core_u.lc1.state_r,
-        dut.compute_cluster_u.banked_core_u.lc0.state_r
+        dut.compute_cluster_u.g_cnm.banked_core_u.lc3.state_r,
+        dut.compute_cluster_u.g_cnm.banked_core_u.lc2.state_r,
+        dut.compute_cluster_u.g_cnm.banked_core_u.lc1.state_r,
+        dut.compute_cluster_u.g_cnm.banked_core_u.lc0.state_r
     };
     assign compute_obs.matrix_banked_req_addr = dut.banked_read_addr;
     assign compute_obs.cnm_req_addr[0] = dut.cnm_read_addr0;
@@ -294,11 +294,11 @@ module tb_ai_accel_uvm;
 
     ai_compute_activity_sva banked_cnm_activity_sva (
         .clk(aclk), .resetn(aresetn), .wake(dut.core_start && dut.banked_op),
-        .busy(dut.banked_busy), .done(dut.compute_cluster_u.banked_core_u.done),
-        .error(dut.compute_cluster_u.banked_core_u.error),
+        .busy(dut.banked_busy), .done(dut.compute_cluster_u.g_cnm.banked_core_u.done),
+        .error(dut.compute_cluster_u.g_cnm.banked_core_u.error),
         .spad_valid(dut.banked_spad_valid || (|dut.cnm_read_valid)),
-        .cycle_count(dut.compute_cluster_u.banked_core_u.cycle_count),
-        .element_count(dut.compute_cluster_u.banked_core_u.element_count)
+        .cycle_count(dut.compute_cluster_u.g_cnm.banked_core_u.cycle_count),
+        .element_count(dut.compute_cluster_u.g_cnm.banked_core_u.element_count)
     );
 
     ai_compute_activity_sva matrix_activity_sva (

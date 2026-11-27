@@ -174,7 +174,7 @@ epsilon 输入）解释为从 0 开始的 query token 下标，且该下标包�
 
 全部寄存器为 32-bit、相对 AXI-Lite base 的字节偏移。`0x000~0x048` 为 CTRL/STATUS/直接模式配置/IRQ/VERSION/CAP；`0x080~0x0D0` 为 CMDQ/CPLQ、doorbell、abort、watchdog、DMA 和 queue status；`0x0D4~0x100` 是 R0~R3 保护区；`0x104~0x118` 为 DMA 二维/后处理；`0x120~0x148` 为 tile 外部地址、双缓冲和尺寸；`0x14C~0x1B0` 为性能、事件、64-bit 地址高字、ABI、错误来源和 CAP2。
 
-核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`CMD_CTRL` bit0=外部描述符、bit1=完成即发事件（见下）；`ABI_INFO={16,64,4,7}`（completion bytes、descriptor bytes、minor、major）；`CAP2` 各位代表原有六项能力、BF16/FP16 dot-to-FP32、bit8 队列 DMA `0x60`、bit9 GEMM 累加尾部（`0x30/0x31 flags[7]`）以及 bit10 INT4 块指数展开加载（`0x60 flags[1]`），即 `CAP2=0x7ff`。
+核心编码：STATUS bit0/1/2=busy/done/error；DMA_CTRL bit0/1=start/store；`CMD_CTRL` bit0=外部描述符、bit1=完成即发事件（见下）；`ABI_INFO={16,64,4,7}`（completion bytes、descriptor bytes、minor、major）；`CAP2` 各位代表原有六项能力、BF16/FP16 dot-to-FP32、bit8 队列 DMA `0x60`、bit9 GEMM 累加尾部（`0x30/0x31 flags[7]`）bit10 INT4 块指数展开加载（`0x60 flags[1]`），以及 bit11 bank-local CNM 引擎存在（opcode `0x20/0x21`，Round 41）。默认构建 `CAP2=0xfff`；以 `ENABLE_CNM=0` 构建时不含 CNM，`CAP2=0x7ff`，`0x20/0x21` 以 `ERR_OP` 完成，不会挂起。
 
 ## 7. 验证证据与边界
 

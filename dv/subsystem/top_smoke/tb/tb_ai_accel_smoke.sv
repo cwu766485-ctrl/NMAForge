@@ -1576,35 +1576,37 @@ module tb_ai_accel_smoke;
                         dut.compute_cluster_u.tensor_matrix_u.read_outstanding_count;
             end
 
+`ifndef AI_NO_CNM
             cnm_compute_any =
-                dut.compute_cluster_u.banked_core_u.lc0.compute_enable ||
-                dut.compute_cluster_u.banked_core_u.lc1.compute_enable ||
-                dut.compute_cluster_u.banked_core_u.lc2.compute_enable ||
-                dut.compute_cluster_u.banked_core_u.lc3.compute_enable;
-            if ((dut.compute_cluster_u.banked_core_u.lc0.state_r == 3'd3 ||
-                 dut.compute_cluster_u.banked_core_u.lc0.state_r == 3'd4) &&
+                dut.compute_cluster_u.g_cnm.banked_core_u.lc0.compute_enable ||
+                dut.compute_cluster_u.g_cnm.banked_core_u.lc1.compute_enable ||
+                dut.compute_cluster_u.g_cnm.banked_core_u.lc2.compute_enable ||
+                dut.compute_cluster_u.g_cnm.banked_core_u.lc3.compute_enable;
+            if ((dut.compute_cluster_u.g_cnm.banked_core_u.lc0.state_r == 3'd3 ||
+                 dut.compute_cluster_u.g_cnm.banked_core_u.lc0.state_r == 3'd4) &&
                 !dut.cnm_rsp_valid[0]) begin
                 cnm_response_wait_any = 1'b1;
                 cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
             end
-            if ((dut.compute_cluster_u.banked_core_u.lc1.state_r == 3'd3 ||
-                 dut.compute_cluster_u.banked_core_u.lc1.state_r == 3'd4) &&
+            if ((dut.compute_cluster_u.g_cnm.banked_core_u.lc1.state_r == 3'd3 ||
+                 dut.compute_cluster_u.g_cnm.banked_core_u.lc1.state_r == 3'd4) &&
                 !dut.cnm_rsp_valid[1]) begin
                 cnm_response_wait_any = 1'b1;
                 cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
             end
-            if ((dut.compute_cluster_u.banked_core_u.lc2.state_r == 3'd3 ||
-                 dut.compute_cluster_u.banked_core_u.lc2.state_r == 3'd4) &&
+            if ((dut.compute_cluster_u.g_cnm.banked_core_u.lc2.state_r == 3'd3 ||
+                 dut.compute_cluster_u.g_cnm.banked_core_u.lc2.state_r == 3'd4) &&
                 !dut.cnm_rsp_valid[2]) begin
                 cnm_response_wait_any = 1'b1;
                 cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
             end
-            if ((dut.compute_cluster_u.banked_core_u.lc3.state_r == 3'd3 ||
-                 dut.compute_cluster_u.banked_core_u.lc3.state_r == 3'd4) &&
+            if ((dut.compute_cluster_u.g_cnm.banked_core_u.lc3.state_r == 3'd3 ||
+                 dut.compute_cluster_u.g_cnm.banked_core_u.lc3.state_r == 3'd4) &&
                 !dut.cnm_rsp_valid[3]) begin
                 cnm_response_wait_any = 1'b1;
                 cnm_response_wait_lanes = cnm_response_wait_lanes + 1;
             end
+`endif
             if (cnm_response_wait_lanes != 0)
                 matrix_cnm_cnm_rsp_wait_lane_cycles <=
                     matrix_cnm_cnm_rsp_wait_lane_cycles + cnm_response_wait_lanes;
@@ -1829,17 +1831,19 @@ module tb_ai_accel_smoke;
         .element_count(dut.compute_cluster_u.core_u.element_count)
     );
 
+`ifndef AI_NO_CNM
     ai_compute_activity_sva banked_cnm_activity_sva(
         .clk          (aclk),
         .resetn       (aresetn),
         .wake         (dut.core_start && dut.banked_op),
         .busy         (dut.banked_busy),
-        .done         (dut.compute_cluster_u.banked_core_u.done),
-        .error        (dut.compute_cluster_u.banked_core_u.error),
+        .done         (dut.compute_cluster_u.g_cnm.banked_core_u.done),
+        .error        (dut.compute_cluster_u.g_cnm.banked_core_u.error),
         .spad_valid   (dut.banked_spad_valid || (|dut.cnm_read_valid)),
-        .cycle_count  (dut.compute_cluster_u.banked_core_u.cycle_count),
-        .element_count(dut.compute_cluster_u.banked_core_u.element_count)
+        .cycle_count  (dut.compute_cluster_u.g_cnm.banked_core_u.cycle_count),
+        .element_count(dut.compute_cluster_u.g_cnm.banked_core_u.element_count)
     );
+`endif
 
     ai_compute_activity_sva matrix_activity_sva(
         .clk          (aclk),
@@ -7696,6 +7700,29 @@ module tb_ai_accel_smoke;
             $finish;
         end
 
+        if ($test$plusargs("AI_NO_CNM_ONLY")) begin
+            // ENABLE_CNM=0 build: CAP2[11] clear, and a direct launch of the
+            // absent bank-local engine completes with ERR_OP instead of hanging.
+            expect_read(REG_CAP2, 32'h0000_07ff, "capabilities without CNM");
+            axi_write(REG_OP_MODE, OP_BANKED_VDOT);
+            axi_write(REG_SRC0_BASE, 32'h3000);
+            axi_write(REG_SRC1_BASE, 32'h3100);
+            axi_write(REG_DST_BASE,  32'h3200);
+            axi_write(REG_LENGTH,    32'd1);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done_expect_error(4'd2);
+            clear_done_irq();
+            axi_write(REG_OP_MODE, OP_BANKED_GEMV);
+            axi_write(REG_M_SIZE,    32'd4);
+            axi_write(REG_CTRL,      32'h0000_0003);
+            wait_done_expect_error(4'd2);
+            clear_done_irq();
+            if (errors != 0)
+                $fatal(1, "no-CNM build reported %0d errors", errors);
+            $display("AI_NO_CNM_PASS cap2=0x7ff vdot=ERR_OP gemv=ERR_OP");
+            $finish;
+        end
+
         if ($test$plusargs("AI_SPAD_CAPACITY_BOUNDARIES")) begin
             run_spad_capacity_boundaries();
             $finish;
@@ -7705,7 +7732,7 @@ module tb_ai_accel_smoke;
         expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
                     "mapped AXI aperture version");
         expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
-        expect_read(REG_CAP2, 32'h0000_07ff, "architectural capabilities");
+        expect_read(REG_CAP2, 32'h0000_0fff, "architectural capabilities");
         expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
         axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
         expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");

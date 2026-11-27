@@ -1,5 +1,8 @@
 // Structural wrapper for the accelerator compute engines.
-module ai_accel_compute_cluster (
+module ai_accel_compute_cluster #(
+    // 0 removes the bank-local CNM engine (opcodes 0x20/0x21) from the build.
+    parameter integer ENABLE_CNM = 1
+) (
     input  wire        aclk,
     input  wire        aresetn,
 
@@ -203,26 +206,55 @@ module ai_accel_compute_cluster (
                                    banked_element_count, fp_element_count,
                                    scalar_element_count};
 
-    ai_banked_cnm_core banked_core_u(
-        .clk(aclk), .resetn(aresetn), .start(core_start && banked_op), .abort(core_abort), .op_mode(launch_op),
-        .src0_base(launch_src0), .src1_base(launch_src1), .dst_base(launch_dst),
-        .length(launch_length), .m_size(launch_m), .scale_shift(launch_shift), .activation(launch_activation),
-        .watchdog_limit(watchdog_limit),
-        .cnm_req_valid(cnm_read_valid), .cnm_addr0(cnm_read_addr0), .cnm_addr1(cnm_read_addr1),
-        .cnm_addr2(cnm_read_addr2), .cnm_addr3(cnm_read_addr3), .cnm_req_ready(arb_cnm_ready),
-        .cnm_rsp_valid(cnm_rsp_valid), .cnm_data0(cnm_data0), .cnm_data1(cnm_data1),
-        .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
-        .cnm_protection_error(cnm_protection_error),
-        .spad_valid(banked_spad_valid), .spad_write(banked_spad_write), .spad_addr(banked_spad_addr), .spad_wdata(banked_spad_wdata),
-        .spad_ready(engine_core_ready[2]),
-        .spad_protection_error(engine_core_protection_error[2]),
-        .busy(banked_busy), .done(banked_done), .error(banked_error), .error_code(banked_error_code),
-        .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count),
-        // Optional CNM benchmark counters are not part of the top-level ABI.
-        .local_accumulate_events(), .global_reduce_events(),
-        .banked_read_issue_events(), .prefetch_events(),
-        .pipeline_compute_events(), .response_wait_cycles()
-    );
+    // ENABLE_CNM=0 removes the bank-local CNM (opcodes 0x20/0x21) from the
+    // build; CAP2[11] reports its presence. A launch to the absent engine
+    // completes one cycle later with ERR_OP, so neither the queue nor the
+    // direct path can hang, and the CNM SPAD lanes stay idle.
+    generate
+        if (ENABLE_CNM != 0) begin : g_cnm
+        ai_banked_cnm_core banked_core_u(
+            .clk(aclk), .resetn(aresetn), .start(core_start && banked_op), .abort(core_abort), .op_mode(launch_op),
+            .src0_base(launch_src0), .src1_base(launch_src1), .dst_base(launch_dst),
+            .length(launch_length), .m_size(launch_m), .scale_shift(launch_shift), .activation(launch_activation),
+            .watchdog_limit(watchdog_limit),
+            .cnm_req_valid(cnm_read_valid), .cnm_addr0(cnm_read_addr0), .cnm_addr1(cnm_read_addr1),
+            .cnm_addr2(cnm_read_addr2), .cnm_addr3(cnm_read_addr3), .cnm_req_ready(arb_cnm_ready),
+            .cnm_rsp_valid(cnm_rsp_valid), .cnm_data0(cnm_data0), .cnm_data1(cnm_data1),
+            .cnm_data2(cnm_data2), .cnm_data3(cnm_data3), .cnm_parity_error(cnm_parity),
+            .cnm_protection_error(cnm_protection_error),
+            .spad_valid(banked_spad_valid), .spad_write(banked_spad_write), .spad_addr(banked_spad_addr), .spad_wdata(banked_spad_wdata),
+            .spad_ready(engine_core_ready[2]),
+            .spad_protection_error(engine_core_protection_error[2]),
+            .busy(banked_busy), .done(banked_done), .error(banked_error), .error_code(banked_error_code),
+            .result(banked_result), .cycle_count(banked_cycle_count), .element_count(banked_element_count),
+            // Optional CNM benchmark counters are not part of the top-level ABI.
+            .local_accumulate_events(), .global_reduce_events(),
+            .banked_read_issue_events(), .prefetch_events(),
+            .pipeline_compute_events(), .response_wait_cycles()
+        );
+        end else begin : g_no_cnm
+            reg stub_done_r;
+            always @(posedge aclk or negedge aresetn)
+                if (!aresetn) stub_done_r <= 1'b0;
+                else stub_done_r <= core_start && banked_op && !stub_done_r;
+            assign cnm_read_valid = 4'd0;
+            assign cnm_read_addr0 = 32'd0;
+            assign cnm_read_addr1 = 32'd0;
+            assign cnm_read_addr2 = 32'd0;
+            assign cnm_read_addr3 = 32'd0;
+            assign banked_spad_valid = 1'b0;
+            assign banked_spad_write = 1'b0;
+            assign banked_spad_addr = 32'd0;
+            assign banked_spad_wdata = 32'd0;
+            assign banked_busy = 1'b0;
+            assign banked_done = stub_done_r;
+            assign banked_error = stub_done_r;
+            assign banked_error_code = stub_done_r ? 4'd2 : 4'd0;   // ERR_OP
+            assign banked_result = 32'd0;
+            assign banked_cycle_count = 32'd0;
+            assign banked_element_count = 32'd0;
+        end
+    endgenerate
 
     ai_tensor_matrix_core tensor_matrix_u(
         .clk(aclk), .resetn(aresetn),

@@ -5,7 +5,9 @@
 // lifecycle.  It only stores software configuration, emits control pulses and
 // records completion/DMA status.
 module ai_accel_regs #(
-    parameter [31:0] SPAD_BYTES = 32'd131072
+    parameter [31:0] SPAD_BYTES = 32'd131072,
+    // CAP2[11]: the bank-local CNM engine (opcodes 0x20/0x21) is present.
+    parameter integer ENABLE_CNM = 1
 )(
     input wire clk, input wire resetn,
     input wire reg_req_valid, input wire reg_req_write, input wire [31:0] reg_req_addr,
@@ -281,7 +283,7 @@ module ai_accel_regs #(
         // bit 8 the queued CMDQ DMA_COPY opcode 0x60.
         ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd4,8'd7};
         ERROR_INFO:reg_rsp_rdata={24'd0,error_source_r,error_code_r};
-        CAP2:reg_rsp_rdata=32'h0000_07ff;
+        CAP2:reg_rsp_rdata={20'd0, (ENABLE_CNM != 0), 11'h7ff};
       endcase
     end
     always @(posedge clk or negedge resetn) begin

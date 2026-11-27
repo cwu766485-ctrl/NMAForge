@@ -1,5 +1,29 @@
 # Project update log
 
+## NMAForge V1.4 Round 41 — optional CNM build and pre-synthesis decision record (2026-11-28)
+
+- **Optional CNM.** New `ai_accel_top` parameter `ENABLE_CNM` (default 1).
+  - With 0, the bank-local CNM engine is not instantiated.
+  - Its SPAD lanes stay idle, and a launch of `0x20/0x21` completes one
+    cycle later with `ERR_OP`, so neither the queue nor the direct path can
+    hang.
+  - `CAP2[11]` reports the engine. The default build reads `CAP2=0xfff`; a
+    build with 0 reads `0x7ff`.
+  - Round 40 measured no decode benefit from the CNM, so the product PPA build
+    uses `ENABLE_CNM=0`.
+- **Decision record.** [PRE_SYNTHESIS_DECISIONS.md](verification/PRE_SYNTHESIS_DECISIONS.md)
+  covers:
+  - the RTL changes since the last DC run;
+  - the decisions DC must settle (250 MHz, burst length, SFU cache depth,
+    CNM, operand staging);
+  - the three synthesis runs to request and the static-analysis order.
+- **Verification.**
+  - Default build: `make ai_smoke`, `make ai_run AI_RANDOM_CASES=20
+    AI_SEED=12345` and `make -C dv/uvm/sim uvm_compile` pass.
+  - CNM-free build: `make ai_no_cnm_check` passes (`CAP2=0x7ff`, VDOT and
+    GEMV return `ERR_OP`).
+  - The testbench hierarchical paths moved to `compute_cluster_u.g_cnm.banked_core_u`.
+
 ## NMAForge V1.4 Round 40 — memory-latency model, four-sequence decode, CNM attention study (2026-11-27)
 
 - **Result.** GPT-2 small, 12 layers, GPTQ INT4, decode only, streaming memory
