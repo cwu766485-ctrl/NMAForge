@@ -94,6 +94,10 @@ def footprint(d) -> tuple[list, list]:
             rd.append(w4(d.bias, d.n))
         if d.flags & FLAG_GEMM_ACC:                    # accumulate epilogue reads C
             rd += list(wr)
+    elif d.op == 0x21:                                 # CNM banked GEMV, row-major B
+        vec = 16 * d.k_or_length                       # bytes per A vector / B row
+        rd += [(d.src0, d.src0 + vec), (d.src1, d.src1 + d.m * vec)]
+        wr.append(w4(d.dst, d.m))
     elif d.op in (0x35, 0x36):                         # GELU(LUT) / REQUANT
         rd.append(w4(d.src0, ln))
         wr.append((d.dst, d.dst + ln) if d.flags & (1 << 4) else w4(d.dst, ln))

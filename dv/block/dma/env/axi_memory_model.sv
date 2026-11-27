@@ -121,7 +121,31 @@ module axi_memory_model #(
     wire write_inject_error;
     wire ar_fire = arvalid && arready;
     wire aw_fire = awvalid && awready;
-    wire read_dequeue = !read_active_r && !rvalid && read_q_count_r != 0;
+    // Optional DDR-like read timing (plusargs, default off = legacy timing):
+    //   +AXI_MEM_READ_LATENCY=<n>  first beat no earlier than n cycles after
+    //                              its AR handshake (queued ARs overlap);
+    //   +AXI_MEM_STREAM=1          beats back to back (RVALID stays high).
+    integer    cfg_read_latency = 0;
+    integer    cfg_read_stream = 0;
+    longint    mem_cycle_r;
+    longint    read_time_fifo [0:3];
+    initial begin
+        if (!$value$plusargs("AXI_MEM_READ_LATENCY=%d", cfg_read_latency))
+            cfg_read_latency = 0;
+        if (!$value$plusargs("AXI_MEM_STREAM=%d", cfg_read_stream))
+            cfg_read_stream = 0;
+        if (cfg_read_latency != 0 || cfg_read_stream != 0)
+            $display("AXI_MEM_TIMING read_latency=%0d stream=%0d", cfg_read_latency, cfg_read_stream);
+    end
+    wire read_dequeue = !read_active_r && !rvalid && read_q_count_r != 0 &&
+                        (mem_cycle_r >= read_time_fifo[read_q_head_r]);
+    wire [31:0] stream_word_addr = read_addr_r[31:2] +
+        (read_size_r == AXI_SIZE_128B ? {22'd0,(read_idx_r + 8'd1),2'b00} :
+                                        {24'd0,(read_idx_r + 8'd1)});
+    wire stream_addr_error = (((read_addr_r >> 32) != 0) &&
+                              !(ALLOW_HIGH_ADDR_ALIAS &&
+                                ((read_addr_r >> 32) == HIGH_ADDR_ALIAS_TAG))) ||
+                             (stream_word_addr >= WORDS);
 
     // Nonzero address-gap settings select periodic READY-low windows.  The
     // phase counters are free-running and independent of VALID, avoiding an
@@ -244,6 +268,7 @@ module axi_memory_model #(
             read_q_head_r  <= 2'd0;
             read_q_tail_r  <= 2'd0;
             read_q_count_r <= 3'd0;
+            mem_cycle_r <= 0;
             read_size_r <= AXI_SIZE_32B;
             read_id_r <= 4'd0;
             write_active_r <= 1'b0;
@@ -278,6 +303,7 @@ module axi_memory_model #(
             inject_read_error_word <= -1;
             inject_write_error_word <= -1;
         end else begin
+            mem_cycle_r <= mem_cycle_r + 1;
             arready_base_r <= read_q_count_r < 3'd4;
             awready_base_r <= !write_active_r && !bvalid;
             wready  <= write_active_r && !bvalid && (wready_gap_r == 2'd0);
@@ -375,6 +401,7 @@ module axi_memory_model #(
                 read_len_fifo[read_q_tail_r] <= arlen;
                 read_size_fifo[read_q_tail_r] <= arsize;
                 read_id_fifo[read_q_tail_r] <= arid;
+                read_time_fifo[read_q_tail_r] <= mem_cycle_r + cfg_read_latency;
                 read_error_fifo[read_q_tail_r] <=
                     ((arsize != AXI_SIZE_32B) && (arsize != AXI_SIZE_128B)) ||
                     (arburst != AXI_BURST_INCR) ||
@@ -393,6 +420,7 @@ module axi_memory_model #(
                 rid           <= read_id_fifo[read_q_head_r];
                 read_q_head_r <= read_q_head_r + 1'b1;
                 gap_pick = transaction_jitter_enable ? choose_gap(read_gap_cfg) : read_gap_cfg[1:0];
+                if (cfg_read_stream != 0) gap_pick = 2'd0;
                 read_gap_r <= gap_pick;
                 if (transaction_jitter_enable)
                     read_response_gap_cg.sample(gap_pick);
@@ -427,7 +455,27 @@ module axi_memory_model #(
                 end
             end
 
-            if (rvalid && rready) begin
+            if (rvalid && rready && !rlast && (cfg_read_stream != 0)) begin
+                // Streaming: present the next beat in the accepting cycle.
+                read_idx_r <= read_idx_r + 8'd1;
+                if (stream_addr_error) rdata <= 128'd0;
+                else if (read_size_r == AXI_SIZE_128B)
+                    rdata <= {mem[stream_word_addr+3],mem[stream_word_addr+2],
+                              mem[stream_word_addr+1],mem[stream_word_addr]};
+                else begin
+                    case (read_addr_r[3:2])
+                      2'd0: rdata <= {96'd0,mem[stream_word_addr]};
+                      2'd1: rdata <= {64'd0,mem[stream_word_addr],32'd0};
+                      2'd2: rdata <= {32'd0,mem[stream_word_addr],64'd0};
+                      default: rdata <= {mem[stream_word_addr],96'd0};
+                    endcase
+                end
+                rresp <= (read_error_r || stream_addr_error ||
+                          ((inject_read_error_word >= 0) &&
+                           (stream_word_addr == inject_read_error_word[31:0]))) ?
+                         AXI_RESP_SLVERR : AXI_RESP_OKAY;
+                rlast <= ((read_idx_r + 8'd1) == read_len_r);
+            end else if (rvalid && rready) begin
                 rvalid <= 1'b0;
                 if (rlast) begin
                     read_active_r <= 1'b0;

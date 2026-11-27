@@ -1,0 +1,3 @@
+AXI_MEM_TIMING read_latency=50 stream=1
+COMPILED_PROGRAM_PASS format=3 segments=18 descriptors=3365 queued_dma=1265 queued_dma_stores=120 queued_dma_bytes=20742144 checkpoint_words=91136 final_words=3072 end_to_end_cycles=9773415 host_publish_cycles=2209 cmdq=ddr dma_fenced_cycles=0 host_spad_data_writes=0
+COMPILED_V3_PROFILE cycles=9773415 matrix_busy=6992264 sfu_busy=1527308 kv_busy=0 dma_busy=3762822 matrix_and_dma=1918317 dma_only=1245335 idle=8508

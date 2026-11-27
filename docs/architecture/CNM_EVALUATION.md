@@ -31,6 +31,32 @@ ASIC TOPS, energy efficiency or application latency claims. Memory latency,
 DDR bandwidth, tile size, clock frequency and workload shape can dominate an
 actual system result.
 
+## Comparison with the Matrix engine (Round 40, 2026-11-27)
+
+The speedups above are against the retained scalar baseline. On GPT-2 decode
+shapes the Matrix engine of the same Product Top is faster:
+
+| Shape | CNM `0x21` GEMV (1 row) | Matrix `0x30` GEMM (4 rows, Round 39) |
+|---|---:|---:|
+| 64×768 | 9,697 cycles | 3,977 cycles |
+| 256×64 | 4,705 cycles | 1,795 cycles |
+
+The bank-local controllers fetch the A and B words in separate admissions, so
+the CNM streams about 5 B/cycle of weights against about 13 B/cycle for the
+staged Matrix.
+
+The CNM can overlap the Matrix on independent work. 8 GEMMs plus 8 GEMVs take
+96,928 cycles concurrently, against 141,684 cycles serially.
+
+Moving per-sequence decode attention onto the CNM was nevertheless 3.7–10.8%
+slower than Matrix attention at contexts of 64 and 256, for three reasons:
+
+- in-order issue;
+- the single scheduler-side SPAD port;
+- the SPAD capacity left for double-buffered caches.
+
+See the [Round 40 report](../benchmark/NMAFORGE_V1_4_ROUND40_BATCH_DECODE_BANDWIDTH.md).
+
 ## Implementation evidence
 
 A licensed commercial-28-nm pre-layout synthesis study met a 4.0 ns clock

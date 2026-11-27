@@ -1,5 +1,36 @@
 # Project update log
 
+## NMAForge V1.4 Round 40 — memory-latency model, four-sequence decode, CNM attention study (2026-11-27)
+
+- **Result.** GPT-2 small, 12 layers, GPTQ INT4, decode only, streaming memory
+  with 100-cycle latency, bit-exact:
+  - four sequences per step reach 54.6 tok/s at 250 MHz (4.58 M cycles/token);
+  - one sequence reaches 14.7 tok/s, so batching gives 3.7×;
+  - DDR bytes per token fall from 49.4 MB to 13.1 MB.
+- **Testbench.** `axi_memory_model` gains opt-in `+AXI_MEM_READ_LATENCY=<n>`
+  and `+AXI_MEM_STREAM=1`; the default timing is unchanged. The legacy model
+  delivered one beat per 2–3 cycles, which inflated the Round 39
+  exposed-DMA share.
+- **Burst length.** 32-beat bursts gain 2.2% on the 1-layer final program and
+  10–12% on DMA-bound batch decode at latency 100. They cost +8 Kbit. The
+  default stays 16 until the PPA run.
+- **Compiler.**
+  - New `sw/compiler/gpt2_batch.py` (lockstep multi-sequence decode).
+  - V^T cache byte insertion through a lane-expanded V^T GEMM (N = 16) plus a
+    32-bit RESIDUAL merge.
+  - Per-slot attention accumulated with the GEMM epilogue.
+  - `0x21` footprint model in `nmaf/program.py`.
+- **CNM attention (negative).** Moving S/AV onto the bank-local CNM `0x21`
+  with Matrix/CNM interleaving is 3.7–10.8% slower than Matrix attention at
+  kmax 64 and 256. The CNM streams about 5 B/cycle (against the Matrix's 13),
+  the issue is in order, and the SPAD has one port. The mode stays
+  experimental.
+- **Verification.** Batch programs are bit-exact (1 and 12 layers, Matrix and
+  CNM attention, kmax 64/256, 16/32-beat). Smoke and DMA UVM (19 tests) pass.
+  NOT RUN: SpyGlass, formal, DC. Area is pending synthesis.
+
+See the [report](benchmark/NMAFORGE_V1_4_ROUND40_BATCH_DECODE_BANDWIDTH.md).
+
 ## NMAForge V1.4 Round 39 — Matrix GEMM read pipeline, VCS scratchpad fix, GPTQ INT4 (2026-11-27)
 
 - **Result.** GPT-2 small, 12 layers, prompt + 8 decode, bit-exact on Product
