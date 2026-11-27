@@ -9,7 +9,10 @@ reloads of the stored data, so it exercises:
   * footprint-derived RAW/WAR/WAW event dependencies, including a DDR
     store -> load round trip;
   * DMA hoisting over independent compute (rotating double buffers);
-  * event-on-complete and the DDR-resident CMDQ ring.
+  * event-on-complete and the DDR-resident CMDQ ring;
+  * INT4 block-exponent expansion on load (0x60 flags[1]) with random shift
+    nibbles (values above 4 clamp to 4), single and multi-burst streams that
+    cross 4-KiB boundaries.
 
 Every round's result is checked bit-exactly (checkpoint at the end of the
 round's segment) and the final accumulator is checked at program end.
@@ -40,6 +43,7 @@ def main() -> None:
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--rounds", type=int, default=6)
     ap.add_argument("--seed", type=int, default=37)
+    ap.add_argument("--i4-superblocks", type=int, nargs="*", default=[1, 37])
     a = ap.parse_args()
     rng = np.random.default_rng(a.seed)
     n = ROWS * COLS
@@ -77,8 +81,16 @@ def main() -> None:
         mix = I.residual(av, acc_v, 2)
         P.checkpoint(idx, tmp, I.words_i32(mix))
         stored.append(t)
+    # INT4 expansion: raw random super-blocks (any shift nibble) -> SPAD.
+    for t, n_sb in enumerate(a.i4_superblocks):
+        words = rng.integers(0, 1 << 32, n_sb * 64, dtype=np.int64)
+        P.ddr_put(f"i4_{t}", words, align=256)
+        dst = P.alloc(f"I4_{t}", n_sb * 480)
+        idx = P.dma(f"i4_{t}", dst, expand_i4=True)
+        P.checkpoint(idx, dst, I.words_i32(I.lines_to_words(I.expand_i4_stream(words))))
     P.final_rows(acc, I.words_i32(acc_v), COLS, ROWS)
-    man = P.write(a.out, {"selftest": "qdma", "rounds": a.rounds, "seed": a.seed})
+    man = P.write(a.out, {"selftest": "qdma", "rounds": a.rounds, "seed": a.seed,
+                          "i4_superblocks": a.i4_superblocks})
     print("QDMA_SELFTEST_READY " + " ".join(f"{k}={man.get(k)}" for k in (
         "descriptors", "segments", "queued_dma", "hoisted_dma", "event_bits_peak",
         "dependency_waits", "cmdq_ddr_base")))

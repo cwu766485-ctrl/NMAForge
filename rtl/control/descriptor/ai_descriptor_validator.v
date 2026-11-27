@@ -257,14 +257,23 @@ module ai_descriptor_validator (
     // store may not use the gather path (the payload DMA has none).
     wire [31:0] qdma_words = (m_size == 16'd0) ? {16'd0,length} :
                              ({16'd0,length} * {16'd0,m_size});
+    // flags[1] (CAP2[10]) expands INT4 super-blocks on load: 1D only,
+    // 256-byte source, 16-byte SPAD, length a multiple of 64 source words;
+    // the SPAD span is length/64 super-blocks of 480 bytes.
+    wire qdma_expand = flags[1];
+    wire qdma_expand_ok = !qdma_expand ||
+        (!flags[0] && (m_size == 16'd0) && (src0[7:0] == 8'd0) &&
+         (length[5:0] == 6'd0) && (dst[3:0] == 4'd0));
     wire [32:0] qdma_spad_last =
         {1'b0,dst} +
-        ((m_size == 16'd0) ? ({1'b0,qdma_words} << 2) :
+        (qdma_expand ? ({23'd0,length[15:6]} * 33'd480) :
+         (m_size == 16'd0) ? ({1'b0,qdma_words} << 2) :
          ({17'd0,m_size - 16'd1} * {1'b0,dst_stride}) +
          ({17'd0,length} << 2));
     wire qdma_fields_valid =
         !is_queued_dma ||
-        ((version == 8'd7) && (flags[7:1] == 7'd0) && (bias_enable == flags[0]) &&
+        ((version == 8'd7) && (flags[7:2] == 6'd0) && qdma_expand_ok &&
+         (bias_enable == flags[0]) &&
          (bias_base == 32'd0) && (n_size == 16'd0) &&
          (scale_shift == 5'd0) && (activation == 2'd0) && (aux0 == 32'd0) &&
          (src1_stride == 32'd0) && (batch_count == 16'd0) &&
@@ -272,6 +281,14 @@ module ai_descriptor_validator (
          ((m_size == 16'd0) ? ((src0_stride == 32'd0) && (dst_stride == 32'd0)) :
           ((src0_stride[1:0] == 2'd0) && (dst_stride[1:0] == 2'd0))) &&
          !qdma_spad_last[32] && queued_dma_allowed);
+
+    // Round 38 GEMM accumulate epilogue: flags[7] on 0x30/0x31 makes the
+    // matrix core read-add-write the destination (16-byte aligned rows).
+    // flags[7] stays reserved on the other matrix opcodes.
+    wire gemm_acc_fields_valid =
+        !(flags[7] && ((op == 8'h52) || (op == 8'h53))) &&
+        !(flags[7] && ((op == 8'h30) || (op == 8'h31)) &&
+          ((|dst[3:0]) || ((batch_count > 16'd1) && (|dst_stride[3:0]))));
 
     assign descriptor_invalid = !op_valid || !dimensions_valid ||
                                 !version_valid ||
@@ -289,6 +306,7 @@ module ai_descriptor_validator (
                                 !repack_fields_valid ||
                                 !kv_fields_valid ||
                                 !gemv_fields_valid ||
-                                !qdma_fields_valid;
+                                !qdma_fields_valid ||
+                                !gemm_acc_fields_valid;
 
 endmodule

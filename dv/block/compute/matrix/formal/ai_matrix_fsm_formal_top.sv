@@ -20,6 +20,7 @@ module ai_matrix_fsm_formal_top (
     input logic bias_enable,
     input logic [4:0] scale_shift,
     input logic [1:0] activation,
+    input logic accumulate,
     input logic [31:0] aux0,
     input logic [31:0] watchdog_limit,
     input logic [31:0] bank0_data,
@@ -79,7 +80,7 @@ module ai_matrix_fsm_formal_top (
         (op_mode == 8'h30 && m_size == 16'd4 && n_size == 16'd4 &&
          k_words == 16'd3 && instance_count == 32'd1 &&
          src0_base == 32'h0000_0100 && src1_base == 32'h0000_0200 &&
-         dst_base == 32'h0000_0400 && bias_enable == 1'b0));
+         dst_base == 32'h0000_0400 && bias_enable == 1'b0 && accumulate == 1'b0));
     assume_banked_response_has_owner: assume property (
         @(posedge clk) disable iff (!resetn)
         banked_rsp_valid |-> (dut.read_outstanding_count != 0));

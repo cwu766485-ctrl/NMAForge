@@ -13,6 +13,7 @@ module tb_ai_descriptor_validator;
     reg [15:0] batch_count, head_count;
     reg macro_child_fetch;
     reg queued_dma_allowed;
+    integer gemm_acc_checks;
     integer qdma_checks;
 
     wire op_valid, is_macro, is_tensor_matrix, is_tensor_sfu;
@@ -200,10 +201,37 @@ module tb_ai_descriptor_validator;
         set_qdma_defaults(1'b0); src0_stride = 32'd64; check_invalid("DMA_COPY 1D stride");
         set_qdma_defaults(1'b1); bias_base = 32'h100; check_invalid("DMA_COPY reserved bias base");
         set_qdma_defaults(1'b1); dst_stride = 32'd66; check_invalid("DMA_COPY 2D unaligned stride");
-        set_qdma_defaults(1'b0); flags = 8'h02; check_invalid("DMA_COPY reserved flag");
+        set_qdma_defaults(1'b0); flags = 8'h04; check_invalid("DMA_COPY reserved flag");
         set_qdma_defaults(1'b0); aux0 = 32'd1; check_invalid("DMA_COPY reserved aux0");
         set_qdma_defaults(1'b0); version = 8'd3; check_invalid("DMA_COPY version");
         set_qdma_defaults(1'b0); dst = 32'hffff_fff0; check_invalid("DMA_COPY spad wrap");
+
+        // CAP2[10] INT4 expansion (0x60 flags[1]): 1D load, 256-byte source,
+        // 16-byte SPAD destination, length a multiple of 64 source words.
+        set_qdma_defaults(1'b0); flags = 8'h02; #1;
+        if (descriptor_invalid) $fatal(1, "legal INT4 expansion DMA rejected");
+        qdma_checks = qdma_checks + 1;
+        set_qdma_defaults(1'b1); flags = 8'h03; check_invalid("DMA INT4 expansion on store/2D");
+        set_qdma_defaults(1'b0); flags = 8'h02; src0 = 32'h0000_1040; check_invalid("DMA INT4 source not 256B");
+        set_qdma_defaults(1'b0); flags = 8'h02; length = 16'd96; k_words = 16'd96; check_invalid("DMA INT4 length not x64");
+        set_qdma_defaults(1'b0); flags = 8'h02; dst = 32'h0000_0108; check_invalid("DMA INT4 dst not 16B");
+        set_qdma_defaults(1'b0); flags = 8'h02; dst = 32'hffff_ff00; check_invalid("DMA INT4 expanded span wraps");
+
+        // Round 38 GEMM accumulate epilogue: flags[7] on 0x30/0x31 needs a
+        // 16-byte aligned destination (and batch stride); reserved on 0x52/0x53.
+        gemm_acc_checks = 0;
+        set_legal_defaults(8'h30); flags = 8'h80; #1;
+        if (descriptor_invalid) $fatal(1, "legal accumulate GEMM rejected");
+        gemm_acc_checks = gemm_acc_checks + 1;
+        set_legal_defaults(8'h31); flags = 8'h81; bias_enable = 1'b1; batch_count = 16'd2;
+        dst_stride = 32'd256; #1;
+        if (descriptor_invalid) $fatal(1, "legal accumulate batch GEMM rejected");
+        gemm_acc_checks = gemm_acc_checks + 1;
+        set_legal_defaults(8'h30); flags = 8'h80; dst = 32'h0000_0304; check_invalid("GEMM accumulate dst not 16B");
+        set_legal_defaults(8'h31); flags = 8'h80; batch_count = 16'd2; dst_stride = 32'd260;
+        check_invalid("GEMM accumulate batch stride not 16B");
+        set_legal_defaults(8'h52); flags = 8'h80; check_invalid("GEMV accumulate reserved");
+        set_legal_defaults(8'h53); flags = 8'h80; check_invalid("fused GEMM accumulate reserved");
         qdma_checks = qdma_checks + 11;
 
         // The descriptor-only Matrix A tile packing mode has an additional
@@ -422,11 +450,11 @@ module tb_ai_descriptor_validator;
             $fatal(1, "Matrix A tile-pack accepted a non-matching M*N length");
         boundary_reject_checks = boundary_reject_checks + 1;
 
-        if (legal_opcode_checks != 30 || invalid_rule_checks != 51 ||
+        if (legal_opcode_checks != 30 || invalid_rule_checks != 60 ||
             boundary_accept_checks != 49 || boundary_reject_checks != 28)
-            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/51/49/28",
+            $fatal(1, "testpoint count mismatch legal=%0d invalid=%0d boundary_accept=%0d boundary_reject=%0d expected=30/60/49/28",
                    legal_opcode_checks, invalid_rule_checks, boundary_accept_checks, boundary_reject_checks);
-        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 queued_dma=%0d tile_pack=1 invalid_rules=51 boundary_accept=49/49 boundary_reject=28/28 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0", qdma_checks);
+        $display("DESCRIPTOR_VALIDATOR_PASS legal_opcodes=29 queued_dma=%0d gemm_acc=%0d tile_pack=1 invalid_rules=60 boundary_accept=49/49 boundary_reject=28/28 tile_forward_accept=3/3 repack_physical_span=1 repack_compact_span=1 legacy_aux_compat=1 opcode_classes_consistent=1 engine_limit_claim=0", qdma_checks, gemm_acc_checks);
         $finish;
     end
 endmodule

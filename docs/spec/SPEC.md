@@ -29,6 +29,21 @@ Top dispatcher keeps 32 in-flight records. `CMD_TAIL` is now writable while
 busy (append-only); if the queue drained before the append, software rings
 `DOORBELL` again. See SPEC_ZH for details.
 
+Round 38 compatible extensions (`CAP2=0x7ff`). INT4 expansion (`CAP2[10]`):
+`flags[1]` on a `0x60` load expands 256-byte super-blocks (one beat of 32
+4-bit line shifts plus 15 beats of packed signed INT4) into 30 INT8 SPAD lines
+(480 bytes), byte = `sat8(sext4(n) << min(shift, 4))`; 1D load only, source
+256-byte aligned, `length` a multiple of 64 source words, `dst` 16-byte
+aligned. Each expanded line is one 4x4 block of the packed matrix layouts.
+GEMM accumulate epilogue (`CAP2[9]`):
+`flags[7]` on `0x30`/`0x31` makes the matrix core read the old destination
+line through its banked port before each 4-word row write and store
+`C = sat32(C_old + R)`, where `R` is the value the command would write
+without the bit. The sum matches `RESIDUAL_I32` (shift 0), so "GEMM to PART +
+RESIDUAL" becomes one descriptor with bit-identical results. `dst` (and the
+`0x31` batch `dst_stride`) must be 16-byte aligned; `flags[7]` stays reserved
+on `0x52`/`0x53`. Software keeps `dst` disjoint from A, B and bias.
+
 Opcode `0x50` (`BF16_DOT_ACC_FP32`) remains unchanged. A10 adds opcode `0x51`
 (`FP16_DOT_ACC_FP32`); both use the existing command lifecycle, scratchpad
 arbiter and completion writer, with sequential non-fused FP32 accumulation.

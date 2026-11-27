@@ -1,0 +1,1 @@
+COMPILED_PROGRAM_PASS format=3 segments=3 descriptors=1377 queued_dma=47 queued_dma_stores=0 queued_dma_bytes=2998592 checkpoint_words=78800 final_words=37824 end_to_end_cycles=3304720 host_publish_cycles=913 cmdq=ddr dma_fenced_cycles=0 host_spad_data_writes=0

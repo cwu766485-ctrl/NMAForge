@@ -44,6 +44,13 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
   start（优先级 tile > 队列 DMA > 寄存器 DMA），完成后像计算引擎一样回报 done/error。产品 top
   的在途记录 FIFO 为 32 项；`CMD_CTRL[1]` 打开“完成即发事件”，使后续计算只等待真正的数据依赖，
   不被排在前面的长 DMA 的顺序退休阻塞。DMA 仍经 `ai_spad_arbiter` 的 DMA 客户端访问 SPAD。
+- INT4 展开加载（Round 38）：`ai_axi128_dma` 在 `expand_i4`（只来自队列 DMA 的 `0x60 flags[1]`）
+  下照常按源 word 规划 AXI 突发，排空 slot 时每个数据拍写两行 SPAD，shift 拍原地留在 slot
+  缓冲里供本 super-block 的数据拍查表，不写 SPAD。DDR 字节数减半，SPAD 填充速率与 INT8 相当。
+- GEMM 累加尾部（Round 38）：`ai_tensor_matrix_core` 在 `0x30/0x31 flags[7]` 下于 `ST_WRITE`
+  先用 banked 读口读出旧的输出行（读元数据 FIFO 用第 69 位标记，响应不进入 A/B 缓冲），
+  再把 `sat32(旧值 + 结果)` 整行写回。注意力各 head 的输出投影与 FFN 各分块的 `fc2`
+  因此直接累加进 ACC/X，省掉中间的 PART 写回和 RESIDUAL 命令。
 - 多引擎通过 `ai_compute_spad_mux` 汇入 `ai_spad_arbiter` 的单一 core 客户端。仲裁保持
   请求和响应归属，但不建立跨 descriptor 的数据依赖；软件要避免可能并发任务的 SPAD 读写冲突。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion

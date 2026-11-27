@@ -281,7 +281,7 @@ module ai_accel_regs #(
         // bit 8 the queued CMDQ DMA_COPY opcode 0x60.
         ABI_INFO:reg_rsp_rdata={8'd16,8'd64,8'd4,8'd7};
         ERROR_INFO:reg_rsp_rdata={24'd0,error_source_r,error_code_r};
-        CAP2:reg_rsp_rdata=32'h0000_01ff;
+        CAP2:reg_rsp_rdata=32'h0000_07ff;
       endcase
     end
     always @(posedge clk or negedge resetn) begin

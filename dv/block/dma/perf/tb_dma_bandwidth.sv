@@ -38,6 +38,7 @@ module tb_dma_bandwidth;
         .ext_addr(ext_addr), .spad_addr(spad_addr), .length_words(length_words),
         .row_words(16'd0), .row_count(16'd0), .ext_stride(32'd0), .spad_stride(32'd0),
         .gather_enable(1'b0), .gather_index_base(32'd0), .read_outstanding(outstanding),
+        .expand_i4(1'b0),
         .busy(busy), .done(done), .error(error), .error_code(error_code),
         .spad_valid(sv), .spad_write(sw), .spad_addr_o(sa), .spad_wdata(sd),
         .spad_ready(spad_ready_r), .spad_rsp_valid(1'b0), .spad_rdata(32'd0),

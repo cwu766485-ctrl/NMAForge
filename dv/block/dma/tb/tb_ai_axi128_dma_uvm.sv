@@ -24,6 +24,7 @@ module tb_ai_axi128_dma_uvm;
         .row_count(ctrl_if.row_count), .ext_stride(ctrl_if.ext_stride),
         .spad_stride(ctrl_if.spad_stride), .gather_enable(ctrl_if.gather_enable),
         .gather_index_base(ctrl_if.gather_index_base), .read_outstanding(ctrl_if.read_outstanding),
+        .expand_i4(1'b0),
         .busy(ctrl_if.busy), .done(ctrl_if.done), .error(ctrl_if.error),
         .error_code(ctrl_if.error_code),
         .spad_valid(spad_if.spad_valid), .spad_write(spad_if.spad_write),

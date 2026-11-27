@@ -33,6 +33,7 @@ module ai_accel_dma_request_mux (
     input  wire [15:0] qdma_row_count,
     input  wire [31:0] qdma_ext_stride,
     input  wire [31:0] qdma_spad_stride,
+    input  wire        qdma_expand_i4,
 
     output wire        dma_start_mux,
     output wire        dma_store_mux,
@@ -45,7 +46,8 @@ module ai_accel_dma_request_mux (
     output wire [31:0] dma_spad_stride_mux,
     output wire        dma_gather_enable_mux,
     output wire [31:0] dma_gather_index_base_mux,
-    output wire [2:0]  dma_read_outstanding_mux
+    output wire [2:0]  dma_read_outstanding_mux,
+    output wire        dma_expand_i4_mux
 );
 
     assign dma_start_mux = tile_active ? tile_dma_start :
@@ -69,6 +71,8 @@ module ai_accel_dma_request_mux (
     assign dma_gather_enable_mux = (tile_active || qdma_own) ? 1'b0 : dma_gather_enable;
     assign dma_gather_index_base_mux = (tile_active || qdma_own) ? 32'd0 :
                                        dma_gather_index_base;
+    // INT4 expansion exists only on the queued path (0x60 flags[1]).
+    assign dma_expand_i4_mux = !tile_active && qdma_own && qdma_expand_i4;
     // Queued DMA uses the software-programmed DMA_CFG read window.
     assign dma_read_outstanding_mux = tile_active ? 3'd1 : dma_read_outstanding;
 

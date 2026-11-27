@@ -1,0 +1,8 @@
+MATRIX_CORE_ACC_CASE_PASS id=0 shape_mnk=4,4,4 batches=1 bias=0 shift=0 act=0 cycles=43
+MATRIX_CORE_ACC_CASE_PASS id=1 shape_mnk=16,16,16 batches=1 bias=1 shift=2 act=0 cycles=544
+MATRIX_CORE_ACC_CASE_PASS id=2 shape_mnk=32,48,32 batches=1 bias=1 shift=3 act=0 cycles=3334
+MATRIX_CORE_ACC_CASE_PASS id=3 shape_mnk=8,8,8 batches=2 bias=0 shift=1 act=1 cycles=251
+MATRIX_CORE_ACC_CASE_PASS id=4 shape_mnk=16,32,68 batches=1 bias=1 shift=0 act=0 cycles=1509
+MATRIX_CORE_ACC_CASE_PASS id=5 shape_mnk=48,16,12 batches=1 bias=0 shift=4 act=2 cycles=1337
+MATRIX_CORE_ACC_PASS cases=6 faults=3 saturated_words=532 golden=bit-exact
+grep -Eq '^MATRIX_CORE_ACC_PASS cases=6 faults=3 saturated_words=[1-9][0-9]* golden=bit-exact$' /tmp/nmaforge_matrix_core_20261021/run.log

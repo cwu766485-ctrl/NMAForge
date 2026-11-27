@@ -17,6 +17,8 @@
 //   src0_stride  external row stride in bytes (2D only)
 //   dst_stride   SPAD row stride in bytes (2D only)
 //   flags[0]     0 = load DDR->SPAD, 1 = store SPAD->DDR
+//   flags[1]     INT4 block-exponent expansion on load (CAP2[10]); length
+//                counts source words, SPAD receives length/64*480 bytes
 //
 // Completion: result=0 and elements=words transferred on success. On a DMA
 // error the payload-DMA error code is reported unchanged (as the tile path
@@ -50,6 +52,7 @@ module ai_dma_queue_engine (
     output reg  [15:0] dma_row_count,
     output reg  [31:0] dma_ext_stride,
     output reg  [31:0] dma_spad_stride,
+    output reg         dma_expand_i4,
 
     output wire        busy,
     output reg         done,
@@ -80,6 +83,7 @@ module ai_dma_queue_engine (
             dma_row_count <= 16'd0;
             dma_ext_stride <= 32'd0;
             dma_spad_stride <= 32'd0;
+            dma_expand_i4 <= 1'b0;
             done <= 1'b0;
             error <= 1'b0;
             error_code <= 4'd0;
@@ -97,6 +101,7 @@ module ai_dma_queue_engine (
                     if (launch) begin
                         own <= 1'b1;
                         dma_store <= flags[0];
+                        dma_expand_i4 <= flags[1];
                         dma_ext_addr <= {src1, src0};
                         dma_spad_addr <= dst;
                         dma_length_words <= length;

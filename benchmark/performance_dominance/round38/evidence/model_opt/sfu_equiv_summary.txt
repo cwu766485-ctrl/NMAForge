@@ -1,0 +1,6 @@
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=443 legacy_fallback_cases=48 legacy_cycles=849094 fast_cycles=313027 stall=1 stability_checks=49456
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=434 legacy_fallback_cases=57 legacy_cycles=795291 fast_cycles=341673 stall=1 stability_checks=44502
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=434 legacy_fallback_cases=57 legacy_cycles=632765 fast_cycles=268890 stall=0 stability_checks=0
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=443 legacy_fallback_cases=48 legacy_cycles=677921 fast_cycles=249666 stall=0 stability_checks=0
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=444 legacy_fallback_cases=47 legacy_cycles=758286 fast_cycles=278686 stall=1 stability_checks=44175
+SFU_STREAM_EQUIV_PASS cases=491 fault_cases=60 fast_path_cases=444 legacy_fallback_cases=47 legacy_cycles=607210 fast_cycles=222593 stall=0 stability_checks=0

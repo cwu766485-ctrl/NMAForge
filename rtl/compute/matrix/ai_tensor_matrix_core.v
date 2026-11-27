@@ -38,6 +38,9 @@ module ai_tensor_matrix_core #(
     input  wire        bias_enable,
     input  wire [4:0]  scale_shift,
     input  wire [1:0]  activation,
+    // GEMM accumulate epilogue (descriptor flags[7] on 0x30/0x31):
+    // C[i][j] = sat32(C_old[i][j] + post_process(A*B + bias)).
+    input  wire        accumulate,
     input  wire [31:0] aux0,
     input  wire [31:0] watchdog_limit,
 
@@ -128,6 +131,10 @@ module ai_tensor_matrix_core #(
         MAX_OUTSTANDING_READS - 1;
 
     reg [3:0] state_r;
+    reg        acc_mode_r;
+    reg [1:0]  acc_phase_r;
+    reg [127:0] acc_old_r;
+    wire acc_line_ready_to_write = !acc_mode_r || (acc_phase_r == 2'd2);
     // Passive per-command profile used by VCS regressions. Indexes follow the
     // ST_* encoding below; the aggregate stalls split request arbitration,
     // response latency, and output writeback backpressure without changing
@@ -163,7 +170,7 @@ module ai_tensor_matrix_core #(
     reg [READ_FIFO_PTR_WIDTH-1:0] read_fifo_wr_ptr, read_fifo_rd_ptr;
     // {operand B, 4x4 group, K group, N-tile, full bank-word address}. The fixed-latency
     // response path has no ID, so accepted request ownership is retained here.
-    reg [68:0] read_response_meta_fifo [0:MAX_OUTSTANDING_READS-1];
+    reg [69:0] read_response_meta_fifo [0:MAX_OUTSTANDING_READS-1];
     reg [READ_FIFO_COUNT_WIDTH-1:0] perf_outstanding_highwater;
     reg [31:0] perf_fifo_full_cycles;
     reg [15:0] m_r, n_r, k_words_r;
@@ -520,7 +527,10 @@ module ai_tensor_matrix_core #(
     wire [READ_FIFO_PTR_WIDTH-1:0] read_fifo_rd_next =
         (read_fifo_rd_ptr == READ_FIFO_LAST) ?
         {READ_FIFO_PTR_WIDTH{1'b0}} : read_fifo_rd_ptr + 1'b1;
-    wire [68:0] response_meta = read_response_meta_fifo[read_fifo_rd_ptr];
+    wire [69:0] response_meta = read_response_meta_fifo[read_fifo_rd_ptr];
+    // Bit 69 tags an accumulate-epilogue read of the old C line. Those
+    // responses bypass the A/B operand buffers and the context check.
+    wire response_acc = response_meta[69];
     wire response_buffer = response_meta[68];
     wire response_operand_b = response_meta[67];
     wire [2:0] response_group = response_meta[66:64];
@@ -555,7 +565,7 @@ module ai_tensor_matrix_core #(
         (response_operand_b ? (b_tile_base_r + response_group_offset) :
                               (a_tile_base_r + response_group_offset));
     wire banked_response_context_fault = banked_response_accept &&
-        (state_r != ST_ERROR_DRAIN) &&
+        !response_acc && (state_r != ST_ERROR_DRAIN) &&
         ((response_k_group >= k_words_r) ||
          (response_request_addr != response_expected_addr));
     wire [31:0] bias_read_addr =
@@ -655,9 +665,19 @@ module ai_tensor_matrix_core #(
                               invalid_gemv_contract;
     wire invalid_alignment = |src0_base[3:0] || |src1_base[3:0] ||
                              |dst_base[1:0] || (bias_enable && |bias_base[1:0]);
+    wire invalid_accumulate = accumulate &&
+        (((op_mode != OP_TENSOR_GEMM) && (op_mode != OP_TENSOR_BATCH_GEMM)) ||
+         |dst_base[3:0] ||
+         ((instance_count > 32'd1) && |dst_batch_stride[3:0]));
     wire last_k_group = (k_group_r == k_words_r - 1'b1);
     wire watchdog_expired = busy && (watchdog_limit_r != 0) &&
                             (cycle_count >= watchdog_limit_r);
+    wire acc_read_request = acc_mode_r && (state_r == ST_WRITE) &&
+        (acc_phase_r == 2'd0) && !prefetch_issue_active &&
+        (read_outstanding_count < MAX_OUTSTANDING_READS) &&
+        !abort && !watchdog_expired && !banked_response_fault &&
+        !banked_response_context_fault;
+    wire acc_read_issue = acc_read_request && banked_ready;
     wire gemv_b_initial_copy =
         ((((state_r == ST_A_REQ) && gemv_a_line_reuse) ||
           ((state_r == ST_A_WAIT) && (read_outstanding_next == 0))) &&
@@ -711,6 +731,7 @@ module ai_tensor_matrix_core #(
                                 !watchdog_expired;
     wire output_write_accepted = fused_pingpong ? fused_pingpong_commit :
                                 (line_store_eligible && line_ready &&
+                                  acc_line_ready_to_write &&
                                   (!fused_requant_output || fused_commit_pending_r)) ||
                                  (!line_store_eligible && scalar_output_valid &&
                                   spad_ready);
@@ -763,6 +784,13 @@ module ai_tensor_matrix_core #(
         post_process_matrix(write_acc2,write_bias2,scale_shift_r,activation_r);
     wire [31:0] write_result3 =
         post_process_matrix(write_acc3,write_bias3,scale_shift_r,activation_r);
+    // Accumulate epilogue: one old-C line is read through the banked port
+    // (phase 0 -> 1), captured on its response (1 -> 2), then the saturated
+    // sums are written as one line (2 -> 0). Only line stores are used.
+    wire [31:0] acc_sum0 = sat_add_i32(acc_old_r[31:0],   write_result0);
+    wire [31:0] acc_sum1 = sat_add_i32(acc_old_r[63:32],  write_result1);
+    wire [31:0] acc_sum2 = sat_add_i32(acc_old_r[95:64],  write_result2);
+    wire [31:0] acc_sum3 = sat_add_i32(acc_old_r[127:96], write_result3);
     wire [31:0] scalar_write_result =
         (write_lane_r == 2'd0) ? write_result0 :
         (write_lane_r == 2'd1) ? write_result1 :
@@ -860,6 +888,21 @@ module ai_tensor_matrix_core #(
         end
     endfunction
 
+    function [31:0] sat_add_i32;
+        input [31:0] a;
+        input [31:0] b;
+        reg signed [32:0] sum;
+        begin
+            sum = {a[31],a} + {b[31],b};
+            if (sum > 33'sd2147483647)
+                sat_add_i32 = 32'h7fff_ffff;
+            else if (sum < -33'sd2147483648)
+                sat_add_i32 = 32'h8000_0000;
+            else
+                sat_add_i32 = sum[31:0];
+        end
+    endfunction
+
     function signed [63:0] gemv_reduced_accumulator;
         input integer logical_row;
         input integer logical_col;
@@ -928,6 +971,9 @@ module ai_tensor_matrix_core #(
                      !banked_response_context_fault) begin
             banked_read_valid = 1'b1;
             banked_addr = b_read_addr;
+        end else if (acc_read_request) begin
+            banked_read_valid = 1'b1;
+            banked_addr = write_row_addr;
         end
 
         spad_valid = (state_r == ST_BIAS_REQ) ||
@@ -940,11 +986,13 @@ module ai_tensor_matrix_core #(
         spad_wdata = scalar_write_result;
 
         line_valid = (state_r == ST_WRITE) && line_store_eligible &&
+                     acc_line_ready_to_write &&
                      (!fused_requant_output || fused_commit_pending_r);
         line_addr = fused_linearized_output_r ? fused_linearized_line_addr :
                     write_row_addr;
         line_wdata = fused_linearized_output_r ? fused_linearized_line_data :
                      (fused_requant_output ? fused_line_buffer_r :
+                      acc_mode_r ? {acc_sum3,acc_sum2,acc_sum1,acc_sum0} :
                       {write_result3,write_result2,write_result1,write_result0});
         if (fused_pingpong) begin
             line_valid = (state_r == ST_WRITE) &&
@@ -1216,6 +1264,34 @@ module ai_tensor_matrix_core #(
         end
     end
 
+    // Accumulate-epilogue sequencing. A read of the old C line is issued in
+    // ST_WRITE, its banked response (tagged in the metadata FIFO) is
+    // captured, and only then is the summed line offered to the line port.
+    always @(posedge clk or negedge resetn) begin
+        if (!resetn) begin
+            acc_mode_r <= 1'b0;
+            acc_phase_r <= 2'd0;
+            acc_old_r <= 128'd0;
+        end else begin
+            if ((state_r == ST_IDLE) && start)
+                acc_mode_r <= accumulate && !invalid_accumulate;
+            if (state_r != ST_WRITE) begin
+                acc_phase_r <= 2'd0;
+            end else begin
+                case (acc_phase_r)
+                    2'd0: if (acc_read_issue) acc_phase_r <= 2'd1;
+                    2'd1: if (read_fifo_pop && response_acc &&
+                              !bank_response_has_parity_error) begin
+                        acc_old_r <= {bank3_data,bank2_data,bank1_data,bank0_data};
+                        acc_phase_r <= 2'd2;
+                    end
+                    2'd2: if (output_write_accepted) acc_phase_r <= 2'd0;
+                    default: acc_phase_r <= 2'd0;
+                endcase
+            end
+        end
+    end
+
     always @(posedge clk or negedge resetn) begin
         if (!resetn) begin
             state_r <= ST_IDLE;
@@ -1400,7 +1476,7 @@ module ai_tensor_matrix_core #(
             // response arrives. A response can coincide with a new accept.
             if (read_fifo_push) begin
                 read_response_meta_fifo[read_fifo_wr_ptr] <= {
-                    banked_request_buffer, banked_request_is_b,
+                    acc_read_issue, banked_request_buffer, banked_request_is_b,
                     banked_request_group, banked_request_k_group,
                     col_tile_r, banked_addr
                 };
@@ -1414,7 +1490,7 @@ module ai_tensor_matrix_core #(
                 default: read_outstanding_count <= read_outstanding_count;
             endcase
 
-            if (read_fifo_pop && !bank_response_has_parity_error &&
+            if (read_fifo_pop && !response_acc && !bank_response_has_parity_error &&
                 !banked_response_context_fault &&
                 (state_r != ST_ERROR_DRAIN) && !abort &&
                 !watchdog_expired) begin
@@ -1730,7 +1806,7 @@ module ai_tensor_matrix_core #(
                                 (ARRAY_SIZE == 16) &&
                                 ((op_mode == OP_TENSOR_GEMM) ||
                                  (op_mode == OP_TENSOR_BATCH_GEMM)) &&
-                                !bias_enable &&
+                                !bias_enable && !accumulate &&
                                 (m_size[3:0] == 4'd0) &&
                                 (n_size[3:0] == 4'd0) &&
                                 (dst_base[3:0] == 4'd0) &&
@@ -1836,7 +1912,7 @@ module ai_tensor_matrix_core #(
                                 error_code <= ERR_OP;
                                 state_r <= ST_ERROR;
                             end else if (invalid_dimensions || invalid_alignment ||
-                                invalid_gemv_contract ||
+                                invalid_gemv_contract || invalid_accumulate ||
                                 invalid_tile_forward_contract ||
                                 ((op_mode == OP_TENSOR_GEMM_REQUANT_TILE_A) &&
                                  ((|dst_base[3:0]) ||

@@ -2687,6 +2687,22 @@ module tb_ai_accel_smoke;
     // free slots while earlier ones execute, completions are checked and
     // consumed as they retire, and checkpoint records (last descriptor of the
     // segment only) are compared after the segment drains.
+    // Compiled-program v3 engine-occupancy profile (cycles while busy).
+    // Counted only while v3_prof_on; matrix=engine 3, sfu=4, kv=6, dma=qdma.
+    reg v3_prof_on = 1'b0;
+    longint unsigned v3p_matrix = 0, v3p_sfu = 0, v3p_kv = 0, v3p_dma = 0,
+                     v3p_dma_only = 0, v3p_matrix_dma = 0, v3p_idle = 0, v3p_cycles = 0;
+    always @(posedge aclk) if (v3_prof_on) begin
+        v3p_cycles <= v3p_cycles + 1;
+        if (dut.engine_busy[3]) v3p_matrix <= v3p_matrix + 1;
+        if (dut.engine_busy[4]) v3p_sfu <= v3p_sfu + 1;
+        if (dut.engine_busy[6]) v3p_kv <= v3p_kv + 1;
+        if (dut.qdma_busy) v3p_dma <= v3p_dma + 1;
+        if (dut.qdma_busy && !(|dut.engine_busy)) v3p_dma_only <= v3p_dma_only + 1;
+        if (dut.qdma_busy && dut.engine_busy[3]) v3p_matrix_dma <= v3p_matrix_dma + 1;
+        if (!dut.qdma_busy && !(|dut.engine_busy)) v3p_idle <= v3p_idle + 1;
+    end
+
     task run_compiled_program_v3;
         input integer seg_timing;
         reg [31:0] dw [0:15];
@@ -2696,6 +2712,7 @@ module tb_ai_accel_smoke;
         integer cur, nseg, seg, ndma, ndesc, nck, i, w, qsize, dbase, cbase, k, nb;
         integer cum, seg_start, pub, obs, consumed, last_ct, delta, poll, nfinal, slot, tail;
         integer t_stage, t_total, t0, ts, total_desc, total_ck, bad, qdma, qdma_st, dma_bytes;
+        longint unsigned p_mat0, p_sfu0, p_kv0, p_dma0, p_do0, p_id0;
         begin
             qsize = cp_prog[2]; dbase = cp_prog[3]; cbase = cp_prog[4]; nseg = cp_prog[6];
             // CMD_CTRL[0]=1 puts the ring in DDR at dbase: the host writes its
@@ -2721,6 +2738,9 @@ module tb_ai_accel_smoke;
                 ndma = cp_prog[cur]; ndesc = cp_prog[cur + 1]; nck = cp_prog[cur + 2]; cur = cur + 3;
                 if (ndma != 0) $fatal(1, "v3 program segment %0d has fenced DMA entries", seg);
                 t0 = transformer_top_cycle_counter;
+                p_mat0 = v3p_matrix; p_sfu0 = v3p_sfu; p_kv0 = v3p_kv;
+                p_dma0 = v3p_dma; p_do0 = v3p_dma_only; p_id0 = v3p_idle;
+                v3_prof_on = 1'b1;
                 seg_start = cum % qsize;
                 pub = 0; obs = 0; consumed = 0; last_ct = seg_start; poll = 0;
                 while (obs < ndesc) begin
@@ -2790,9 +2810,12 @@ module tb_ai_accel_smoke;
                     if (!idle_ok) $fatal(1, "compiled v3 segment %0d did not retire", seg);
                 end
                 t_total = t_total + (transformer_top_cycle_counter - t0);
+                v3_prof_on = 1'b0;
                 if (seg_timing)
-                    $display("COMPILED_SEGMENT seg=%0d descriptors=%0d compute_cycles=%0d",
-                             seg, ndesc, transformer_top_cycle_counter - t0);
+                    $display("COMPILED_SEGMENT seg=%0d descriptors=%0d compute_cycles=%0d matrix_busy=%0d sfu_busy=%0d kv_busy=%0d dma_busy=%0d dma_only=%0d idle=%0d",
+                             seg, ndesc, transformer_top_cycle_counter - t0,
+                             v3p_matrix - p_mat0, v3p_sfu - p_sfu0, v3p_kv - p_kv0,
+                             v3p_dma - p_dma0, v3p_dma_only - p_do0, v3p_idle - p_id0);
                 cur = cur + ndesc * 16;
                 bad = 0;
                 for (i = 0; i < nck; i = i + 1) begin
@@ -2824,6 +2847,9 @@ module tb_ai_accel_smoke;
             if (bad) $fatal(1, "COMPILED_FINAL_FAIL mismatches=%0d/%0d", bad, nfinal);
             $display("COMPILED_PROGRAM_PASS format=3 segments=%0d descriptors=%0d queued_dma=%0d queued_dma_stores=%0d queued_dma_bytes=%0d checkpoint_words=%0d final_words=%0d end_to_end_cycles=%0d host_publish_cycles=%0d cmdq=ddr dma_fenced_cycles=0 host_spad_data_writes=0",
                      nseg, total_desc, qdma, qdma_st, dma_bytes, total_ck, nfinal, t_total, t_stage);
+            $display("COMPILED_V3_PROFILE cycles=%0d matrix_busy=%0d sfu_busy=%0d kv_busy=%0d dma_busy=%0d matrix_and_dma=%0d dma_only=%0d idle=%0d",
+                     v3p_cycles, v3p_matrix, v3p_sfu, v3p_kv, v3p_dma, v3p_matrix_dma,
+                     v3p_dma_only, v3p_idle);
         end
     endtask
 
@@ -7679,7 +7705,7 @@ module tb_ai_accel_smoke;
         expect_read(FPGA_AXI_BASE + REG_VERSION, 32'h1000_000a,
                     "mapped AXI aperture version");
         expect_read(REG_ABI_INFO, 32'h1040_0407, "ABI v7.4 sizes");
-        expect_read(REG_CAP2, 32'h0000_01ff, "architectural capabilities");
+        expect_read(REG_CAP2, 32'h0000_07ff, "architectural capabilities");
         expect_read(REG_ERROR_INFO, 32'h0000_0000, "reset error source");
         axi_write(REG_DMA_EXT_HI, 32'h0000_0001);
         expect_read(REG_DMA_EXT_HI, 32'h0000_0001, "DMA 64-bit address high");

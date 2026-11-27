@@ -125,3 +125,72 @@ def words_i32(x: np.ndarray) -> np.ndarray:
 def pack_lut(lut: np.ndarray) -> np.ndarray:
     v = (lut.astype(np.int64) & 0xFF).reshape(64, 4)
     return v[:, 0] | (v[:, 1] << 8) | (v[:, 2] << 16) | (v[:, 3] << 24)
+
+
+# ------------------------------------------------ INT4 block-exponent stream
+# 0x60 flags[1]: a 256-byte super-block = one shift beat (32 x 4-bit, line
+# j uses nibble j) + 15 data beats; data beat b expands into lines 2b, 2b+1
+# (low / high 64 bits), byte i = sat8(sext4(nibble i) << min(shift, 4)).
+I4_LINES_PER_SB = 30
+
+
+def i4_line_shift(line: np.ndarray) -> int:
+    """Smallest shift s <= 4 with line == (line >> s) << s and line >> s in
+    [-8, 7]; raises if the INT8 line is not an INT4 block-exponent image."""
+    v = np.asarray(line, dtype=np.int64)
+    for s in range(5):
+        q = v >> s
+        if np.all((q << s) == v) and q.min() >= -8 and q.max() <= 7:
+            return s
+    raise ValueError("line is not representable as INT4 << shift")
+
+
+def pack_i4_stream(lines: np.ndarray) -> np.ndarray:
+    """INT8 SPAD lines [n, 16] -> DDR words of INT4 super-blocks (the line
+    count is padded to a multiple of 30 with zero lines)."""
+    lines = np.asarray(lines, dtype=np.int64).reshape(-1, 16)
+    n_sb = -(-len(lines) // I4_LINES_PER_SB)
+    pad = np.zeros((n_sb * I4_LINES_PER_SB - len(lines), 16), np.int64)
+    lines = np.concatenate([lines, pad])
+    out = np.zeros((n_sb, 16, 4), np.int64)            # [sb, beat, word]
+    for sb in range(n_sb):
+        blk = lines[sb * I4_LINES_PER_SB:(sb + 1) * I4_LINES_PER_SB]
+        shifts = [i4_line_shift(l) for l in blk]
+        sh_bits = 0
+        for j, sv in enumerate(shifts):
+            sh_bits |= sv << (4 * j)
+        for w in range(4):
+            out[sb, 0, w] = (sh_bits >> (32 * w)) & 0xFFFFFFFF
+        for b in range(15):
+            nib = 0
+            for h in range(2):
+                l = blk[2 * b + h] >> shifts[2 * b + h]
+                for i in range(16):
+                    nib |= (int(l[i]) & 0xF) << (64 * h + 4 * i)
+            for w in range(4):
+                out[sb, 1 + b, w] = (nib >> (32 * w)) & 0xFFFFFFFF
+    return out.reshape(-1)
+
+
+def expand_i4_stream(words: np.ndarray) -> np.ndarray:
+    """Reference hardware expansion: DDR words -> INT8 SPAD lines [n, 16]."""
+    w = np.asarray(words, dtype=np.int64).reshape(-1, 16, 4) & 0xFFFFFFFF
+    lines = []
+    for sb in w:
+        sh = sum(int(sb[0, k]) << (32 * k) for k in range(4))
+        for b in range(15):
+            beat = sum(int(sb[1 + b, k]) << (32 * k) for k in range(4))
+            for h in range(2):
+                j = 2 * b + h
+                s = min((sh >> (4 * j)) & 0xF, 4)
+                half = (beat >> (64 * h)) & ((1 << 64) - 1)
+                nib = np.array([(half >> (4 * i)) & 0xF for i in range(16)], np.int64)
+                nib = np.where(nib >= 8, nib - 16, nib)
+                lines.append(np.clip(nib << s, -128, 127))
+    return np.array(lines, np.int64).reshape(-1, 16)
+
+
+def lines_to_words(lines: np.ndarray) -> np.ndarray:
+    """INT8 lines [n, 16] -> little-endian INT32 words [n * 4]."""
+    b = (np.asarray(lines, dtype=np.int64).reshape(-1, 4) & 0xFF)
+    return b[:, 0] | (b[:, 1] << 8) | (b[:, 2] << 16) | (b[:, 3] << 24)

@@ -75,7 +75,10 @@ module ai_tensor_sfu_core #(
 `else
     localparam integer FAST_PATH_ENABLE = FAST_PATH_ENABLE_P;
 `endif
-    localparam integer FAST_CACHE_DEPTH = 256;
+    // Round 38: 1024-entry row cache so LayerNorm rows up to D=1024 (GPT-2
+    // D=768) stay on the stream path; Softmax keeps its Round 34 256 limit.
+    localparam integer FAST_CACHE_DEPTH = 1024;
+    localparam integer FAST_SOFTMAX_MAX = 256;
     localparam [7:0] OP_SOFTMAX_Q15 = 8'h32;
     localparam [7:0] OP_RMSNORM_Q15 = 8'h33;
     localparam [7:0] OP_RESIDUAL_I32= 8'h34;
@@ -349,6 +352,7 @@ module ai_tensor_sfu_core #(
     wire fp_dst_src1_ok = (dst_base == src1_base) ||
                           fp_disjoint(dst_base, fp_dst_bytes, src1_base, fp_len_bytes);
     wire fp_row_fits = (length <= FAST_CACHE_DEPTH);
+    wire fp_softmax_fits = (length <= FAST_SOFTMAX_MAX);
     wire fp_common_ok = (FAST_PATH_ENABLE != 0) && (length != 0) &&
                         !input_alignment_error && !pack_tile_config_error &&
                         !repack_config_error && !input_tile_a;
@@ -362,10 +366,10 @@ module ai_tensor_sfu_core #(
          ((src1_base == 0) || fp_disjoint(dst_base, fp_len_bytes, src1_base, fp_len_bytes)) &&
          (!beta_enable || fp_disjoint(dst_base, fp_len_bytes, beta_base, fp_len_bytes))) ||
         (((op_mode == OP_SOFTMAX_Q15) || (op_mode == OP_CAUSAL_SOFTMAX_Q15)) &&
-         fp_row_fits && fp_dst_src0_ok));
+         fp_softmax_fits && fp_dst_src0_ok));
     wire stream_start = start && (state_r == ST_IDLE) && !s_busy && stream_eligible;
 
-    ai_tensor_sfu_stream #(.CACHE_DEPTH(FAST_CACHE_DEPTH), .CACHE_AW(8)) stream_u(
+    ai_tensor_sfu_stream #(.CACHE_DEPTH(FAST_CACHE_DEPTH), .CACHE_AW(10)) stream_u(
         .clk(clk), .resetn(resetn), .start(stream_start), .abort(abort),
         .op_mode(op_mode), .src0_base(src0_base), .src1_base(src1_base),
         .beta_base(beta_base), .beta_enable(beta_enable), .pack_enable(pack_enable),

@@ -33,6 +33,13 @@ module ai_axi128_dma #(
     input  wire         gather_enable,
     input  wire [31:0]  gather_index_base,
     input  wire [2:0]   read_outstanding,
+    // INT4 block-exponent expansion (loads only, 1D): every 256-byte
+    // super-block is one exponent beat (32 x 4-bit shifts) plus 15 data beats
+    // of packed signed INT4. Each data beat becomes two 16-byte SPAD lines,
+    // byte i = sat8(sext4(nibble i) << shift[line]). length_words counts
+    // source words and must be a multiple of 64; ext_addr is 256-byte and
+    // spad_addr 16-byte aligned. One super-block writes 30 lines (480 bytes).
+    input  wire         expand_i4,
     output reg          busy,
     output reg          done,
     output reg          error,
@@ -117,6 +124,7 @@ module ai_axi128_dma #(
                      ST_ABORT_READ=9;
 
     reg [3:0] state_r;
+    reg       expand_r;
     reg [2:0] read_limit_r;
     reg [2:0] rd_highwater_r;
     reg       abort_pending_r;
@@ -218,10 +226,42 @@ module ai_axi128_dma #(
 
     // Scratchpad request selection is stateless.  It is kept out of the
     // lifecycle FSM so line/scalar transfer eligibility is locally visible.
+    // INT4 expansion drain: rd_slot_word_index_r counts half beats. The
+    // super-block exponent beat (position 0) is read in place from the slot
+    // buffer while its data beats drain; it is skipped without a SPAD write.
+    wire [15:0] exp_half_idx = rd_slot_word_index_r[rd_drain_slot_comb];
+    wire [14:0] exp_beat_idx = exp_half_idx[15:1];
+    wire [3:0]  exp_pos = exp_beat_idx[3:0];
+    wire        exp_is_shift_beat = (exp_pos == 4'd0);
+    wire [4:0]  exp_line_in_sb = {exp_pos - 4'd1, 1'b0} + {4'd0, exp_half_idx[0]};
+    wire [127:0] exp_shift_beat = rd_data_r[(rd_drain_slot_comb * MAX_BURST_BEATS) +
+                                            {exp_beat_idx[14:4], 4'd0}];
+    wire [3:0]  exp_shift_raw = exp_shift_beat[{exp_line_in_sb, 2'b00} +: 4];
+    wire [2:0]  exp_shift = (exp_shift_raw > 4'd4) ? 3'd4 : exp_shift_raw[2:0];
+    wire [BEAT_W-1:0] rd_drain_beat_std;
+    assign rd_drain_beat_comb = expand_r ? exp_beat_idx[BEAT_W-1:0] : rd_drain_beat_std;
     assign rd_drain_data_comb = rd_data_r[
         (rd_drain_slot_comb * MAX_BURST_BEATS) + rd_drain_beat_comb];
+    wire [63:0] exp_src = exp_half_idx[0] ? rd_drain_data_comb[127:64] :
+                                           rd_drain_data_comb[63:0];
+    reg  [127:0] exp_line_data;
+    integer exp_i;
+    reg signed [11:0] exp_wide;
+    always @(*) begin
+        exp_line_data = 128'd0;
+        for (exp_i = 0; exp_i < 16; exp_i = exp_i + 1) begin
+            exp_wide = $signed({{8{exp_src[exp_i*4+3]}}, exp_src[exp_i*4 +: 4]}) <<< exp_shift;
+            exp_line_data[exp_i*8 +: 8] = (exp_wide > 12'sd127) ? 8'h7f :
+                                          (exp_wide < -12'sd128) ? 8'h80 : exp_wide[7:0];
+        end
+    end
+    wire [31:0] exp_line_addr = rd_slot_spad_r[rd_drain_slot_comb] +
+        (({17'd0, exp_beat_idx[14:4]} * 32'd480) + ({27'd0, exp_line_in_sb} << 4));
+    wire exp_line_valid = expand_r && rd_drain_found_comb && !exp_is_shift_beat;
     ai_dma_spad_transfer_adapter #(.MAX_BURST_BEATS(MAX_BURST_BEATS)) spad_transfer_adapter_u(
         .read_active(state_r == ST_READ), .rd_drain_found(rd_drain_found_comb),
+        .rd_expand(expand_r), .exp_line_valid(exp_line_valid),
+        .exp_line_addr(exp_line_addr), .exp_line_data(exp_line_data),
         .rd_word_index(rd_slot_word_index_r[rd_drain_slot_comb]),
         .rd_words(rd_slot_words_r[rd_drain_slot_comb]),
         .rd_spad_base(rd_slot_spad_r[rd_drain_slot_comb]),
@@ -233,7 +273,7 @@ module ai_axi128_dma #(
         .write_gather_active(state_r == ST_WRITE_GATHER),
         .wr_read_pending(wr_read_pending_r), .wr_burst_words(wr_burst_words_r),
         .wr_word_index(wr_word_index_r), .wr_spad_base(plan_spad_r),
-        .rd_beat_index(rd_drain_beat_comb), .rd_line_eligible(rd_drain_line_comb),
+        .rd_beat_index(rd_drain_beat_std), .rd_line_eligible(rd_drain_line_comb),
         .wr_line_eligible(wr_gather_line_comb),
         .spad_valid(spad_valid), .spad_write(spad_write), .spad_addr(spad_addr_o),
         .spad_wdata(spad_wdata), .spad_line_valid(spad_line_valid),
@@ -281,6 +321,7 @@ module ai_axi128_dma #(
     always @(posedge clk or negedge resetn) begin
       if (!resetn) begin
         state_r <= ST_IDLE;
+        expand_r <= 1'b0;
         busy <= 0;
         done <= 0;
         error <= 0;
@@ -413,12 +454,17 @@ module ai_axi128_dma #(
                      (ext_stride[1:0] != 0 || spad_stride[1:0] != 0)) ||
                     (gather_enable &&
                      (store || row_count == 0 ||
-                      gather_index_base[1:0] != 0))) begin
+                      gather_index_base[1:0] != 0)) ||
+                    (expand_i4 &&
+                     (store || gather_enable || row_count != 0 ||
+                      ext_addr[7:0] != 0 || length_words[5:0] != 0 ||
+                      spad_addr[3:0] != 0 || (MAX_BURST_BEATS % 16) != 0))) begin
                   error <= 1'b1;
                   error_code <= ERR_CONFIG;
                   state_r <= ST_ERROR;
                 end else begin
                   busy <= 1'b1;
+                  expand_r <= expand_i4;
                   rd_highwater_r <= 0;
                   rd_slot_valid_r <= 0;
                   rd_slot_complete_r <= 0;
@@ -484,7 +530,8 @@ module ai_axi128_dma #(
                 rd_slot_complete_r[m_axi_arid-READ_ID_FIRST] <= 1'b0;
                 rd_slot_expected_r[m_axi_arid-READ_ID_FIRST] <= m_axi_arlen + 1'b1;
                 rd_slot_received_r[m_axi_arid-READ_ID_FIRST] <= 0;
-                rd_slot_words_r[m_axi_arid-READ_ID_FIRST] <= plan_words_comb;
+                rd_slot_words_r[m_axi_arid-READ_ID_FIRST] <=
+                    expand_r ? (plan_words_comb >> 1) : plan_words_comb;
                 rd_slot_word_index_r[m_axi_arid-READ_ID_FIRST] <= 0;
                 rd_slot_spad_r[m_axi_arid-READ_ID_FIRST] <= plan_spad_r;
                 rd_slot_wide_r[m_axi_arid-READ_ID_FIRST] <=
@@ -514,8 +561,9 @@ module ai_axi128_dma #(
                 end else begin
                   plan_remaining_r <= plan_remaining_r - plan_words_comb;
                   plan_ext_r <= plan_ext_r + plan_bytes_comb;
-                  plan_spad_r <= plan_spad_r +
-                                 ({16'd0, plan_words_comb} << 2);
+                  plan_spad_r <= plan_spad_r + (expand_r ?
+                                 ({22'd0, plan_words_comb[15:6]} * 32'd480) :
+                                 ({16'd0, plan_words_comb} << 2));
                 end
               end
 
@@ -549,7 +597,18 @@ module ai_axi128_dma #(
                 end
               end
 
-              if (rd_drain_line_comb && spad_line_ready) begin
+              if (expand_r) begin
+                if (rd_drain_found_comb && (exp_is_shift_beat || spad_line_ready)) begin
+                  if (exp_half_idx + (exp_is_shift_beat ? 16'd2 : 16'd1) >=
+                      rd_slot_words_r[rd_drain_slot_comb]) begin
+                    rd_slot_complete_r[rd_drain_slot_comb] <= 1'b0;
+                    rd_slot_valid_r[rd_drain_slot_comb] <= 1'b0;
+                  end else begin
+                    rd_slot_word_index_r[rd_drain_slot_comb] <=
+                        exp_half_idx + (exp_is_shift_beat ? 16'd2 : 16'd1);
+                  end
+                end
+              end else if (rd_drain_line_comb && spad_line_ready) begin
                 if (rd_slot_word_index_r[rd_drain_slot_comb] + 4 >=
                     rd_slot_words_r[rd_drain_slot_comb]) begin
                   rd_slot_complete_r[rd_drain_slot_comb] <= 1'b0;

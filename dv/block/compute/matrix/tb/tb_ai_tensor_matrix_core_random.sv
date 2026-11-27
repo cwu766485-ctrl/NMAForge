@@ -52,6 +52,11 @@ module tb_ai_tensor_matrix_core_random;
   reg transpose_a=0,transpose_b=0,bias_enable=0;
   reg [4:0] scale_shift=0;
   reg [1:0] activation=0;
+  reg accumulate=0;
+  // Accumulate epilogue: banked reads at or above DST_BASE return the live
+  // output image so the DUT's read-add-write sees the old C words.
+  reg acc_read_output=0;
+  integer acc_case_count=0, acc_fault_count=0, acc_sat_hits=0;
   reg [31:0] aux0=0;
   reg [31:0] watchdog_limit=0;
 
@@ -253,6 +258,7 @@ module tb_ai_tensor_matrix_core_random;
     .src0_batch_stride(src0_batch_stride),.src1_batch_stride(src1_batch_stride),
     .dst_batch_stride(dst_batch_stride),.transpose_a(transpose_a),.transpose_b(transpose_b),
     .bias_enable(bias_enable),.scale_shift(scale_shift),.activation(activation),
+    .accumulate(accumulate),
     .aux0(aux0),
     .watchdog_limit(watchdog_limit),
     .bank0_data(bank0_data),.bank1_data(bank1_data),.bank2_data(bank2_data),.bank3_data(bank3_data),
@@ -460,12 +466,20 @@ module tb_ai_tensor_matrix_core_random;
           $fatal(1,"banked responder queue overflow state=%0d addr=%08x",
                  dut.state_r,banked_addr);
         bank_response_data_fifo[bank_response_wr_ptr][0]<=
+            (acc_read_output && (banked_addr>=DST_BASE)) ?
+            output_mem[((banked_addr>>2)&32'hfffc)+0] :
             bank_mem[0][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][1]<=
+            (acc_read_output && (banked_addr>=DST_BASE)) ?
+            output_mem[((banked_addr>>2)&32'hfffc)+1] :
             bank_mem[1][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][2]<=
+            (acc_read_output && (banked_addr>=DST_BASE)) ?
+            output_mem[((banked_addr>>2)&32'hfffc)+2] :
             bank_mem[2][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][3]<=
+            (acc_read_output && (banked_addr>=DST_BASE)) ?
+            output_mem[((banked_addr>>2)&32'hfffc)+3] :
             bank_mem[3][(banked_addr>>4)&13'h1fff];
         bank_response_issue_fifo[bank_response_wr_ptr]<=bank_read_count;
         bank_response_delay_fifo[bank_response_wr_ptr]<=
@@ -1593,6 +1607,69 @@ module tb_ai_tensor_matrix_core_random;
         dut.banked_request_is_b,banked_addr,dut.response_operand_b,
         dut.response_request_addr);
   end
+
+  // GEMM accumulate epilogue (accumulate=1 on 0x30/0x31):
+  // C = sat32(C_old + post_process(A*B + bias)). Old C words are seeded
+  // with values near both INT32 limits so saturation is exercised.
+  function automatic [31:0] ref_sat_add(input [31:0] a, input [31:0] b);
+    reg signed [32:0] sum;
+    begin
+      sum={a[31],a}+{b[31],b};
+      if(sum>33'sd2147483647) ref_sat_add=32'h7fff_ffff;
+      else if(sum< -33'sd2147483648) ref_sat_add=32'h8000_0000;
+      else ref_sat_add=sum[31:0];
+    end
+  endfunction
+
+  task automatic run_accumulate_case(
+      input integer case_id,input integer m,input integer n,input integer kw,
+      input integer batches,input integer use_bias,input integer shift,input integer act);
+    integer ii,rr,cc,local_word,sel,dst_stride_words;
+    reg [31:0] old_value,exp_value;
+    begin
+      prepare_case(m,n,kw,batches,0,0,use_bias,shift,act,0,0);
+      dst_stride_words=m*n;
+      for(ii=0;ii<batches;ii=ii+1)
+        for(rr=0;rr<m;rr=rr+1)
+          for(cc=0;cc<n;cc=cc+1) begin
+            local_word=(dst_base>>2)+ii*dst_stride_words+rr*n+cc;
+            sel=$unsigned($random(rand_state))%4;
+            old_value=(sel==0)?(32'h7fff_fff0+($unsigned($random(rand_state))%16)):
+                      (sel==1)?(32'h8000_0000+($unsigned($random(rand_state))%16)):
+                      $random(rand_state)%100000;
+            exp_value=ref_sat_add(old_value,expected_mem[local_word]);
+            if(exp_value==32'h7fff_ffff || exp_value==32'h8000_0000)
+              acc_sat_hits=acc_sat_hits+1;
+            output_mem[local_word]=old_value;
+            expected_mem[local_word]=exp_value;
+          end
+      accumulate=1;acc_read_output=1;
+      launch_and_wait();
+      accumulate=0;acc_read_output=0;
+      if(error || error_code!==0)
+        $fatal(1,"matrix accumulate case %0d unexpected error=%b code=%0d",case_id,error,error_code);
+      if(element_count!==(m*n*batches))
+        $fatal(1,"matrix accumulate case %0d elements=%0d expected=%0d",
+               case_id,element_count,m*n*batches);
+      if(line_write_count!==(m*batches*(n/4)) || scalar_write_count!==0)
+        $fatal(1,"matrix accumulate case %0d writes line=%0d scalar=%0d",
+               case_id,line_write_count,scalar_write_count);
+      for(ii=0;ii<batches;ii=ii+1)
+        for(rr=0;rr<m;rr=rr+1)
+          for(cc=0;cc<n;cc=cc+1) begin
+            local_word=(dst_base>>2)+ii*dst_stride_words+rr*n+cc;
+            if(output_mem[local_word]!==expected_mem[local_word])
+              $fatal(1,"matrix accumulate case %0d batch=%0d row=%0d col=%0d got=%08x exp=%08x",
+                     case_id,ii,rr,cc,output_mem[local_word],expected_mem[local_word]);
+          end
+      if(bank_read_count!=bank_response_count || pending_bank)
+        $fatal(1,"matrix accumulate case %0d read drain %0d/%0d",case_id,
+               bank_read_count,bank_response_count);
+      acc_case_count=acc_case_count+1;
+      $display("MATRIX_CORE_ACC_CASE_PASS id=%0d shape_mnk=%0d,%0d,%0d batches=%0d bias=%0d shift=%0d act=%0d cycles=%0d",
+               case_id,m,n,kw*4,batches,use_bias,shift,act,cycle_count);
+    end
+  endtask
 
   task automatic check_valid_case(input integer case_id);
     integer expected_line_writes,expected_scalar_writes;
@@ -2814,6 +2891,24 @@ module tb_ai_tensor_matrix_core_random;
              line_full_strobe_checks,line_stall_stability_checks,
              matrix_unaligned_fallback_seen,matrix_line_protection_seen);
     run_fused_requant_boundary_case();
+    // Accumulate epilogue: shapes cover single/multi macro tiles, K that
+    // triggers next-K prefetch, bias/shift/ReLU and the 0x31 batch path.
+    run_accumulate_case(0,4,4,1,1,0,0,0);
+    run_accumulate_case(1,16,16,4,1,1,2,0);
+    run_accumulate_case(2,32,48,8,1,1,3,0);
+    run_accumulate_case(3,8,8,2,2,0,1,1);
+    run_accumulate_case(4,16,32,17,1,1,0,0);
+    run_accumulate_case(5,48,16,3,1,0,4,2);
+    if(acc_sat_hits==0) $fatal(1,"matrix accumulate saturation never exercised");
+    // Contract faults: accumulate needs 0x30/0x31 and 16-byte dst rows.
+    simple_fault_setup();accumulate=1;dst_base=DST_BASE+4;
+    check_fault(ERR_CONFIG,60);accumulate=0;acc_fault_count=acc_fault_count+1;
+    prepare_case(4,4,1,1,0,0,0,0,0,0,0);accumulate=1;op_mode=8'h53;
+    check_fault(ERR_CONFIG,61);accumulate=0;acc_fault_count=acc_fault_count+1;
+    prepare_case(8,8,1,2,0,0,0,0,0,1,0);accumulate=1;dst_batch_stride=32'd260;
+    check_fault(ERR_CONFIG,62);accumulate=0;acc_fault_count=acc_fault_count+1;
+    $display("MATRIX_CORE_ACC_PASS cases=%0d faults=%0d saturated_words=%0d golden=bit-exact",
+             acc_case_count,acc_fault_count,acc_sat_hits);
     $display("MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=%0d unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported",
              line_stall_stability_checks);
     $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",

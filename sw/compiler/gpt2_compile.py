@@ -43,7 +43,7 @@ import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from nmaf import intops as I                                   # noqa: E402
-from nmaf.program import Program                               # noqa: E402
+from nmaf.program import FLAG_GEMM_ACC, Program                # noqa: E402
 from cimforge_mapper import (FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A,  # noqa: E402
                              OP_CAUSAL_SOFTMAX, OP_GEMM, OP_GELU, OP_LAYERNORM,
                              OP_REQUANT, OP_RESIDUAL)
@@ -175,11 +175,30 @@ def wq_pow2(w: np.ndarray):
     return np.clip(np.round(w / 2.0 ** ew), -127, 127).astype(np.int64), ew
 
 
+def wq_i4blk(w: np.ndarray):
+    """INT4 block-exponent weight (0x60 flags[1] stream): one power-of-two
+    scale per aligned 4x4 block (= one packed SPAD line), limited to the 5
+    levels [E, E+4] (E = Emax - 4) so the expanded value w4 << (e - E) fits
+    INT8.  Returns the expanded INT8 values and E (w ~= w8 * 2^E)."""
+    K, N = w.shape
+    b = w.reshape(K // 4, 4, N // 4, 4)
+    amax = np.abs(b).max(axis=(1, 3), keepdims=True)
+    e = np.ceil(np.log2(np.maximum(amax, 1e-30) / 7.0))
+    E = int(e.max()) - 4                          # (an MSE-chosen lower base that
+    e = np.maximum(e, E)                          #  clips outlier blocks was worse)
+    w4 = np.clip(np.round(b / 2.0 ** e), -8, 7)
+    w8 = (w4 * 2.0 ** (e - E)).astype(np.int64)
+    return w8.reshape(K, N), E
+
+
 class QuantLayer:
     """Integer constants and shifts for one decoder block."""
 
-    def __init__(self, fm: FloatGpt2, i: int, obs: dict):
+    def __init__(self, fm: FloatGpt2, i: int, obs: dict, int4: frozenset = frozenset()):
         D, H, HD, FF = fm.D, fm.H, fm.HD, fm.FF
+        wq8 = globals()["wq_pow2"]
+        wq_attn = wq_i4blk if "attn" in int4 else wq8
+        wq_ffn = wq_i4blk if "ffn" in int4 else wq8
         self.D, self.H, self.HD, self.FF, self.NC = D, H, HD, FF, FF // CH
         g = lambda n: fm.g(i, n).double().numpy()
         ex = lambda v: p2(float(v) / 127.0)
@@ -206,9 +225,9 @@ class QuantLayer:
         ewo, wo_q = [], []
         for h in range(H):
             cs = slice(h * HD, (h + 1) * HD)
-            wq_, ewq = wq_pow2(w[:, cs] * sc)
-            wk_, ewk = wq_pow2(w[:, D:][:, cs])
-            wv_, ewv = wq_pow2(w[:, 2 * D:][:, cs])
+            wq_, ewq = wq_attn(w[:, cs] * sc)
+            wk_, ewk = wq_attn(w[:, D:][:, cs])
+            wv_, ewv = wq_attn(w[:, 2 * D:][:, cs])
             if e["q"][h] + e["k"][h] > -8:               # Q8.8 scores need 2^(eq+ek) <= 2^-8
                 e["q"][h] = -8 - e["k"][h]
             shq = e["q"][h] - (e["ln1"] + ewq)
@@ -220,7 +239,7 @@ class QuantLayer:
             self.sh_a.append(e["att"][h] - (-7 + e["v"][h]))
             self.bq.append(np.round(b[cs] * sc / 2.0 ** (e["ln1"] + ewq)).astype(np.int64) + half(shq))
             self.bk.append(np.round(b[D:][cs] / 2.0 ** (e["ln1"] + ewk)).astype(np.int64) + half(shk))
-            q_, ew = wq_pow2(wo_f[cs, :])
+            q_, ew = wq_attn(wo_f[cs, :])
             wo_q.append(q_); ewo.append(ew)
         prod = [e["att"][h] + ewo[h] for h in range(H)]
         self.E_o = max(max(prod), -F_RES - MAX_ACC_SHIFT)
@@ -238,14 +257,14 @@ class QuantLayer:
         prod2, w2_q = [], []
         for c in range(self.NC):
             cs = slice(c * CH, (c + 1) * CH)
-            q1, ew1 = wq_pow2(w1[:, cs])
+            q1, ew1 = wq_ffn(w1[:, cs])
             self.w1.append(q1)
             self.b1.append(np.round(b1[cs] / 2.0 ** (e["ln2"] + ew1)).astype(np.int64))
             self.sh_l.append(e["fc1"][c] - (e["ln2"] + ew1))
             codes = np.arange(-128, 128) * 2.0 ** e["fc1"][c]
             self.lut.append(np.clip(np.round(gelu_new_np(codes) / 2.0 ** e["gelu"][c]),
                                     -128, 127).astype(np.int64))
-            q2, ew2 = wq_pow2(w2[cs, :])
+            q2, ew2 = wq_ffn(w2[cs, :])
             w2_q.append(q2); prod2.append(e["gelu"][c] + ew2)
         self.E_2 = max(max(prod2), -F_RES - MAX_ACC_SHIFT)
         self.s_2 = -F_RES - self.E_2
@@ -355,25 +374,39 @@ def head_logits(fm: FloatGpt2, x_int: np.ndarray) -> torch.Tensor:
 
 
 # ------------------------------------------------------------------ emission
+def put_weight(P: Program, name: str, packed_words: np.ndarray, kind: str):
+    """Packed INT8 operand words -> DDR; INT4 block-exponent super-blocks
+    (256-byte aligned) when the program streams this kind of weight as INT4."""
+    if kind in getattr(P, "weight_i4", ()):
+        w = np.asarray(packed_words, np.int64).reshape(-1)
+        b = np.stack([(w >> (8 * k)) & 0xFF for k in range(4)], 1).reshape(-1, 16)
+        P.ddr_put(name, I.pack_i4_stream(np.where(b >= 128, b - 256, b)), align=256)
+    else:
+        P.ddr_put(name, packed_words)
+
+
 def put_layer(P: Program, ql: QuantLayer, li: int, kmax: int):
     """DDR image of one block: weights/biases plus zeroed per-head K/V caches."""
     base, HD = f"L{li}", ql.HD
     P.ddr_put(f"{base}.ln1", np.concatenate(ql.ln1)); P.ddr_put(f"{base}.ln2", np.concatenate(ql.ln2))
     for h in range(ql.H):
-        P.ddr_put(f"{base}.wq{h}", I.pack_b(ql.wq[h])); P.ddr_put(f"{base}.wk{h}", I.pack_b(ql.wk[h]))
-        P.ddr_put(f"{base}.wvt{h}", I.pack_a(ql.wvt[h])); P.ddr_put(f"{base}.wo{h}", I.pack_b(ql.wo[h]))
+        put_weight(P, f"{base}.wq{h}", I.pack_b(ql.wq[h]), "attn")
+        put_weight(P, f"{base}.wk{h}", I.pack_b(ql.wk[h]), "attn")
+        put_weight(P, f"{base}.wvt{h}", I.pack_a(ql.wvt[h]), "attn")
+        put_weight(P, f"{base}.wo{h}", I.pack_b(ql.wo[h]), "attn")
         P.ddr_put(f"{base}.hb{h}", np.concatenate([
             ql.bq[h], ql.bk[h], np.full(kmax, half(ql.sh_v[h])), np.full(kmax, half(ql.sh_s[h])),
             np.full(HD, half(ql.sh_a[h])), ql.bo[h]]))
         P.ddr_put(f"{base}.kc{h}", np.zeros(kmax * HD // 4, np.int64))   # packed-A K [kmax, hd]
         P.ddr_put(f"{base}.vc{h}", np.zeros(kmax * HD // 4, np.int64))   # packed-A V^T [hd, kmax]
     for c in range(ql.NC):
-        P.ddr_put(f"{base}.w1c{c}", I.pack_b(ql.w1[c])); P.ddr_put(f"{base}.w2c{c}", I.pack_b(ql.w2[c]))
+        put_weight(P, f"{base}.w1c{c}", I.pack_b(ql.w1[c]), "ffn")
+        put_weight(P, f"{base}.w2c{c}", I.pack_b(ql.w2[c]), "ffn")
         P.ddr_put(f"{base}.cb{c}", np.concatenate([ql.b1[c], I.pack_lut(ql.lut[c]), ql.b2[c]]))
 
 
 def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, pos0: int,
-               kv: list, kmax: int, tag: str, check: str):
+               kv: list, kmax: int, tag: str, check: str, gemm_acc: bool = True):
     """One block over rows pos0..pos0+T-1 (prefill: all prompt rows; decode: the
     4-token group holding the new token).  K/V caches live in DDR per head."""
     D, H, HD, T = ql.D, ql.H, ql.HD, x_in.shape[0]
@@ -381,6 +414,8 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
     tr = {}
     out = ql.forward(x_in, pos0, kv, tr)
     base, mem = f"{tag}.L{li}", f"L{li}"
+    ai4 = "attn" in getattr(P, "weight_i4", ())
+    fi4 = "ffn" in getattr(P, "weight_i4", ())
 
     def nxt(kind):
         """Rotate through the kind's SPAD slots (one slot each, except two
@@ -403,8 +438,9 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
         return P.emit(name, OP_REQUANT, src, dst, m=m, n=n_, k_or_length=m * n_, flags=flags,
                       shift=shift, aux0=1)
 
-    def gemm(name, a, b, dst, bias, m, n_, k, shift):
-        return P.emit(name, OP_GEMM, a, dst, src1=b, bias=bias, flags=FLAG_BIAS, m=m, n=n_,
+    def gemm(name, a, b, dst, bias, m, n_, k, shift, acc=False):
+        return P.emit(name, OP_GEMM, a, dst, src1=b, bias=bias,
+                      flags=FLAG_BIAS | (FLAG_GEMM_ACC if acc else 0), m=m, n=n_,
                       k_or_length=k // 4, shift=shift, aux0=1)
 
     def resid(name, dst, a, b, shift=0):
@@ -434,7 +470,8 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
         BSR = BVR + kmax * 4
         BAR = BSR + kmax * 4
         BO = BAR + HD * 4
-        P.dma(f"{mem}.wq{h}", wq); P.dma(f"{mem}.wk{h}", wk); P.dma(f"{mem}.hb{h}", hb)
+        P.dma(f"{mem}.wq{h}", wq, expand_i4=ai4); P.dma(f"{mem}.wk{h}", wk, expand_i4=ai4)
+        P.dma(f"{mem}.hb{h}", hb)
         if pos0:
             P.dma(f"{mem}.kc{h}", KC, pos0 * HD // 4)
         gemm(f"{base}.h{h}.q", R["XP"], wq, R["PROJ"], BQ, T, HD, D, ql.sh_q[h])
@@ -442,7 +479,7 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
         gemm(f"{base}.h{h}.k", R["XP"], wk, R["PROJ"], BK, T, HD, D, ql.sh_k[h])
         ik = pack(f"{base}.h{h}.kpack", R["PROJ"], KC + pos0 * HD, T, HD)
         wv, wo = nxt("W"), nxt("W")
-        P.dma(f"{mem}.wvt{h}", wv); P.dma(f"{mem}.wo{h}", wo)
+        P.dma(f"{mem}.wvt{h}", wv, expand_i4=ai4); P.dma(f"{mem}.wo{h}", wo, expand_i4=ai4)
         gemm(f"{base}.h{h}.vt", wv, R["XP"], R["PROJ"], BVR, HD, T, D, ql.sh_v[h])
         iv = pack(f"{base}.h{h}.vtpack", R["PROJ"], R["VT8"], HD, T)
         # V^T group columns -> DDR cache rows (2D store), then the whole cache back.
@@ -456,10 +493,14 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
         pack(f"{base}.h{h}.p8", R["PR"], R["P8"], T, kmax, shift=8, flags=PACK | FLAG7)
         gemm(f"{base}.h{h}.av", R["P8"], VC, R["AVO"], BAR, T, HD, kmax, ql.sh_a[h])
         i_av = pack(f"{base}.h{h}.avpack", R["AVO"], R["AV8"], T, HD)
-        dst = R["ACC"] if h == 0 else R["PART"]
-        idx = gemm(f"{base}.h{h}.wo", R["AV8"], wo, dst, BO, T, D, HD, ql.sh_o[h])
-        if h:
-            idx = resid(f"{base}.h{h}.acc", R["ACC"], R["ACC"], R["PART"])
+        if gemm_acc:            # ACC = sat32(ACC + head output) in the GEMM epilogue
+            idx = gemm(f"{base}.h{h}.wo", R["AV8"], wo, R["ACC"], BO, T, D, HD, ql.sh_o[h],
+                       acc=h > 0)
+        else:
+            dst = R["ACC"] if h == 0 else R["PART"]
+            idx = gemm(f"{base}.h{h}.wo", R["AV8"], wo, dst, BO, T, D, HD, ql.sh_o[h])
+            if h:
+                idx = resid(f"{base}.h{h}.acc", R["ACC"], R["ACC"], R["PART"])
         if dbg and h == 0:
             P.checkpoint(ik, KC, I.pack_a(tr["kc"][:n]))
             P.checkpoint(iv, R["VT8"], I.pack_a(tr["vt8"]))
@@ -479,16 +520,21 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, p
         P.checkpoint(idx, R["XP"], I.pack_a(tr["x2p"]))
     for c in range(ql.NC):
         w1, w2, cb = nxt("W"), nxt("W"), nxt("CB")
-        P.dma(f"{mem}.w1c{c}", w1); P.dma(f"{mem}.w2c{c}", w2); P.dma(f"{mem}.cb{c}", cb)
+        P.dma(f"{mem}.w1c{c}", w1, expand_i4=fi4); P.dma(f"{mem}.w2c{c}", w2, expand_i4=fi4)
+        P.dma(f"{mem}.cb{c}", cb)
         gemm(f"{base}.c{c}.fc1", R["XP"], w1, R["H1"], cb, T, CH, D, 0)
         ig = P.emit(f"{base}.c{c}.gelu", OP_GELU, R["H1"], R["H8"], src1=cb + CH * 4, m=T, n=CH,
                     k_or_length=T * CH, flags=PACK | FLAG7, shift=ql.sh_l[c], aux0=1)
         if dbg and c == 0:
             P.checkpoint(ig, R["H8"], I.pack_a(tr["h8"]))
-        dst = R["ACC"] if c == 0 else R["PART"]
-        gemm(f"{base}.c{c}.fc2", R["H8"], w2, dst, cb + (CH + 64) * 4, T, D, CH, ql.sh_2[c])
-        if c:
-            resid(f"{base}.c{c}.acc", R["ACC"], R["ACC"], R["PART"])
+        if gemm_acc:
+            gemm(f"{base}.c{c}.fc2", R["H8"], w2, R["ACC"], cb + (CH + 64) * 4, T, D, CH,
+                 ql.sh_2[c], acc=c > 0)
+        else:
+            dst = R["ACC"] if c == 0 else R["PART"]
+            gemm(f"{base}.c{c}.fc2", R["H8"], w2, dst, cb + (CH + 64) * 4, T, D, CH, ql.sh_2[c])
+            if c:
+                resid(f"{base}.c{c}.acc", R["ACC"], R["ACC"], R["PART"])
     rescale(f"{base}.ffn", ql.s_2)
     idx = resid(f"{base}.res2", R["X"], R["X"], R["ACC"])
     P.checkpoint(idx, R["X"], I.words_i32(out))
@@ -504,7 +550,10 @@ def allocate(P: Program, T: int, D: int, HD: int, kmax: int, pools: dict | None 
     for nm, sz in (("X", T * D * 4), ("ACC", T * D * 4), ("PART", T * D * 4), ("XP", T * D),
                    ("LNT", 4 * D * 4)):
         R[nm] = P.alloc(nm, sz)
-    sizes = {"W": D * HD, "LN": 2 * D * 4, "HB": (HD + HD + kmax + kmax + HD + D) * 4,
+    w_bytes = D * HD
+    if getattr(P, "weight_i4", ()):                # INT4 streams land in 480-byte super-blocks
+        w_bytes = -(-w_bytes // 480) * 480
+    sizes = {"W": w_bytes, "LN": 2 * D * 4, "HB": (HD + HD + kmax + kmax + HD + D) * 4,
              "CB": (CH + 64 + D) * 4, "KC": kmax * HD, "VC": kmax * HD}
     for kind in ("W", "LN", "HB", "CB"):
         R[kind + "_slots"] = [P.alloc(f"{kind}{i}", sizes[kind]) for i in range(pools[kind])]
@@ -587,6 +636,11 @@ def main():
                     help="program format v3: CMDQ DMA (0x60) overlapped with compute")
     ap.add_argument("--hoist", type=int, default=48,
                     help="max descriptors a DMA load may be moved ahead (--overlap)")
+    ap.add_argument("--int4-weights", choices=("none", "ffn", "all"), default="none",
+                    help="stream these Linear weights as INT4 block-exponent super-blocks "
+                         "(0x60 flags[1]): ffn = MLP only, all = MLP + attention")
+    ap.add_argument("--no-gemm-acc", action="store_true",
+                    help="legacy head/chunk sums: GEMM to PART + RESIDUAL (no 0x30 flags[7])")
     ap.add_argument("--out", type=Path, required=True)
     a = ap.parse_args()
     assert a.ppl_ctx % 4 == 0
@@ -615,7 +669,9 @@ def main():
         for w in calib:
             fm.forward(w[:-1], obs)
     smoothed_diff = (fm.forward(probe) - ref.forward(probe)).abs().max().item()
-    qls = [QuantLayer(fm, i, obs[i]) for i in range(fm.L)]
+    i4_kinds = {"none": frozenset(), "ffn": frozenset({"ffn"}),
+                "all": frozenset({"ffn", "attn"})}[a.int4_weights]
+    qls = [QuantLayer(fm, i, obs[i], int4=i4_kinds) for i in range(fm.L)]
     result = {"model": fm.name, "d_model": fm.D, "n_layer": fm.L, "n_head": fm.H,
               "f_res": F_RES, "ln_round_bits": LN_RB, "smooth_alpha": a.smooth,
               "calib": f"{len(calib)}x{a.calib_ctx} WikiText-2 test tail",
@@ -647,6 +703,9 @@ def main():
     T = (Lp + 3) // 4 * 4                              # prefill rows (padding rows are zero)
     assert Lp + S <= kmax and kmax % 4 == 0
     P = Program(overlap=a.overlap, hoist=a.hoist)
+    if i4_kinds and not a.overlap and not a.no_program:
+        raise SystemExit("--int4-weights needs --overlap (queued DMA)")
+    P.weight_i4 = i4_kinds
     R = (allocate_overlap if a.overlap else allocate)(P, T, fm.D, fm.HD, kmax)
     P.ddr_put("zeros_pr", np.zeros(T * kmax, np.int64))
     P.dma("zeros_pr", R["PR"])
@@ -661,7 +720,8 @@ def main():
         for li in range(L):
             if li < a.layers:
                 x = emit_layer(P, qls[li], li, R, x, pos0, kv[li], kmax, tag,
-                               a.check if tag == "P" else "layer")
+                               a.check if tag == "P" else "layer",
+                               gemm_acc=not a.no_gemm_acc)
                 x_npu = x
             else:
                 x = qls[li].forward(x, pos0, kv[li])
@@ -703,7 +763,8 @@ def main():
                                                 if u != v), S + 1)))
     result.update(overlap=a.overlap, weight_slots=len(R["W_slots"]),
                   decode_weight_slots=len(Rd["W_slots"]),
-                  hoist=a.hoist if a.overlap else 0)
+                  hoist=a.hoist if a.overlap else 0, gemm_acc=not a.no_gemm_acc,
+                  int4_weights=a.int4_weights)
     man = P.write(a.out, result)
     print("GPT2_PROGRAM_READY " + json.dumps({k: man.get(k) for k in (
         "descriptors", "segments", "dma_loads", "dma_stores", "dma_bytes", "spad_high_water",

@@ -59,7 +59,7 @@ module ai_matrix_gemv_request_formal_top (
         .transpose_b(1'b0),
         .bias_enable(1'b0),
         .scale_shift(5'd0),
-        .activation(2'd0),
+        .activation(2'd0), .accumulate(1'b0),
         .aux0(32'd0),
         .watchdog_limit(32'd0),
         .bank0_data(bank0_data),

@@ -31,8 +31,12 @@ def length_for(rng: random.Random, op: str) -> int:
         return m * n
     if pick < 0.15:
         return rng.choice((1, 2, 3, 4, 5, 15, 16, 17, 32, 64, 197, 255, 256))
-    if pick < 0.22 and op in ("layernorm", "softmax", "causal_softmax"):
-        return rng.choice((257, 300, 384))  # exceeds row cache: legacy fallback
+    if pick < 0.30 and op == "layernorm":
+        # Round 38: the 1024-entry row cache keeps LN rows up to 1024 on the
+        # stream path (GPT-2 D=768); longer rows fall back to the legacy FSM.
+        return rng.choice((257, 384, 512, 768, 768, 1024, 1025, 1100))
+    if pick < 0.22 and op in ("softmax", "causal_softmax"):
+        return rng.choice((257, 300, 384))  # Softmax stream limit 256: legacy fallback
     return rng.randint(1, 256)
 
 

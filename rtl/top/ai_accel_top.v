@@ -531,6 +531,7 @@ module ai_accel_top #(
     wire [63:0] qdma_ext_addr;
     wire [31:0] qdma_spad_addr, qdma_ext_stride, qdma_spad_stride;
     wire [15:0] qdma_length_words, qdma_row_words, qdma_row_count;
+    wire        qdma_expand_i4, dma_expand_i4_mux;
     wire        qdma_busy, qdma_done, qdma_error;
     wire [3:0]  qdma_error_code;
     wire [31:0] qdma_result, qdma_cycles, qdma_elements;
@@ -856,7 +857,8 @@ module ai_accel_top #(
         .qdma_ext_addr(qdma_ext_addr), .qdma_spad_addr(qdma_spad_addr),
         .qdma_length_words(qdma_length_words), .qdma_row_words(qdma_row_words),
         .qdma_row_count(qdma_row_count), .qdma_ext_stride(qdma_ext_stride),
-        .qdma_spad_stride(qdma_spad_stride),
+        .qdma_spad_stride(qdma_spad_stride), .qdma_expand_i4(qdma_expand_i4),
+        .dma_expand_i4_mux(dma_expand_i4_mux),
         .dma_start_mux(dma_start_mux), .dma_store_mux(dma_store_mux),
         .dma_ext_addr_mux(dma_ext_addr_mux), .dma_spad_addr_mux(dma_spad_addr_mux),
         .dma_length_words_mux(dma_length_words_mux), .dma_row_words_mux(dma_row_words_mux),
@@ -1283,7 +1285,7 @@ module ai_accel_top #(
         .dma_ext_addr(qdma_ext_addr), .dma_spad_addr(qdma_spad_addr),
         .dma_length_words(qdma_length_words), .dma_row_words(qdma_row_words),
         .dma_row_count(qdma_row_count), .dma_ext_stride(qdma_ext_stride),
-        .dma_spad_stride(qdma_spad_stride),
+        .dma_spad_stride(qdma_spad_stride), .dma_expand_i4(qdma_expand_i4),
         .busy(qdma_busy), .done(qdma_done), .error(qdma_error),
         .error_code(qdma_error_code), .result(qdma_result),
         .cycles(qdma_cycles), .elements(qdma_elements)
@@ -1319,7 +1321,8 @@ module ai_accel_top #(
         .ext_stride(dma_ext_stride_mux), .spad_stride(dma_spad_stride_mux),
         .gather_enable(dma_gather_enable_mux),
         .gather_index_base(dma_gather_index_base_mux),
-        .read_outstanding(dma_read_outstanding_mux), .busy(dma_busy),
+        .read_outstanding(dma_read_outstanding_mux), .expand_i4(dma_expand_i4_mux),
+        .busy(dma_busy),
         .done(dma_done), .error(dma_error), .error_code(dma_error_code),
         .spad_valid(dma_spad_valid), .spad_write(dma_spad_write),
         .spad_addr_o(dma_spad_addr_o), .spad_wdata(dma_spad_wdata),

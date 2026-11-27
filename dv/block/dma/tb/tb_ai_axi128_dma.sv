@@ -11,6 +11,7 @@ module tb_ai_axi128_dma;
   reg [31:0] ext_stride=0, spad_stride=0;
   reg gather_enable=0;
   reg [31:0] gather_index_base=0;
+  reg expand_i4=0;
   reg [2:0] read_outstanding=3'd4;
   wire busy, done, error;
   wire [3:0] error_code;
@@ -294,6 +295,19 @@ module tb_ai_axi128_dma;
     if(spad_line_read_count!=4)
       $fatal(1,"expected four 128-bit scratchpad line reads, got %0d",
              spad_line_read_count);
+
+    // INT4 expansion needs MAX_BURST_BEATS to be a multiple of 16 (this
+    // bench uses 4) and a 256-byte/x64-word source: both must be rejected
+    // with ERR_CONFIG before any AXI request.
+    ar_count=0;
+    expand_i4=1;
+    pulse_start(0,32'h0000_1000,0,64);
+    expand_i4=0;
+    timeout=0;
+    while(!done && timeout<100) begin @(posedge clk); timeout=timeout+1; end
+    if(!done || !error || error_code!==4'd1 || ar_count!=0)
+      $fatal(1,"INT4 expansion config error not reported: done=%0d error=%0d code=%0d ar=%0d",
+             done,error,error_code,ar_count);
 
     $display("Unified AXI128 DMA PASS: highwater=%0d",rd_highwater);
     $finish;

@@ -1,5 +1,34 @@
 # Project update log
 
+## NMAForge V1.4 Rounds 37–38 — queued DMA overlap, GEMM accumulate, INT4 weights, LN fast path (2026-11-27)
+
+- **Result.** GPT-2 small, 12 layers, prompt + 8 decode steps, bit-exact on
+  Product Top: 221,473,132 cycles end to end. Round 36 was 366.9M (compute +
+  fenced DMA), so this is −39.6%. DeiT-Tiny 12 layers: 39,211,913 cycles,
+  against 45.7M in Round 35 (−14.1%).
+- **RTL.** Four changes:
+  - queued DMA `0x60` as dispatcher engine 7 (`CAP2[8]`);
+  - GEMM accumulate epilogue, `0x30/0x31 flags[7]` (`CAP2[9]`);
+  - INT4 block-exponent expansion on DMA load, `0x60 flags[1]` (`CAP2[10]`);
+  - SFU stream row cache of 1024 entries, so LayerNorm with D ≤ 1024 uses the
+    fast path.
+  `CAP2=0x7ff`.
+- **Accuracy.** Integer GPT-2 PPL on 10×256 windows: INT8 51.25; INT4 for the
+  MLP only 58.20 (0.69× weight bytes); INT4 everywhere 64.14 (0.53×). The
+  reported final configuration uses INT4 for the MLP only.
+- **Verification.**
+  - Top: smoke and `ai_run 20/12345`.
+  - Block: qdma+INT4 self-test, matrix regressions with new accumulate
+    cases, descriptor validator, SFU stream equivalence (3 seeds × 2 latency
+    modes) plus act-modes, DMA block TB.
+  - UVM: control (9 tests) and DMA (19 tests).
+  - NOT RUN: SpyGlass, formal, DC. The SFU cache area is an open disposition
+    item.
+- **Bank lanes.** Gate 5 design contract only. The measured SFU share caps
+  the gain.
+
+See the [report](benchmark/NMAFORGE_V1_4_ROUND37_38_MODEL_OPTIMIZATION.md).
+
 ## NMAForge V1.3 Round 36 — official GPT-2 small prefill + KV-cache decode on Product Top (2026-11-26)
 
 - **Result.** The new `sw/compiler/gpt2_compile.py` runs official `gpt2`

@@ -39,7 +39,7 @@ class control_reset_version_seq extends control_base_seq;
         read32(VERSION, data); expect_eq("VERSION", data, 32'h1000_000a);
         read32(CAP, data); expect_eq("CAP", data, 32'h001f_ff17);
         read32(ABI_INFO, data); expect_eq("ABI_INFO", data, 32'h1040_0407);
-        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_01ff);
+        read32(CAP2, data); expect_eq("CAP2", data, 32'h0000_07ff);
         read32(OP, data); expect_eq("reset OP", data, 0);
         read32(IRQ_ENABLE, data); expect_eq("reset IRQ_ENABLE", data, 0);
         read32(STATUS, data); expect_eq("reset STATUS", data, 0);
@@ -265,7 +265,7 @@ class control_register_file_seq extends control_base_seq;
         read32(PERF_MATRIX_CYCLES, got); expect_eq("PERF_MATRIX_CYCLES", got, 32'h8888_0008);
         read32(PERF_DMA_RD_STATE, got); expect_eq("PERF_DMA_RD_STATE", got, 32'h0000_002b);
         read32(ABI_INFO, got); expect_eq("ABI_INFO", got, 32'h1040_0407);
-        read32(CAP2, got); expect_eq("CAP2", got, 32'h0000_01ff);
+        read32(CAP2, got); expect_eq("CAP2", got, 32'h0000_07ff);
         write32(VERSION, 32'h0, 4'hf, 2'b10);
         write32(PERF_TOTAL, 32'h0, 4'hf, 2'b10);
     endtask

@@ -11,6 +11,7 @@ module tb_output_dma_gate1;
   reg [31:0] ext_stride=0, spad_stride=0;
   reg gather_enable=0;
   reg [31:0] gather_index_base=0;
+  reg expand_i4=0;
   reg [2:0] read_outstanding=3'd4;
   wire busy, done, error;
   wire [3:0] error_code;

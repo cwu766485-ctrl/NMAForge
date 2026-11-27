@@ -815,6 +815,8 @@ ai_precheck: ai_a4_ref ai_quick
 ai_dma_comp:
 	vcs -full64 -sverilog -timescale=1ns/1ns +define+VCS \
 		-top tb_ai_axi128_dma ../../../../rtl/dma/ai_axi128_dma.v \
+		../../../../rtl/dma/ai_dma_burst_planner.v ../../../../rtl/dma/ai_dma_read_slot_tracker.v \
+		../../../../rtl/dma/ai_dma_write_response_tracker.v ../../../../rtl/dma/ai_dma_spad_transfer_adapter.v \
 		../../../block/dma/tb/tb_ai_axi128_dma.sv -o simv_dma -l ai_dma_comp.log
 
 ai_dma_run: ai_dma_comp
@@ -1763,7 +1765,7 @@ AI_QDMA_PYTHON ?= python3
 ai_qdma_selftest:
 	$(AI_QDMA_PYTHON) ../../../../sw/compiler/qdma_selftest.py --out $(AI_QDMA_SELFTEST_DIR)
 	$(MAKE) ai_compiled_program AI_COMPILED_DIR=$(AI_QDMA_SELFTEST_DIR)
-	grep -q '^COMPILED_PROGRAM_PASS format=3 segments=6 descriptors=43 queued_dma=25 queued_dma_stores=6 ' $(AI_QDMA_SELFTEST_DIR)/sim/run.log
+	grep -q '^COMPILED_PROGRAM_PASS format=3 segments=8 descriptors=45 queued_dma=27 queued_dma_stores=6 ' $(AI_QDMA_SELFTEST_DIR)/sim/run.log
 
 ai_compiled_program:
 	test -n "$(AI_COMPILED_DIR)" && test -f "$(AI_COMPILED_DIR)/program.memh"

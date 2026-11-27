@@ -30,7 +30,7 @@ import torch
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "benchmark" / "deit_official"))
 from nmaf import intops as I                                   # noqa: E402
-from nmaf.program import Program                               # noqa: E402
+from nmaf.program import FLAG_GEMM_ACC, Program                # noqa: E402
 from cimforge_mapper import (FLAG_BIAS, FLAG_PACK_I8, FLAG_PACK_I8_TILE_A,  # noqa: E402
                              OP_GEMM, OP_GELU, OP_LAYERNORM, OP_REQUANT, OP_RESIDUAL,
                              OP_SOFTMAX)
@@ -192,7 +192,8 @@ def head_logits(fm: FloatDeit, x_int: np.ndarray) -> np.ndarray:
 
 
 # ------------------------------------------------------------------ emission
-def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, check: str):
+def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, check: str,
+               gemm_acc: bool = True):
     tr = {}
     out = ql.forward(x_in, tr)
     base = f"L{li}"
@@ -265,6 +266,12 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, c
     P.dma(f"{base}.wo", R["WO"]); P.dma(f"{base}.bo", R["BO"])
     for b in range(TP // QB):
         r0 = b * QB
+        if gemm_acc:            # X rows = sat32(X + attention output) in the GEMM epilogue
+            idx = P.emit(f"{base}.wo.b{b}", OP_GEMM, R["MRG"] + (r0 // 4) * D * 4,
+                         R["X"] + r0 * D * 4, src1=R["WO"], bias=R["BO"],
+                         flags=FLAG_BIAS | FLAG_GEMM_ACC, m=QB, n=D, k_or_length=D // 4,
+                         shift=ql.sh_o, aux0=1)
+            continue
         P.emit(f"{base}.wo.b{b}", OP_GEMM, R["MRG"] + (r0 // 4) * D * 4, R["SC"], src1=R["WO"],
                bias=R["BO"], flags=FLAG_BIAS, m=QB, n=D, k_or_length=D // 4, shift=ql.sh_o, aux0=1)
         idx = P.emit(f"{base}.res1.b{b}", OP_RESIDUAL, R["X"] + r0 * D * 4, R["X"] + r0 * D * 4,
@@ -285,10 +292,15 @@ def emit_layer(P: Program, ql: QuantLayer, li: int, R: dict, x_in: np.ndarray, c
                k_or_length=m * FF, flags=FLAG_PACK_I8 | FLAG_PACK_I8_TILE_A | FLAG7,
                shift=ql.sh_l, aux0=1)
         P.dma(f"{base}.w2", R["W"])
-        P.emit(f"{base}.fc2.r{r0}", OP_GEMM, R["H8"], R["Y"], src1=R["W"], bias=R["B2"],
-               flags=FLAG_BIAS, m=m, n=D, k_or_length=FF // 4, shift=ql.sh_2, aux0=1)
-        idx = P.emit(f"{base}.res2.r{r0}", OP_RESIDUAL, R["X"] + r0 * D * 4, R["X"] + r0 * D * 4,
-                     src1=R["Y"], k_or_length=m * D, aux0=1)
+        if gemm_acc:
+            idx = P.emit(f"{base}.fc2.r{r0}", OP_GEMM, R["H8"], R["X"] + r0 * D * 4, src1=R["W"],
+                         bias=R["B2"], flags=FLAG_BIAS | FLAG_GEMM_ACC, m=m, n=D,
+                         k_or_length=FF // 4, shift=ql.sh_2, aux0=1)
+        else:
+            P.emit(f"{base}.fc2.r{r0}", OP_GEMM, R["H8"], R["Y"], src1=R["W"], bias=R["B2"],
+                   flags=FLAG_BIAS, m=m, n=D, k_or_length=FF // 4, shift=ql.sh_2, aux0=1)
+            idx = P.emit(f"{base}.res2.r{r0}", OP_RESIDUAL, R["X"] + r0 * D * 4,
+                         R["X"] + r0 * D * 4, src1=R["Y"], k_or_length=m * D, aux0=1)
         r0 += m
     P.checkpoint_rows(idx, R["X"], out, D, T)
     return out
@@ -328,6 +340,8 @@ def main():
     ap.add_argument("--calib", type=int, default=20)
     ap.add_argument("--image-index", type=int, default=0)
     ap.add_argument("--accuracy", type=int, default=0, help="images per class for integer accuracy")
+    ap.add_argument("--no-gemm-acc", action="store_true",
+                    help="legacy residual adds: GEMM to SC/Y + RESIDUAL (no 0x30 flags[7])")
     ap.add_argument("--out", type=Path, required=True)
     ap.add_argument("--check", default="layer", choices=("layer", "debug"))
     ap.add_argument("--overlap", action="store_true",
@@ -378,12 +392,12 @@ def main():
     P.ddr_put("x0", I.words_i32(x))
     P.dma("x0", R["X"])
     for li in range(a.layers):
-        x = emit_layer(P, qls[li], li, R, x, a.check)
+        x = emit_layer(P, qls[li], li, R, x, a.check, gemm_acc=not a.no_gemm_acc)
     P.final_rows(R["X"], I.words_i32(x), D, T)
     if a.layers == 12:
         result["npu_program_top1_label"] = int(np.argmax(head_logits(fm, x)))
         result["label"] = idx0
-    result.update(overlap=a.overlap, hoist=a.hoist if a.overlap else 0)
+    result.update(overlap=a.overlap, hoist=a.hoist if a.overlap else 0, gemm_acc=not a.no_gemm_acc)
     man = P.write(a.out, result)
     print("DEIT_PROGRAM_READY " + json.dumps({k: man.get(k) for k in (
         "descriptors", "segments", "dma_events", "dma_bytes", "spad_high_water",

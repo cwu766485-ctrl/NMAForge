@@ -12,6 +12,11 @@ module ai_dma_spad_transfer_adapter #(
     input  wire         rd_wide,
     input  wire [1:0]   rd_narrow_lane,
     input  wire [127:0] rd_data,
+    // INT4 expansion: ai_axi128_dma supplies the expanded line directly.
+    input  wire         rd_expand,
+    input  wire         exp_line_valid,
+    input  wire [31:0]  exp_line_addr,
+    input  wire [127:0] exp_line_data,
 
     input  wire         gather_need_index,
     input  wire         gather_wait_rsp,
@@ -67,7 +72,15 @@ module ai_dma_spad_transfer_adapter #(
         spad_line_wdata = 128'd0;
         spad_line_wstrb = 16'd0;
 
-        if (read_active && rd_line_eligible) begin
+        if (read_active && rd_expand) begin
+            if (exp_line_valid) begin
+                spad_line_valid = 1'b1;
+                spad_line_write = 1'b1;
+                spad_line_addr  = exp_line_addr;
+                spad_line_wdata = exp_line_data;
+                spad_line_wstrb = 16'hffff;
+            end
+        end else if (read_active && rd_line_eligible) begin
             spad_line_valid = 1'b1;
             spad_line_write = 1'b1;
             spad_line_addr  = rd_spad_addr;

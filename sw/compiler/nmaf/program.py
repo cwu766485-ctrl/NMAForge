@@ -73,6 +73,8 @@ def engine_for_op(op: int) -> int:
 
 
 OP_DMA_COPY = 0x60
+FLAG_DMA_EXPAND_I4 = 0x02     # 0x60 flags[1]: INT4 block-exponent expansion on load
+FLAG_GEMM_ACC = 0x80          # 0x30/0x31 flags[7]: C = sat32(C + A*B epilogue)
 DDR_SPACE = 1 << 40           # DDR byte ranges are offset so they never meet SPAD ones
 
 
@@ -90,6 +92,8 @@ def footprint(d) -> tuple[list, list]:
             wr += [w4(d.dst + b * d.dst_stride, d.m * d.n)]
         if d.flags & 1:
             rd.append(w4(d.bias, d.n))
+        if d.flags & FLAG_GEMM_ACC:                    # accumulate epilogue reads C
+            rd += list(wr)
     elif d.op in (0x35, 0x36):                         # GELU(LUT) / REQUANT
         rd.append(w4(d.src0, ln))
         wr.append((d.dst, d.dst + ln) if d.flags & (1 << 4) else w4(d.dst, ln))
@@ -109,6 +113,8 @@ def footprint(d) -> tuple[list, list]:
     elif d.op == OP_DMA_COPY:
         rows = max(d.m, 1)
         sp_hi = d.dst + (rows - 1) * d.dst_stride + 4 * ln
+        if d.flags & FLAG_DMA_EXPAND_I4:               # INT4 super-blocks -> 480 B each
+            sp_hi = d.dst + (ln // 64) * 480
         ext = d.src0 | (d.src1 << 32)
         ex_hi = ext + (rows - 1) * d.src0_stride + 4 * ln
         spad, ddr = (d.dst, sp_hi), (DDR_SPACE + ext, DDR_SPACE + ex_hi)
@@ -215,8 +221,12 @@ class Program:
         self.next_addr = 0
         self.region_prefix = prefix
 
-    def ddr_put(self, name: str, words: np.ndarray) -> int:
+    def ddr_put(self, name: str, words: np.ndarray, align: int = 16) -> int:
         words = np.asarray(words, dtype=np.int64).reshape(-1) & 0xFFFFFFFF
+        lead = (-self.ddr_words) % (align // 4)       # e.g. 256 B for INT4 streams
+        if lead:
+            self.ddr.append(np.zeros(lead, np.int64))
+            self.ddr_words += lead
         pad = (-len(words)) % 4                       # keep 16-byte alignment
         if pad:
             words = np.concatenate([words, np.zeros(pad, np.int64)])
@@ -228,26 +238,33 @@ class Program:
 
     # ---------------------------------------------------------- program
     def dma(self, ddr_name: str, spad_addr: int, words: int | None = None, *, offset: int = 0,
-            rows: int = 0, ext_stride: int = 0, spad_stride: int = 0, store: bool = False):
+            rows: int = 0, ext_stride: int = 0, spad_stride: int = 0, store: bool = False,
+            expand_i4: bool = False):
         """Fenced DMA before the next descriptors.  `offset` is a byte offset into
         the DDR blob; rows > 0 makes `words` the per-row length of a 2D transfer."""
         ext, n = self.ddr_index[ddr_name]
         n = n - offset // 4 if words is None else words
         if not 0 < n < 65536 or offset % 4:
             raise ValueError(f"DMA {ddr_name}: illegal length {n} / offset {offset}")
+        if expand_i4 and (not self.overlap or store or rows or n % 64 or (ext + offset) % 256
+                          or spad_addr % 16):
+            raise ValueError(f"DMA {ddr_name}: illegal INT4 expansion transfer")
         if self.overlap:
             d = Descriptor(name=f"dma.{ddr_name}", task_id=self.task & 0xFFFF, op=OP_DMA_COPY,
                            src0=(ext + offset) & 0xFFFFFFFF, src1=(ext + offset) >> 32,
-                           dst=spad_addr, m=rows, k_or_length=n, flags=int(store),
+                           dst=spad_addr, m=rows, k_or_length=n,
+                           flags=int(store) | (FLAG_DMA_EXPAND_I4 if expand_i4 else 0),
                            src0_stride=ext_stride if rows else 0,
                            dst_stride=spad_stride if rows else 0,
                            batch_count=0, head_count=0)
-            self._add_op(d)
+            idx = self._add_op(d)
             self.stats["dma_events"] += 1
             key = "dma_stores" if store else "dma_loads"
             self.stats[key] = self.stats.get(key, 0) + 1
             self.stats["dma_bytes"] += 4 * n * max(rows, 1)
-            return
+            if expand_i4:
+                self.stats["dma_i4"] = self.stats.get("dma_i4", 0) + 1
+            return idx
         if self.segments[-1].desc:
             self.segments.append(Segment())
         self.segments[-1].dma.append((ext + offset, spad_addr, (int(store) << 31) | n, rows,
