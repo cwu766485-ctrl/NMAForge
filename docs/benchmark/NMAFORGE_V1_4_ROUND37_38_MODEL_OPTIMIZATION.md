@@ -151,10 +151,8 @@ Evidence (summaries, manifests, gzipped run logs) is in
   statistics fusion at write-back are not done.
 - **INT4 weight streaming.** Done: INT4 block-exponent expansion in the DMA,
   with GEMM consuming the expanded INT8.
-- **Bank-level programmable lanes.** Design contract only:
-  [BANK_LANE_GATE5_CONTRACT.md](../architecture/BANK_LANE_GATE5_CONTRACT.md).
-  The measured SFU share (7–16%) caps the gain, so the contract requires at
-  least 5% end-to-end before any RTL is built.
+- **Bank-level programmable lanes.** Dropped from the innovation list. The
+  measured SFU share (7–16%) caps the gain.
 
 ## Next
 

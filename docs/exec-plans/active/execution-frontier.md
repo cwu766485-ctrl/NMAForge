@@ -11,7 +11,7 @@
      W1/W2 re-stream.
   3. Per-16-column weight scales.
   4. Patch embedding and head on the NPU.
-  5. Innovations: INT4 GEMV, epilogue fusion, bank lanes.
+  5. Innovations: INT4 GEMV, epilogue fusion (bank lanes dropped 2026-11-27).
 
 ## Round 35 step 1 status (2026-11-25)
 
@@ -28,8 +28,9 @@ Next, in order:
 3. A GPT-2 small / distilgpt2 software PTQ quality gate, then a weight-streamed
    H768 mapper.
 4. DeiT Layer-0 closure and a bit-exact software accuracy model.
-5. Round-35 innovation items (GEMM epilogue fusion, INT4 weight-stream GEMV,
-   bank-level near-memory lanes), each through Gate 5.
+5. Round-35 innovation items (GEMM epilogue fusion, INT4 weight-stream GEMV),
+   each through Gate 5. Bank-level near-memory lanes were dropped on
+   2026-11-27.
 
 ## NMAForge V1.3 Round 34 — Transformer SFU and GPT-2 runtime (2026-11-25)
 

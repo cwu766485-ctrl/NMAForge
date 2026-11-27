@@ -24,8 +24,8 @@
   - UVM: control (9 tests) and DMA (19 tests).
   - NOT RUN: SpyGlass, formal, DC. The SFU cache area is an open disposition
     item.
-- **Bank lanes.** Gate 5 design contract only. The measured SFU share caps
-  the gain.
+- **Bank lanes.** Dropped from the innovation list (2026-11-27). The measured
+  SFU share (7–16%) caps the gain.
 
 See the [report](benchmark/NMAFORGE_V1_4_ROUND37_38_MODEL_OPTIMIZATION.md).
 
