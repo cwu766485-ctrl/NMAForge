@@ -167,6 +167,9 @@ module tb_ai_tensor_matrix_core_random;
   integer bank_parity_target_issue=0;
   reg prefetch_parity_response_seen=0;
   reg watchdog_during_prefetch_seen=0;
+  // A prefetch is in flight while its FSM issues, or (GEMM operand staging)
+  // while an issued buffer still waits for its responses.
+  wire prefetch_in_flight = dut.prefetch_active || (dut.stage_drain_pend_r != 2'b00);
   reg prefetch_handoff_seen=0;
   reg tile_forward_last_seen=0;
   reg tile_forward_backpressure_seen=0;
@@ -402,10 +405,18 @@ module tb_ai_tensor_matrix_core_random;
         line_stall_pending<=1'b0;
       end
       if(perf_mac_active) mac_cycle_count<=mac_cycle_count+1;
-      if(dut.prefetch_active &&
+      // Without GEMM operand staging the MAC reads the compute buffer for all
+      // four lanes. With staging it reads it only on the lane-0 snapshot, so
+      // a prefetch may reuse it afterwards but never a buffer still holding
+      // an un-snapshotted K group.
+      if(dut.prefetch_active && !dut.stage_mode &&
          (dut.prefetch_buffer_r==dut.compute_buffer_r))
         $fatal(1,"Matrix prefetch overwrote active compute buffer k=%0d buffer=%0d",
                dut.prefetch_k_group_r,dut.prefetch_buffer_r);
+      if(dut.stage_mode && dut.prefetch_kick && (dut.prefetch_state_r==0) &&
+         dut.stage_hold_r[dut.prefetch_kick_buffer])
+        $fatal(1,"Matrix staged prefetch targeted un-snapshotted buffer k=%0d buffer=%0d",
+               dut.prefetch_kick_k_group,dut.prefetch_kick_buffer);
       if(dut.prefetch_kick)
         prefetch_buffer_seen_mask[dut.prefetch_kick_buffer] <= 1'b1;
       if((dut.state_r==8) && (dut.lane_r==2'd3) &&
@@ -413,9 +424,9 @@ module tb_ai_tensor_matrix_core_random;
         prefetch_handoff_seen<=1'b1;
       if(banked_rsp_valid && inject_bank_parity &&
          (pending_bank_issue==bank_parity_target_issue) &&
-         dut.prefetch_active && dut.response_buffer)
+         prefetch_in_flight && dut.response_buffer)
         prefetch_parity_response_seen<=1'b1;
-      if(dut.watchdog_expired && dut.prefetch_active)
+      if(dut.watchdog_expired && prefetch_in_flight)
         watchdog_during_prefetch_seen<=1'b1;
       if(dut.tile_forward_capture_valid && !line_ready)
         tile_forward_backpressure_seen<=1'b1;
@@ -468,18 +479,26 @@ module tb_ai_tensor_matrix_core_random;
         bank_response_data_fifo[bank_response_wr_ptr][0]<=
             (acc_read_output && (banked_addr>=DST_BASE)) ?
             output_mem[((banked_addr>>2)&32'hfffc)+0] :
+            ((banked_addr>=BIAS_BASE) && (banked_addr<DST_BASE)) ?
+            bias_mem[((banked_addr>>2)&32'hfffffffc)+0] :
             bank_mem[0][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][1]<=
             (acc_read_output && (banked_addr>=DST_BASE)) ?
             output_mem[((banked_addr>>2)&32'hfffc)+1] :
+            ((banked_addr>=BIAS_BASE) && (banked_addr<DST_BASE)) ?
+            bias_mem[((banked_addr>>2)&32'hfffffffc)+1] :
             bank_mem[1][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][2]<=
             (acc_read_output && (banked_addr>=DST_BASE)) ?
             output_mem[((banked_addr>>2)&32'hfffc)+2] :
+            ((banked_addr>=BIAS_BASE) && (banked_addr<DST_BASE)) ?
+            bias_mem[((banked_addr>>2)&32'hfffffffc)+2] :
             bank_mem[2][(banked_addr>>4)&13'h1fff];
         bank_response_data_fifo[bank_response_wr_ptr][3]<=
             (acc_read_output && (banked_addr>=DST_BASE)) ?
             output_mem[((banked_addr>>2)&32'hfffc)+3] :
+            ((banked_addr>=BIAS_BASE) && (banked_addr<DST_BASE)) ?
+            bias_mem[((banked_addr>>2)&32'hfffffffc)+3] :
             bank_mem[3][(banked_addr>>4)&13'h1fff];
         bank_response_issue_fifo[bank_response_wr_ptr]<=bank_read_count;
         bank_response_delay_fifo[bank_response_wr_ptr]<=
@@ -768,7 +787,8 @@ module tb_ai_tensor_matrix_core_random;
         $fatal(1,"product GEMV left a request/response outstanding");
       gemv_mac_cycles=mac_cycle_count-case_mac_snapshot;
       gemv_bank_reads=bank_read_count-case_bank_snapshot;
-      if(gemv_mac_cycles!=8 || gemv_bank_reads!=40 ||
+      // 40 operand line reads plus the 16-word aligned bias as 4 line reads.
+      if(gemv_mac_cycles!=8 || gemv_bank_reads!=44 ||
          dut.perf_prefetch_completed!=(NEXT_K_PREFETCH_ENABLE ? 7 : 0) ||
          ((NEXT_K_PREFETCH_ENABLE != 0) !=
           (dut.perf_prefetch_overlap_cycles != 0)) ||
@@ -1554,11 +1574,11 @@ module tb_ai_tensor_matrix_core_random;
       force_banked_ready=1;force_bank_response_delay=1;
       @(negedge clk);start=1;@(negedge clk);start=0;
       timeout=0;
-      while(!((dut.state_r==8) && dut.prefetch_active) && !done &&
+      while(!((dut.state_r==8) && prefetch_in_flight) && !done &&
             (timeout<10000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!((dut.state_r==8) && dut.prefetch_active))
+      if(!((dut.state_r==8) && prefetch_in_flight))
         $fatal(1,"tile-forward abort probe missed active Matrix prefetch state=%0d pf=%0d",
                dut.state_r,dut.prefetch_state_r);
       abort=1;@(negedge clk);abort=0;
@@ -2022,11 +2042,11 @@ module tb_ai_tensor_matrix_core_random;
       @(negedge clk);start=1;
       @(negedge clk);start=0;
       timeout=0;
-      while((!dut.prefetch_active || (dut.read_outstanding_count<2)) &&
+      while((!prefetch_in_flight || (dut.read_outstanding_count<2)) &&
             (timeout<2000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!dut.prefetch_active || (dut.read_outstanding_count<2) ||
+      if(!prefetch_in_flight || (dut.read_outstanding_count<2) ||
          !dut.prefetch_buffer_r || dut.prefetch_buffer_r==dut.compute_buffer_r)
         $fatal(1,"Matrix abort did not reach inactive-buffer prefetch state=%0d outstanding=%0d buffers=%b/%b",
                dut.prefetch_state_r,dut.read_outstanding_count,
@@ -2062,11 +2082,11 @@ module tb_ai_tensor_matrix_core_random;
       @(negedge clk);start=1;
       @(negedge clk);start=0;
       timeout=0;
-      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+      while((!prefetch_in_flight || (dut.read_outstanding_count==0)) &&
             !done && (timeout<2000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+      if(!prefetch_in_flight || (dut.read_outstanding_count==0))
         $fatal(1,"Matrix watchdog test never reached outstanding prefetch");
       timeout=0;
       while(!done && (timeout<2000)) begin
@@ -2095,11 +2115,11 @@ module tb_ai_tensor_matrix_core_random;
       @(negedge clk);start=1;
       @(negedge clk);start=0;
       timeout=0;
-      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+      while((!prefetch_in_flight || (dut.read_outstanding_count==0)) &&
             (timeout<2000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+      if(!prefetch_in_flight || (dut.read_outstanding_count==0))
         $fatal(1,"Matrix reset test never reached outstanding prefetch");
       resetn=0;#1;
       if(busy || done || error || error_code!=0 ||
@@ -2169,7 +2189,7 @@ module tb_ai_tensor_matrix_core_random;
       while((dut.state_r!=14) && !done && (timeout<2000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if((dut.state_r!=14) || !dut.prefetch_active)
+      if((dut.state_r!=14) || !prefetch_in_flight)
         $fatal(1,"Matrix core did not enter ST_PREFETCH_WAIT core=%0d prefetch=%0d active=%b",
                dut.state_r,dut.prefetch_state_r,dut.prefetch_active);
       lines_before=line_write_count;scalars_before=scalar_write_count;
@@ -2418,11 +2438,11 @@ module tb_ai_tensor_matrix_core_random;
       force_banked_ready=1;force_bank_response_delay=1;
       @(negedge clk);start=1;@(negedge clk);start=0;
       timeout=0;
-      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+      while((!prefetch_in_flight || (dut.read_outstanding_count==0)) &&
             !done && (timeout<5000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+      if(!prefetch_in_flight || (dut.read_outstanding_count==0))
         $fatal(1,"0x52 abort missed active prefetch/outstanding state=%0d count=%0d",
                dut.state_r,dut.read_outstanding_count);
       accepted_at_fault=bank_read_count;
@@ -2445,11 +2465,11 @@ module tb_ai_tensor_matrix_core_random;
       force_banked_ready=1;force_bank_response_delay=1;
       @(negedge clk);start=1;@(negedge clk);start=0;
       timeout=0;
-      while((!dut.prefetch_active || (dut.read_outstanding_count==0)) &&
+      while((!prefetch_in_flight || (dut.read_outstanding_count==0)) &&
             !done && (timeout<5000)) begin
         @(negedge clk);timeout=timeout+1;
       end
-      if(!dut.prefetch_active || (dut.read_outstanding_count==0))
+      if(!prefetch_in_flight || (dut.read_outstanding_count==0))
         $fatal(1,"0x52 reset missed active prefetch/outstanding state=%0d count=%0d",
                dut.state_r,dut.read_outstanding_count);
       @(negedge clk);resetn=0;#1;
@@ -2806,10 +2826,12 @@ module tb_ai_tensor_matrix_core_random;
     prepare_case(4,4,2,1,0,0,0,0,0,0,0);
     bank_parity_target_issue=bank_read_count;inject_bank_parity=1;
     check_fault(ERR_PARITY,3);inject_bank_parity=0;
-    prepare_case(4,4,1,1,0,0,1,0,0,0,0);inject_spad_parity=1;
+    // A 16-byte aligned bias tile is read as lines through the banked port;
+    // a 4-byte aligned base keeps the scalar bias path these faults target.
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);bias_base=BIAS_BASE+4;inject_spad_parity=1;
     check_fault(ERR_PARITY,4);inject_spad_parity=0;
-    prepare_case(4,4,1,1,0,0,1,0,0,0,0);inject_spad_protection=1;
-    spad_protection_addr=BIAS_BASE;check_fault(ERR_PROTECTION,5);inject_spad_protection=0;
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);bias_base=BIAS_BASE+4;inject_spad_protection=1;
+    spad_protection_addr=BIAS_BASE+4;check_fault(ERR_PROTECTION,5);inject_spad_protection=0;
     prepare_case(4,4,1,1,0,0,0,0,0,0,0);inject_line_protection=1;
     line_protection_addr=DST_BASE;check_fault(ERR_PROTECTION,6);inject_line_protection=0;
     prepare_case(4,4,1,1,0,0,0,0,0,0,1);inject_spad_protection=1;
@@ -2909,6 +2931,14 @@ module tb_ai_tensor_matrix_core_random;
     check_fault(ERR_CONFIG,62);accumulate=0;acc_fault_count=acc_fault_count+1;
     $display("MATRIX_CORE_ACC_PASS cases=%0d faults=%0d saturated_words=%0d golden=bit-exact",
              acc_case_count,acc_fault_count,acc_sat_hits);
+    // Bias line reads (aligned bias tile): protection on the banked bias
+    // request and parity on its response (reads: A line, B line, bias line).
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);inject_bank_protection=1;
+    bank_protection_addr=BIAS_BASE;check_fault(ERR_PROTECTION,63);inject_bank_protection=0;
+    prepare_case(4,4,1,1,0,0,1,0,0,0,0);
+    bank_parity_target_issue=bank_read_count+2;inject_bank_parity=1;
+    check_fault(ERR_PARITY,64);inject_bank_parity=0;
+    $display("MATRIX_CORE_BIAS_LINE_PASS faults=2 scalar_bias_faults=2");
     $display("MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=%0d unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported",
              line_stall_stability_checks);
     $display("MATRIX_CORE_RANDOM_PASS cases=%0d faults=%0d late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=%0d bank_reads=%0d responses=%0d spad_reads=%0d responses=%0d stalls=%0d/%0d/%0d",

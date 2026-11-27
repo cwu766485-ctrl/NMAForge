@@ -1,5 +1,44 @@
 # Project update log
 
+## NMAForge V1.4 Round 39 — Matrix GEMM read pipeline, VCS scratchpad fix, GPTQ INT4 (2026-11-27)
+
+- **Result.** GPT-2 small, 12 layers, prompt + 8 decode, bit-exact on Product
+  Top:
+  - Round 38 program on the new RTL: 181,354,731 cycles (−18.1% vs 221.5M);
+  - GPTQ INT4 for all weights: 164,124,531 cycles (−25.9%);
+  - against the Round 36 baseline these are −50.6% and −55.3%.
+  - GPT-2 1-layer final configuration: 10.42M (−19.0%).
+  - DeiT layer 0: 2.85M (−13.9%).
+- **RTL (ABI unchanged).** In `ai_tensor_matrix_core`:
+  - bias tiles read as banked lines;
+  - GEMM operand staging with self-timed per-buffer prefetch
+    (`ENABLE_GEMM_OPERAND_STAGE`), so a decode K group takes about 5 cycles
+    instead of 8.5.
+- **Bug fix.** In the `+define+VCS` scratchpad model, line reads now have
+  two register stages, matching XPM `READ_LATENCY=2`. With one stage, a line
+  access in the next cycle overwrote the data the arbiter returns two cycles
+  after the request. The faster Matrix exposed this: a queued DMA store wrote
+  old ACC data into the DDR K cache. The defect predates this round.
+- **Compiler.** GPTQ error propagation for INT4 block-exponent weights
+  (`--no-gptq` disables it). Integer PPL on 10×256 windows, INT8 51.25:
+  - INT4 MLP: 58.14 → 54.60;
+  - INT4 everywhere: 64.14 → 58.35 at 0.53× weight bytes.
+- **Not adopted.** `0x52` GEMV for decode: measured, not faster.
+  `DMA_MAX_BURST_BEATS=32`: passes, but the near-zero-latency AXI model cannot
+  show its gain; the default stays 16.
+- **Verification.**
+  - Top: smoke, `ai_run 20/12345`, qdma+INT4 self-test, DMA block TB,
+    `uvm_compile`.
+  - Block: matrix regressions (bias-line faults added, 38 → 40 faults),
+    4×4 handoff build, DMA/SPAD subsystem.
+  - UVM: control (9 tests) and DMA (19 tests).
+  - NOT RUN: SpyGlass, formal, DC. Staging flops and the bias-line path are
+    open PPA items.
+  - The 4×4 `core-random-test` `run_outstanding_abort` failure reproduces on
+    the Round 38 HEAD.
+
+See the [report](benchmark/NMAFORGE_V1_4_ROUND39_MATRIX_DECODE_GPTQ.md).
+
 ## NMAForge V1.4 Rounds 37–38 — queued DMA overlap, GEMM accumulate, INT4 weights, LN fast path (2026-11-27)
 
 - **Result.** GPT-2 small, 12 layers, prompt + 8 decode steps, bit-exact on

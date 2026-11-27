@@ -1,0 +1,2 @@
+COMPILED_PROGRAM_PASS format=3 segments=117 descriptors=64517 queued_dma=27299 queued_dma_stores=2592 queued_dma_bytes=560569344 checkpoint_words=399360 final_words=3072 end_to_end_cycles=181354731 host_publish_cycles=43089 cmdq=ddr dma_fenced_cycles=0 host_spad_data_writes=0
+COMPILED_V3_PROFILE cycles=181354731 matrix_busy=101425836 sfu_busy=16052595 kv_busy=0 dma_busy=113787260 matrix_and_dma=43829259 dma_only=63758937 idle=117363

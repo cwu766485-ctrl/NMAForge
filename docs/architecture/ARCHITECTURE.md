@@ -51,6 +51,15 @@ DDR <== 128-bit AXI4 ==> ai_axi128_dma <==> ai_spad_arbiter <==> ai_scratchpad
   先用 banked 读口读出旧的输出行（读元数据 FIFO 用第 69 位标记，响应不进入 A/B 缓冲），
   再把 `sat32(旧值 + 结果)` 整行写回。注意力各 head 的输出投影与 FFN 各分块的 `fc2`
   因此直接累加进 ACC/X，省掉中间的 PART 写回和 RESIDUAL 命令。
+- GEMM 读流水（Round 39，ABI 不变）：`ai_tensor_matrix_core` 的 bias 若 16 字节对齐且该列块
+  列数为 4 的倍数，就经 banked 读口按整行读取（元数据第 70 位标记），不再逐字走标量口；
+  其余情况保留标量路径。`ENABLE_GEMM_OPERAND_STAGE=1` 时，普通 GEMM（非 GEMV、非 tile
+  forwarding）在每个 K 组的 lane 0 进入阵列时把该组 A/B 共 32 个字拷入暂存寄存器，lane 1–3
+  从暂存取数，所以读缓冲在 MAC 开始时就空出来；每个缓冲单独计数在途读，预取在上一组仍在排空时
+  就发出下一组（K 组 g 固定在缓冲 g%2）。M=4 的 decode GEMM 每个 K 组约 5 周期（原约 8.5）。
+- VCS 行为级 scratchpad（Round 39 修正）：line 读改为与其他端口及 XPM `READ_LATENCY=2`
+  一致的两级寄存。原先只有一级，若紧随其后一拍有另一笔 line 访问，仲裁器两拍后返回给读者的
+  数据会被覆盖（只影响 `+define+VCS` 仿真模型，FPGA XPM 路径本来就是两级）。
 - 多引擎通过 `ai_compute_spad_mux` 汇入 `ai_spad_arbiter` 的单一 core 客户端。仲裁保持
   请求和响应归属，但不建立跨 descriptor 的数据依赖；软件要避免可能并发任务的 SPAD 读写冲突。
 - `ai_spad_arbiter` 是 scheduler-side scratchpad 的唯一拥有者。descriptor/completion

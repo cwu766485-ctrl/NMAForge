@@ -118,7 +118,17 @@ class FloatGpt2:
                 c = v.abs().amax(0)
                 obs["chan." + k] = torch.maximum(obs["chan." + k], c) if "chan." + k in obs else c
 
-        a = self.ln(x, f"h.{i}.ln_1"); rec("ln1", a); chan("c_attn", a)
+        def hess(k, v, blk=0):
+            """GPTQ input Hessians X^T X (float64); blk > 0 keeps only the
+            diagonal blk x blk blocks (one per head / FF chunk weight slice)."""
+            if obs is None or not obs.get("_hess"):
+                return
+            v = v.double()
+            h = (torch.einsum("tgi,tgj->gij", v.reshape(T, -1, blk), v.reshape(T, -1, blk))
+                 if blk else v.T @ v)
+            obs["H." + k] = obs["H." + k] + h if "H." + k in obs else h
+
+        a = self.ln(x, f"h.{i}.ln_1"); rec("ln1", a); chan("c_attn", a); hess("ln1", a)
         w, b = g("attn.c_attn.weight"), g("attn.c_attn.bias")
         sc = LOG2E / math.sqrt(HD)
         q = (a @ w[:, :D] + b[:D]) * sc
@@ -131,12 +141,12 @@ class FloatGpt2:
             cs = slice(h * HD, (h + 1) * HD)
             s = (q[:, cs] @ k[:, cs].T).masked_fill(~mask, float("-inf"))
             att[:, cs] = torch.softmax(s * math.log(2.0), -1) @ v[:, cs]
-        rec("att", att, H); chan("c_proj", att)
+        rec("att", att, H); chan("c_proj", att); hess("att", att, HD)
         wo, bo = g("attn.c_proj.weight"), g("attn.c_proj.bias")
         x = x + att @ wo + (bo + b[2 * D:] @ wo)
-        m = self.ln(x, f"h.{i}.ln_2"); rec("ln2", m); chan("c_fc", m)
+        m = self.ln(x, f"h.{i}.ln_2"); rec("ln2", m); chan("c_fc", m); hess("ln2", m)
         u = m @ g("mlp.c_fc.weight") + g("mlp.c_fc.bias"); rec("fc1", u, self.FF // CH)
-        u = gelu_new(u); rec("gelu", u, self.FF // CH)
+        u = gelu_new(u); rec("gelu", u, self.FF // CH); hess("gelu", u, CH)
         return x + u @ g("mlp.c_proj.weight") + g("mlp.c_proj.bias")
 
     def head(self, x):
@@ -175,20 +185,43 @@ def wq_pow2(w: np.ndarray):
     return np.clip(np.round(w / 2.0 ** ew), -127, 127).astype(np.int64), ew
 
 
-def wq_i4blk(w: np.ndarray):
+GPTQ_DAMP = 0.01                      # Hessian damping, fraction of mean diagonal
+
+
+def wq_i4blk(w: np.ndarray, hess: np.ndarray | None = None):
     """INT4 block-exponent weight (0x60 flags[1] stream): one power-of-two
     scale per aligned 4x4 block (= one packed SPAD line), limited to the 5
     levels [E, E+4] (E = Emax - 4) so the expanded value w4 << (e - E) fits
-    INT8.  Returns the expanded INT8 values and E (w ~= w8 * 2^E)."""
+    INT8.  Returns the expanded INT8 values and E (w ~= w8 * 2^E).
+
+    With `hess` (input Hessian X^T X, [K, K]) the block scales stay those of
+    the original weight, but rows (inputs) are rounded in order and each
+    row's rounding error is propagated to the remaining rows (GPTQ)."""
     K, N = w.shape
     b = w.reshape(K // 4, 4, N // 4, 4)
     amax = np.abs(b).max(axis=(1, 3), keepdims=True)
     e = np.ceil(np.log2(np.maximum(amax, 1e-30) / 7.0))
     E = int(e.max()) - 4                          # (an MSE-chosen lower base that
     e = np.maximum(e, E)                          #  clips outlier blocks was worse)
-    w4 = np.clip(np.round(b / 2.0 ** e), -8, 7)
-    w8 = (w4 * 2.0 ** (e - E)).astype(np.int64)
-    return w8.reshape(K, N), E
+    if hess is None:
+        w4 = np.clip(np.round(b / 2.0 ** e), -8, 7)
+        w8 = (w4 * 2.0 ** (e - E)).astype(np.int64)
+        return w8.reshape(K, N), E
+    s = np.repeat(np.repeat(2.0 ** e, 4, axis=1), 4, axis=3).reshape(K, N)   # per-element scale
+    h = np.array(hess, np.float64, copy=True)
+    dead = np.diag(h) <= 0
+    h[dead, dead] = 1.0
+    h += GPTQ_DAMP * np.mean(np.diag(h)) * np.eye(K)
+    u = np.linalg.cholesky(np.linalg.inv(h)).T                 # upper Cholesky of H^-1
+    wk = np.array(w, np.float64, copy=True)
+    wk[dead, :] = 0.0
+    q = np.zeros((K, N))
+    for k in range(K):
+        q[k] = np.clip(np.round(wk[k] / s[k]), -8, 7) * s[k]
+        err = (wk[k] - q[k]) / u[k, k]
+        wk[k + 1:] -= np.outer(u[k, k + 1:], err)
+    w8 = np.round(q / 2.0 ** E).astype(np.int64)
+    return w8, E
 
 
 class QuantLayer:
@@ -197,8 +230,12 @@ class QuantLayer:
     def __init__(self, fm: FloatGpt2, i: int, obs: dict, int4: frozenset = frozenset()):
         D, H, HD, FF = fm.D, fm.H, fm.HD, fm.FF
         wq8 = globals()["wq_pow2"]
-        wq_attn = wq_i4blk if "attn" in int4 else wq8
-        wq_ffn = wq_i4blk if "ffn" in int4 else wq8
+        hs = lambda k, j=None: (None if "H." + k not in obs else
+                                (obs["H." + k] if j is None else obs["H." + k][j]).numpy())
+        wq_attn = (lambda w_, h_=None: wq_i4blk(w_, h_)) if "attn" in int4 else \
+            (lambda w_, h_=None: wq8(w_))
+        wq_ffn = (lambda w_, h_=None: wq_i4blk(w_, h_)) if "ffn" in int4 else \
+            (lambda w_, h_=None: wq8(w_))
         self.D, self.H, self.HD, self.FF, self.NC = D, H, HD, FF, FF // CH
         g = lambda n: fm.g(i, n).double().numpy()
         ex = lambda v: p2(float(v) / 127.0)
@@ -225,9 +262,9 @@ class QuantLayer:
         ewo, wo_q = [], []
         for h in range(H):
             cs = slice(h * HD, (h + 1) * HD)
-            wq_, ewq = wq_attn(w[:, cs] * sc)
-            wk_, ewk = wq_attn(w[:, D:][:, cs])
-            wv_, ewv = wq_attn(w[:, 2 * D:][:, cs])
+            wq_, ewq = wq_attn(w[:, cs] * sc, hs("ln1"))
+            wk_, ewk = wq_attn(w[:, D:][:, cs], hs("ln1"))
+            wv_, ewv = wq_attn(w[:, 2 * D:][:, cs], hs("ln1"))
             if e["q"][h] + e["k"][h] > -8:               # Q8.8 scores need 2^(eq+ek) <= 2^-8
                 e["q"][h] = -8 - e["k"][h]
             shq = e["q"][h] - (e["ln1"] + ewq)
@@ -239,7 +276,7 @@ class QuantLayer:
             self.sh_a.append(e["att"][h] - (-7 + e["v"][h]))
             self.bq.append(np.round(b[cs] * sc / 2.0 ** (e["ln1"] + ewq)).astype(np.int64) + half(shq))
             self.bk.append(np.round(b[D:][cs] / 2.0 ** (e["ln1"] + ewk)).astype(np.int64) + half(shk))
-            q_, ew = wq_attn(wo_f[cs, :])
+            q_, ew = wq_attn(wo_f[cs, :], hs("att", h))
             wo_q.append(q_); ewo.append(ew)
         prod = [e["att"][h] + ewo[h] for h in range(H)]
         self.E_o = max(max(prod), -F_RES - MAX_ACC_SHIFT)
@@ -257,14 +294,14 @@ class QuantLayer:
         prod2, w2_q = [], []
         for c in range(self.NC):
             cs = slice(c * CH, (c + 1) * CH)
-            q1, ew1 = wq_ffn(w1[:, cs])
+            q1, ew1 = wq_ffn(w1[:, cs], hs("ln2"))
             self.w1.append(q1)
             self.b1.append(np.round(b1[cs] / 2.0 ** (e["ln2"] + ew1)).astype(np.int64))
             self.sh_l.append(e["fc1"][c] - (e["ln2"] + ew1))
             codes = np.arange(-128, 128) * 2.0 ** e["fc1"][c]
             self.lut.append(np.clip(np.round(gelu_new_np(codes) / 2.0 ** e["gelu"][c]),
                                     -128, 127).astype(np.int64))
-            q2, ew2 = wq_ffn(w2[cs, :])
+            q2, ew2 = wq_ffn(w2[cs, :], hs("gelu", c))
             w2_q.append(q2); prod2.append(e["gelu"][c] + ew2)
         self.E_2 = max(max(prod2), -F_RES - MAX_ACC_SHIFT)
         self.s_2 = -F_RES - self.E_2
@@ -639,6 +676,8 @@ def main():
     ap.add_argument("--int4-weights", choices=("none", "ffn", "all"), default="none",
                     help="stream these Linear weights as INT4 block-exponent super-blocks "
                          "(0x60 flags[1]): ffn = MLP only, all = MLP + attention")
+    ap.add_argument("--no-gptq", action="store_true",
+                    help="round INT4 weights to nearest instead of GPTQ error propagation")
     ap.add_argument("--no-gemm-acc", action="store_true",
                     help="legacy head/chunk sums: GEMM to PART + RESIDUAL (no 0x30 flags[7])")
     ap.add_argument("--out", type=Path, required=True)
@@ -663,9 +702,10 @@ def main():
     obs = [dict() for _ in range(fm.L)]
     for w in calib:
         fm.forward(w[:-1], obs)
+    gptq = a.int4_weights != "none" and not a.no_gptq
     if a.smooth:
         fm.smooth(obs, a.smooth)
-        obs = [dict() for _ in range(fm.L)]
+        obs = [dict(_hess=gptq) for _ in range(fm.L)]
         for w in calib:
             fm.forward(w[:-1], obs)
     smoothed_diff = (fm.forward(probe) - ref.forward(probe)).abs().max().item()
@@ -673,7 +713,7 @@ def main():
                 "all": frozenset({"ffn", "attn"})}[a.int4_weights]
     qls = [QuantLayer(fm, i, obs[i], int4=i4_kinds) for i in range(fm.L)]
     result = {"model": fm.name, "d_model": fm.D, "n_layer": fm.L, "n_head": fm.H,
-              "f_res": F_RES, "ln_round_bits": LN_RB, "smooth_alpha": a.smooth,
+              "f_res": F_RES, "ln_round_bits": LN_RB, "smooth_alpha": a.smooth, "int4_gptq": gptq,
               "calib": f"{len(calib)}x{a.calib_ctx} WikiText-2 test tail",
               "hf_fp32_max_logit_diff": diff, "smoothed_fp32_max_logit_diff": smoothed_diff,
               "layers_on_npu": a.layers, "torch_threads": torch.get_num_threads(),

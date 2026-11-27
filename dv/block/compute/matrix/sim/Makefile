@@ -91,7 +91,8 @@ core-random-run: core-random-compile
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$(SEED) -l $(CORE_OUT_DIR)/run.log
 	grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run.log
 	grep -Eq '^MATRIX_CORE_ACC_PASS cases=6 faults=3 saturated_words=[1-9][0-9]* golden=bit-exact$$' $(CORE_OUT_DIR)/run.log
-	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=38 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
+	grep -q '^MATRIX_CORE_BIAS_LINE_PASS faults=2 scalar_bias_faults=2$$' $(CORE_OUT_DIR)/run.log
+	grep -q '^MATRIX_CORE_RANDOM_PASS cases=18 faults=40 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 ' $(CORE_OUT_DIR)/run.log
 	$(CORE_OUT_DIR)/simv +SEED=$(SEED) +MATRIX_PRODUCT_GEMV_ONLY -cm $(COV_METRICS) \
 		-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_product_gemv_$(SEED) \
 		-l $(CORE_OUT_DIR)/product_gemv.log
@@ -106,7 +107,7 @@ core-random-regress: core-random-compile
 		$(CORE_OUT_DIR)/simv +SEED=$$seed -cm $(COV_METRICS) \
 			-cm_dir $(CORE_OUT_DIR)/coverage.vdb -cm_name matrix_core_seed_$$seed \
 			-l $(CORE_OUT_DIR)/run_seed_$$seed.log; \
-		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=38 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
+		grep -q "^MATRIX_CORE_RANDOM_PASS cases=18 faults=40 late_tile_faults=1 fault_abort_combo=1 reset_fault_combo=1 reset_recovery=1 outstanding_abort=1 outstanding_parity=1 prefetch_parity=1 prefetch_abort=1 prefetch_watchdog=1 prefetch_reset=1 phase_abort=6 prefetch_wait_abort=1 prefetch_b_req_abort=1 prefetch_handoff=1 phase_reset=11 seed=$$seed " $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		grep -Eq '^MATRIX_LINE_CONTRACT_PASS full_wstrb=1 aligned=1 stalled_stability=[1-9][0-9]* unaligned_scalar_fallback=1 protection_error=1 partial_zero_wstrb=unsupported$$' $(CORE_OUT_DIR)/run_seed_$$seed.log; \
 		$(CORE_OUT_DIR)/simv +SEED=$$seed +MATRIX_PRODUCT_GEMV_ONLY \
 			-cm $(COV_METRICS) -cm_dir $(CORE_OUT_DIR)/coverage.vdb \

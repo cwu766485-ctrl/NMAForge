@@ -1,0 +1,1 @@
+GPT2_INT_PPL model=models--gpt2 ctx=256 windows=10 fp32=47.022 int=58.135 ln_sat=0.00e+00 s=52

@@ -156,6 +156,12 @@ module ai_scratchpad #(
     reg bank3_parity [0:WORDS_PER_BANK-1];
     reg [31:0] host_rdata_pipe, compute_rdata_pipe;
     reg host_parity_pipe, compute_parity_pipe;
+    // Line reads use the same two registered stages as every other port
+    // (XPM READ_LATENCY=2): the arbiter returns the response two cycles after
+    // the request, so a line access in the following cycle must not
+    // overwrite the data still owed to the earlier read.
+    reg [127:0] line_rdata_pipe;
+    reg [3:0] line_parity_pipe;
     reg [31:0] banked_data0_pipe, banked_data1_pipe;
     reg [31:0] banked_data2_pipe, banked_data3_pipe;
     reg [3:0] banked_parity_pipe, cnm_parity_pipe;
@@ -182,6 +188,8 @@ module ai_scratchpad #(
         banked_data0 <= banked_data0_pipe; banked_data1 <= banked_data1_pipe;
         banked_data2 <= banked_data2_pipe; banked_data3 <= banked_data3_pipe;
         banked_parity_error <= banked_parity_pipe;
+        line_rdata <= line_rdata_pipe;
+        line_parity_error <= line_parity_pipe;
         cnm_data0 <= cnm_data0_pipe; cnm_data1 <= cnm_data1_pipe;
         cnm_data2 <= cnm_data2_pipe; cnm_data3 <= cnm_data3_pipe;
         cnm_parity_error <= cnm_parity_pipe;
@@ -220,12 +228,12 @@ module ai_scratchpad #(
         // Port B: scheduler.  A scalar/DMA/descriptor request addresses one
         // bank; a banked request addresses all banks at one row in parallel.
         if (line_access_ok) begin
-            line_rdata <= {bank3[line_row],bank2[line_row],
-                           bank1[line_row],bank0[line_row]};
-            line_parity_error[0] <= (^bank0[line_row]) ^ bank0_parity[line_row];
-            line_parity_error[1] <= (^bank1[line_row]) ^ bank1_parity[line_row];
-            line_parity_error[2] <= (^bank2[line_row]) ^ bank2_parity[line_row];
-            line_parity_error[3] <= (^bank3[line_row]) ^ bank3_parity[line_row];
+            line_rdata_pipe <= {bank3[line_row],bank2[line_row],
+                                bank1[line_row],bank0[line_row]};
+            line_parity_pipe[0] <= (^bank0[line_row]) ^ bank0_parity[line_row];
+            line_parity_pipe[1] <= (^bank1[line_row]) ^ bank1_parity[line_row];
+            line_parity_pipe[2] <= (^bank2[line_row]) ^ bank2_parity[line_row];
+            line_parity_pipe[3] <= (^bank3[line_row]) ^ bank3_parity[line_row];
             if (line_write) begin
                 bank0[line_row] <= merge_wstrb(bank0[line_row],line_wdata[31:0],line_wstrb[3:0]);
                 bank1[line_row] <= merge_wstrb(bank1[line_row],line_wdata[63:32],line_wstrb[7:4]);

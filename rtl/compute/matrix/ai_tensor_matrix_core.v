@@ -15,7 +15,11 @@ module ai_tensor_matrix_core #(
     parameter integer ENABLE_FUSED_PINGPONG_WRITEBACK = 1,
     parameter integer ENABLE_MATRIX_OUTPUT_OVERLAP = 1,
     parameter integer ENABLE_MATRIX_DIRECT_PREFETCH = 1,
-    parameter integer ENABLE_GEMV_FILL_MAC_OVERLAP = 1
+    parameter integer ENABLE_GEMV_FILL_MAC_OVERLAP = 1,
+    // GEMM K loop: snapshot each K group's A/B words when its lane 0 enters
+    // the array so the read buffer frees at MAC start, and issue the next
+    // group's prefetch without waiting for the previous one to drain.
+    parameter integer ENABLE_GEMM_OPERAND_STAGE = 1
 )(
     input  wire        clk,
     input  wire        resetn,
@@ -170,7 +174,7 @@ module ai_tensor_matrix_core #(
     reg [READ_FIFO_PTR_WIDTH-1:0] read_fifo_wr_ptr, read_fifo_rd_ptr;
     // {operand B, 4x4 group, K group, N-tile, full bank-word address}. The fixed-latency
     // response path has no ID, so accepted request ownership is retained here.
-    reg [69:0] read_response_meta_fifo [0:MAX_OUTSTANDING_READS-1];
+    reg [70:0] read_response_meta_fifo [0:MAX_OUTSTANDING_READS-1];
     reg [READ_FIFO_COUNT_WIDTH-1:0] perf_outstanding_highwater;
     reg [31:0] perf_fifo_full_cycles;
     reg [15:0] m_r, n_r, k_words_r;
@@ -246,6 +250,13 @@ module ai_tensor_matrix_core #(
 
     reg [31:0] a_tile_words_r [0:1][0:ARRAY_SIZE-1];
     reg [31:0] b_tile_words_r [0:1][0:ARRAY_SIZE-1];
+    // GEMM operand staging (ENABLE_GEMM_OPERAND_STAGE).
+    reg [31:0] a_stage_words_r [0:ARRAY_SIZE-1];
+    reg [31:0] b_stage_words_r [0:ARRAY_SIZE-1];
+    reg [1:0]  stage_hold_r;        // buffer holds a K group not yet snapshotted
+    reg [15:0] stage_next_k_r;      // next K group to prefetch (0: none kicked yet)
+    reg [1:0]  stage_drain_pend_r;  // buffer issued, waiting for its responses
+    reg [READ_FIFO_COUNT_WIDTH-1:0] stage_buf_pend_r [0:1];
     reg [31:0] a_tile_cache_words_r [0:A_TILE_CACHE_K_WORDS-1][0:ARRAY_SIZE-1];
     // Four 1 KiB B macro-tiles retain the four N panels of a 64-column
     // command while the existing A cache retains the active M panel.
@@ -519,17 +530,18 @@ module ai_tensor_matrix_core #(
         read_outstanding_count +
         (read_fifo_push && !read_fifo_pop) -
         (read_fifo_pop && !read_fifo_push);
-    wire prefetch_complete = (prefetch_state_r == PF_B_DRAIN) &&
-                             (read_outstanding_next == 0);
+    wire prefetch_complete;
     wire [READ_FIFO_PTR_WIDTH-1:0] read_fifo_wr_next =
         (read_fifo_wr_ptr == READ_FIFO_LAST) ?
         {READ_FIFO_PTR_WIDTH{1'b0}} : read_fifo_wr_ptr + 1'b1;
     wire [READ_FIFO_PTR_WIDTH-1:0] read_fifo_rd_next =
         (read_fifo_rd_ptr == READ_FIFO_LAST) ?
         {READ_FIFO_PTR_WIDTH{1'b0}} : read_fifo_rd_ptr + 1'b1;
-    wire [69:0] response_meta = read_response_meta_fifo[read_fifo_rd_ptr];
-    // Bit 69 tags an accumulate-epilogue read of the old C line. Those
-    // responses bypass the A/B operand buffers and the context check.
+    wire [70:0] response_meta = read_response_meta_fifo[read_fifo_rd_ptr];
+    // Bit 70 tags a bias line read (bias words 4g..4g+3 of the column tile,
+    // g = response_group). Bit 69 tags an accumulate-epilogue read of the old
+    // C line. Both bypass the A/B operand buffers and the context check.
+    wire response_bias = response_meta[70];
     wire response_acc = response_meta[69];
     wire response_buffer = response_meta[68];
     wire response_operand_b = response_meta[67];
@@ -565,7 +577,7 @@ module ai_tensor_matrix_core #(
         (response_operand_b ? (b_tile_base_r + response_group_offset) :
                               (a_tile_base_r + response_group_offset));
     wire banked_response_context_fault = banked_response_accept &&
-        !response_acc && (state_r != ST_ERROR_DRAIN) &&
+        !response_acc && !response_bias && (state_r != ST_ERROR_DRAIN) &&
         ((response_k_group >= k_words_r) ||
          (response_request_addr != response_expected_addr));
     wire [31:0] bias_read_addr =
@@ -678,6 +690,19 @@ module ai_tensor_matrix_core #(
         !abort && !watchdog_expired && !banked_response_fault &&
         !banked_response_context_fault;
     wire acc_read_issue = acc_read_request && banked_ready;
+    // A 16-byte aligned bias tile whose column count is a multiple of four is
+    // fetched as whole lines through the banked port (bias_index_r counts
+    // lines); other tiles keep the scalar word path.
+    wire bias_line_mode = (bias_tile_base_r[3:0] == 4'd0) &&
+                          (valid_cols[1:0] == 2'b00);
+    wire [31:0] bias_line_count = valid_cols >> 2;
+    wire bias_line_request = (state_r == ST_BIAS_REQ) && bias_line_mode &&
+        !prefetch_issue_active &&
+        ({{(32-TILE_INDEX_WIDTH-1){1'b0}},bias_index_r} < bias_line_count) &&
+        (read_outstanding_count < MAX_OUTSTANDING_READS) &&
+        !abort && !watchdog_expired && !banked_response_fault &&
+        !banked_response_context_fault;
+    wire bias_line_issue = bias_line_request && banked_ready;
     wire gemv_b_initial_copy =
         ((((state_r == ST_A_REQ) && gemv_a_line_reuse) ||
           ((state_r == ST_A_WAIT) && (read_outstanding_next == 0))) &&
@@ -702,6 +727,48 @@ module ai_tensor_matrix_core #(
          (state_r == ST_PREFETCH_WAIT));
     wire matrix_operand_source_buffer = matrix_next_operand_preload ?
         ~compute_buffer_r : compute_buffer_r;
+    // GEMM operand staging. Lane 0 of a K group is loaded from its read
+    // buffer (PREP or the preload edge) while all 32 words are copied into the
+    // stage; lanes 1-3 come from the stage, so the buffer is free for the
+    // K group two ahead. Each buffer counts its own outstanding reads, so the
+    // next prefetch issues while the previous one is still draining.
+    wire stage_mode = (ENABLE_GEMM_OPERAND_STAGE != 0) &&
+                      (ENABLE_NEXT_K_PREFETCH != 0) && !gemv_kfold_r &&
+                      !tile_forward_consume_active_r;
+    wire stage_capture = stage_mode &&
+        ((state_r == ST_PREP_MAC) || matrix_next_operand_preload);
+    wire stage_load_from_stage = stage_mode && (state_r == ST_MAC) &&
+                                 !matrix_next_operand_preload;
+    wire stage_push_operand = read_fifo_push && !acc_read_issue &&
+                              !bias_line_issue;
+    wire stage_pop_operand = read_fifo_pop && !response_acc && !response_bias;
+    wire [READ_FIFO_COUNT_WIDTH-1:0] stage_pend_next0 = stage_buf_pend_r[0] +
+        (stage_push_operand && !banked_request_buffer) -
+        (stage_pop_operand && !response_buffer);
+    wire [READ_FIFO_COUNT_WIDTH-1:0] stage_pend_next1 = stage_buf_pend_r[1] +
+        (stage_push_operand && banked_request_buffer) -
+        (stage_pop_operand && response_buffer);
+    wire [1:0] stage_valid_set = stage_drain_pend_r &
+        {(stage_pend_next1 == 0), (stage_pend_next0 == 0)};
+    wire stage_pf_issue_done = stage_mode && !gemv_b_bulk_fill_r &&
+        (prefetch_state_r == PF_B_REQ) && banked_request_is_prefetch &&
+        banked_read_accept &&
+        (({29'd0,prefetch_group_r} + 32'd1) >= prefetch_b_group_count);
+    wire stage_pf_idle_next =
+        ((prefetch_state_r == PF_IDLE) && !prefetch_kick) ||
+        stage_pf_issue_done ||
+        (stage_mode && (prefetch_state_r == PF_B_DRAIN));
+    wire [1:0] stage_hold_next = stage_hold_r &
+        ~(stage_capture ? (2'b01 << matrix_operand_source_buffer) : 2'b00);
+    wire stage_auto_kick = stage_mode &&
+        ((state_r == ST_MAC) || (state_r == ST_PREFETCH_WAIT)) &&
+        !prefetch_kick && stage_pf_idle_next &&
+        (stage_next_k_r != 16'd0) && (stage_next_k_r < k_words_r) &&
+        !stage_hold_next[stage_next_k_r[0]] &&
+        !abort && !watchdog_expired && !banked_request_fault &&
+        !banked_response_fault && !banked_response_context_fault;
+    assign prefetch_complete = stage_mode ? (|stage_valid_set) :
+        ((prefetch_state_r == PF_B_DRAIN) && (read_outstanding_next == 0));
     wire gemv_stream_next_operand_preload = gemv_kfold_r &&
         !gemv_b_bulk_fill_r && !gemv_b_panel_cached_r &&
         prefetch_valid_r[~compute_buffer_r] &&
@@ -974,9 +1041,13 @@ module ai_tensor_matrix_core #(
         end else if (acc_read_request) begin
             banked_read_valid = 1'b1;
             banked_addr = write_row_addr;
+        end else if (bias_line_request) begin
+            banked_read_valid = 1'b1;
+            banked_addr = bias_tile_base_r +
+                ({{(32-TILE_INDEX_WIDTH-1){1'b0}},bias_index_r} << 4);
         end
 
-        spad_valid = (state_r == ST_BIAS_REQ) ||
+        spad_valid = ((state_r == ST_BIAS_REQ) && !bias_line_mode) ||
                      ((state_r == ST_WRITE) && !fused_requant_output &&
                       !line_store_eligible && scalar_output_valid);
         spad_write = (state_r == ST_WRITE) && !fused_requant_output &&
@@ -1080,6 +1151,19 @@ module ai_tensor_matrix_core #(
                                 ((vector_i%4)*4)+(matrix_col_i/4)]
                                 [(matrix_col_i%4)*8 +: 8];
                 end
+            end else if (stage_load_from_stage) begin
+                array_load_a[vector_i*8 +: 8] = matrix_tile_element(
+                    a_stage_words_r[(vector_i/4)*4+0],
+                    a_stage_words_r[(vector_i/4)*4+1],
+                    a_stage_words_r[(vector_i/4)*4+2],
+                    a_stage_words_r[(vector_i/4)*4+3],
+                    vector_i%4,array_load_lane,transpose_a_r);
+                array_load_b[vector_i*8 +: 8] = matrix_tile_element(
+                    b_stage_words_r[(vector_i/4)*4+0],
+                    b_stage_words_r[(vector_i/4)*4+1],
+                    b_stage_words_r[(vector_i/4)*4+2],
+                    b_stage_words_r[(vector_i/4)*4+3],
+                    vector_i%4,array_load_lane,transpose_b_r);
             end else begin
                 array_load_a[vector_i*8 +: 8] = matrix_tile_element(
                     a_tile_words_r[matrix_operand_source_buffer][(vector_i/4)*4+0],
@@ -1155,15 +1239,26 @@ module ai_tensor_matrix_core #(
             prefetch_k_group_r <= 16'd0;
             prefetch_buffer_r <= 1'b0;
             prefetch_valid_r <= 2'b00;
+            stage_drain_pend_r <= 2'b00;
+            stage_buf_pend_r[0] <= {READ_FIFO_COUNT_WIDTH{1'b0}};
+            stage_buf_pend_r[1] <= {READ_FIFO_COUNT_WIDTH{1'b0}};
         end else begin
+            // Per-buffer outstanding operand reads (every accepted A/B read,
+            // including the error drain, so the counts stay exact).
+            stage_buf_pend_r[0] <= stage_pend_next0;
+            stage_buf_pend_r[1] <= stage_pend_next1;
             if (prefetch_consume)
                 prefetch_valid_r[prefetch_consume_buffer] <= 1'b0;
+            if (stage_valid_set[0]) prefetch_valid_r[0] <= 1'b1;
+            if (stage_valid_set[1]) prefetch_valid_r[1] <= 1'b1;
+            stage_drain_pend_r <= stage_drain_pend_r & ~stage_valid_set;
 
             if (abort || watchdog_expired || banked_request_fault ||
                 banked_response_fault || banked_response_context_fault ||
                 (state_r == ST_ERROR_DRAIN) || (state_r == ST_ERROR)) begin
                 prefetch_state_r <= PF_IDLE;
                 prefetch_valid_r <= 2'b00;
+                stage_drain_pend_r <= 2'b00;
             end else if (prefetch_kick && (prefetch_state_r == PF_IDLE)) begin
                 prefetch_k_group_r <= prefetch_kick_k_group;
                 prefetch_buffer_r <= prefetch_kick_buffer;
@@ -1244,6 +1339,9 @@ module ai_tensor_matrix_core #(
                                     prefetch_group_r <= 3'd0;
                                     if (prefetch_k_group_r[1:0] == 2'b11)
                                         prefetch_state_r <= PF_A_REQ;
+                                end else if (stage_mode) begin
+                                    stage_drain_pend_r[prefetch_buffer_r] <= 1'b1;
+                                    prefetch_state_r <= PF_IDLE;
                                 end else begin
                                     prefetch_state_r <= PF_B_DRAIN;
                                 end
@@ -1253,7 +1351,10 @@ module ai_tensor_matrix_core #(
                         end
                     end
                     PF_B_DRAIN: begin
-                        if (read_outstanding_next == 0) begin
+                        if (stage_mode) begin
+                            stage_drain_pend_r[prefetch_buffer_r] <= 1'b1;
+                            prefetch_state_r <= PF_IDLE;
+                        end else if (read_outstanding_next == 0) begin
                             prefetch_valid_r[prefetch_buffer_r] <= 1'b1;
                             prefetch_state_r <= PF_IDLE;
                         end
@@ -1321,6 +1422,12 @@ module ai_tensor_matrix_core #(
             perf_tile_forward_hits <= 32'd0;
             perf_tile_forward_reads_saved <= 32'd0;
             compute_buffer_r <= 1'b0;
+            stage_hold_r <= 2'b00;
+            stage_next_k_r <= 16'd0;
+            for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1) begin
+                a_stage_words_r[reset_i] <= 32'd0;
+                b_stage_words_r[reset_i] <= 32'd0;
+            end
             prefetch_kick <= 1'b0;
             prefetch_kick_k_group <= 16'd0;
             prefetch_kick_buffer <= 1'b0;
@@ -1437,6 +1544,36 @@ module ai_tensor_matrix_core #(
             prefetch_kick <= 1'b0;
             prefetch_consume <= 1'b0;
 
+            // GEMM operand staging: snapshot, buffer hold and the self-timed
+            // prefetch of K group stage_next_k_r into buffer stage_next_k_r[0]
+            // (K group g always lives in buffer g % 2).
+            if (stage_capture)
+                for (reset_i = 0; reset_i < ARRAY_SIZE; reset_i = reset_i + 1) begin
+                    a_stage_words_r[reset_i] <=
+                        a_tile_words_r[matrix_operand_source_buffer][reset_i];
+                    b_stage_words_r[reset_i] <=
+                        b_tile_words_r[matrix_operand_source_buffer][reset_i];
+                end
+            if ((state_r == ST_IDLE) || (state_r == ST_ERROR) ||
+                (state_r == ST_ERROR_DRAIN)) begin
+                stage_hold_r <= 2'b00;
+                stage_next_k_r <= 16'd0;
+            end else if ((state_r == ST_A_REQ) && (k_group_r == 16'd0)) begin
+                stage_hold_r <= 2'b01;
+                stage_next_k_r <= 16'd0;
+            end else begin
+                stage_hold_r <= stage_hold_next |
+                    ((prefetch_kick && (prefetch_state_r == PF_IDLE)) ?
+                     (2'b01 << prefetch_kick_buffer) : 2'b00);
+                if (prefetch_kick)
+                    stage_next_k_r <= prefetch_kick_k_group + 1'b1;
+            end
+            if (stage_auto_kick) begin
+                prefetch_kick <= 1'b1;
+                prefetch_kick_k_group <= stage_next_k_r;
+                prefetch_kick_buffer <= stage_next_k_r[0];
+            end
+
             // Transfer one complete, post-processed tile to its output owner.
             // The line writer then advances independently of the MAC FSM.
             if (matrix_overlap_launch) begin
@@ -1476,8 +1613,10 @@ module ai_tensor_matrix_core #(
             // response arrives. A response can coincide with a new accept.
             if (read_fifo_push) begin
                 read_response_meta_fifo[read_fifo_wr_ptr] <= {
-                    acc_read_issue, banked_request_buffer, banked_request_is_b,
-                    banked_request_group, banked_request_k_group,
+                    bias_line_issue, acc_read_issue, banked_request_buffer,
+                    banked_request_is_b,
+                    bias_line_issue ? bias_index_r[2:0] : banked_request_group,
+                    banked_request_k_group,
                     col_tile_r, banked_addr
                 };
                 read_fifo_wr_ptr <= read_fifo_wr_next;
@@ -1490,7 +1629,15 @@ module ai_tensor_matrix_core #(
                 default: read_outstanding_count <= read_outstanding_count;
             endcase
 
-            if (read_fifo_pop && !response_acc && !bank_response_has_parity_error &&
+            if (read_fifo_pop && response_bias && !bank_response_has_parity_error &&
+                (state_r != ST_ERROR_DRAIN) && !abort && !watchdog_expired) begin
+                bias_words_r[response_group*4+0] <= bank0_data;
+                bias_words_r[response_group*4+1] <= bank1_data;
+                bias_words_r[response_group*4+2] <= bank2_data;
+                bias_words_r[response_group*4+3] <= bank3_data;
+            end
+            if (read_fifo_pop && !response_acc && !response_bias &&
+                !bank_response_has_parity_error &&
                 !banked_response_context_fault &&
                 (state_r != ST_ERROR_DRAIN) && !abort &&
                 !watchdog_expired) begin
@@ -1754,7 +1901,10 @@ module ai_tensor_matrix_core #(
                 if ((((state_r == ST_A_REQ) || (state_r == ST_A_WAIT) ||
                       (state_r == ST_B_REQ) || (state_r == ST_B_WAIT)) &&
                      (read_outstanding_count != 0) && !banked_rsp_valid) ||
-                    ((state_r == ST_BIAS_WAIT) && !spad_rsp_valid))
+                    ((state_r == ST_BIAS_WAIT) &&
+                     (bias_line_mode ?
+                      ((read_outstanding_count != 0) && !banked_rsp_valid) :
+                      !spad_rsp_valid)))
                     perf_response_wait_cycles <=
                         perf_response_wait_cycles + 1'b1;
                 if (((state_r == ST_WRITE) && !output_write_accepted) ||
@@ -2024,7 +2174,14 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_BIAS_REQ: begin
-                        if (spad_ready) begin
+                        if (bias_line_mode) begin
+                            if (bias_line_issue) begin
+                                bias_index_r <= bias_index_r + 1'b1;
+                                if (({{(32-TILE_INDEX_WIDTH-1){1'b0}},bias_index_r} +
+                                     32'd1) >= bias_line_count)
+                                    state_r <= ST_BIAS_WAIT;
+                            end
+                        end else if (spad_ready) begin
                             if (spad_protection_error) begin
                                 error_code <= ERR_PROTECTION;
                                 state_r <= ST_ERROR;
@@ -2035,7 +2192,25 @@ module ai_tensor_matrix_core #(
                     end
 
                     ST_BIAS_WAIT: begin
-                        if (spad_rsp_valid) begin
+                        if (bias_line_mode) begin
+                            if (read_outstanding_next == 0) begin
+                                bias_loaded_r <= 1'b1;
+                                if (ENABLE_NEXT_K_PREFETCH &&
+                                    !gemv_b_panel_cached_r &&
+                                    ((gemv_kfold_r &&
+                                      (({16'd0,k_group_r} + 32'd1) <
+                                       {16'd0,k_words_r})) ||
+                                     (!gemv_kfold_r && (k_group_r == 0) &&
+                                      (k_words_r > 1)))) begin
+                                    prefetch_kick <= 1'b1;
+                                    prefetch_kick_k_group <= gemv_kfold_r ?
+                                        (k_group_r + 1'b1) : 16'd1;
+                                    prefetch_kick_buffer <= gemv_kfold_r ?
+                                        ~compute_buffer_r : 1'b1;
+                                end
+                                state_r <= ST_PREP_MAC;
+                            end
+                        end else if (spad_rsp_valid) begin
                             if (spad_parity_error) begin
                                 error_code <= ERR_PARITY;
                                 state_r <= ST_ERROR;
@@ -2153,7 +2328,8 @@ module ai_tensor_matrix_core #(
                                 prefetch_consume <= 1'b1;
                                 prefetch_consume_buffer <= ~compute_buffer_r;
                                 read_group_r <= 3'd0;
-                                if (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r}) begin
+                                if (!stage_mode &&
+                                    (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r})) begin
                                     prefetch_kick <= 1'b1;
                                     prefetch_kick_k_group <= k_group_r + 2'd2;
                                     prefetch_kick_buffer <= compute_buffer_r;
@@ -2187,7 +2363,8 @@ module ai_tensor_matrix_core #(
                             prefetch_consume <= 1'b1;
                             prefetch_consume_buffer <= ~compute_buffer_r;
                             read_group_r <= 3'd0;
-                            if (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r}) begin
+                            if (!stage_mode &&
+                                (({16'd0,k_group_r} + 32'd2) < {16'd0,k_words_r})) begin
                                 prefetch_kick <= 1'b1;
                                 prefetch_kick_k_group <= k_group_r + 2'd2;
                                 prefetch_kick_buffer <= compute_buffer_r;
